@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Pre-code — all decisions locked, implementation not started.**
 
-Next action: Provision MongoDB Atlas cluster + configure MCP server.  
+Next action: Scaffold the 8-step agent loop in ADK.  
+Update this line before ending each session — it is the single source of truth for session orientation.  
 Deadline: June 11, 2026 @ 2:00 PM PDT.
 
 ---
@@ -33,7 +34,7 @@ Deadline: June 11, 2026 @ 2:00 PM PDT.
 ```text
 project-root/
 ├── CLAUDE.md                    ← this file — index only
-├── tracking.md                  ← decision log + next actions
+├── tracking.md                  ← decision log
 ├── docs/specs/
 │   ├── 00-overview.md          ← vision, origin, positioning, demo narrative
 │   ├── 01-requirements.md      ← functional spec, 8-step workflow, MVP scope
