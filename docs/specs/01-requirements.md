@@ -138,30 +138,55 @@ Operator uploads a batch of event photos. Agent receives:
 Agent stores event record and bulk-inserts all images into MongoDB with `status: "ingested"`.
 
 ### Step 2 — Event Context Understanding
-Agent retrieves the event record and queries historical events of the same outcome type. It aggregates past commercial performance for similar events to establish a baseline expectation.
+Agent retrieves the event record, aggregates historical conversion performance for events of the same outcome type, and looks up squad members for both teams from the `player_context` collection.
 
-Reasoning output: expected engagement profile, attention spike duration, likely product demand profile.
+The LLM produces a structured **event narrative** — not prose, but a typed output carried into Step 5:
+
+- **Narrative angle:** the story the event tells ("upset victory," "extra-time drama," "defending champions eliminated")
+- **Key figures:** players with grounded biographical facts retrieved from `player_context` — not inferred by the LLM
+- **Commercial timing:** aggressiveness of the routing window given `timeliness` and outcome type
+- **Historical baseline:** which product types performed best for this outcome type in past events
+
+Player context is retrieved here — once per event batch — not in Step 5 where it would repeat once per asset. This output is not consumed by routing (Steps 3–4 are mechanical). Its downstream consumer is Step 5 copy generation. It is what makes campaign headlines specific and factually grounded rather than generic or hallucinated.
 
 ### Step 3 — Similarity-Grounded Routing
 Agent embeds each candidate image using `gemini-embedding-2` (3072 dimensions) and runs vector search against the `assets` collection to find visually/semantically similar past assets with known per-channel performance data.
 
-This is the **primary load-bearing MCP step**: the engine is per-channel image similarity to past performers. Images similar to past poster winners are candidates for poster routing; images similar to past social winners are candidates for social_only routing. Removing MongoDB removes this signal — routing degrades to pure LLM inference with no historical grounding.
+This is the **primary load-bearing MCP step**: the engine is per-channel image similarity to past performers. Every image in the batch is embedded and similarity-scored. Results carry `product_route` from past assets, so channel routing is implied by majority-channel of nearest neighbors.
+
+The top-K by similarity score form the **exploitation queue**. The remainder — images whose similarity score fell below the exploitation cutoff — form the candidate pool from which the 10% random **discovery queue** is drawn. Removing MongoDB removes this signal — routing degrades to pure LLM inference with no historical grounding.
 
 ### Step 4 — Operational Prioritization
-Agent scores each asset across five image-level dimensions using Gemini Vision (see `00-overview.md` for definitions):
-- `quality_score`, `emotional_score`, `social_score`, `merch_score`, `identity_score`
+Gemini Vision scores every image across five dimensions. These split into two distinct types:
+
+**Technical fitness** (near-objective, observable properties):
+- `quality_score` — sharpness, exposure, resolution, printability
+- `merch_score` — silhouette clarity, graphic potential, poster framing
+
+**Commercial signal** (interpretive assessment of observable qualities that correlate with commercial outcomes):
+- `emotional_score` — moment intensity, peak human drama visible in the frame
+- `social_score` — scroll-stop probability at thumbnail scale
+- `identity_score` — fan belonging signal, team colors, player recognizability
 
 Event-level `timeliness` is read from the `events` document (computed at ingestion — not scored per image).
 
-Agent groups top assets by product route using composite scores:
-- **Poster candidate** — top-K by `merch_score` + `quality_score` weighted against event `timeliness`
-- **T-shirt candidate** — top-K by `identity_score` + `quality_score` weighted against event `timeliness`
-- **Social-only candidate** — top-K by `social_score` + `emotional_score`, where `merch_score` is below poster threshold
+Step 4 serves different purposes for the two queues:
+
+**Exploitation queue (top-K by similarity):**
+Channel routing is largely implied by similarity results — past assets carry `product_route`, so majority channel of nearest neighbors indicates the route. Step 4 adds a **quality gate**: technical fitness dimensions (`quality_score`, `merch_score`) catch images that are compositionally similar to past winners but technically unfit for production (motion blur, low resolution, cluttered background). Within a channel, all five dimensional scores provide ranking refinement weighted against event `timeliness`.
+
+**Discovery queue (random sample from low-similarity remainder):**
+No per-channel similarity signal is available. Step 4 provides the **sole routing suggestion** using both dimension types: technical fitness confirms the frame is viable; commercial signal dimensions indicate whether the image has qualities worth surfacing despite low similarity. The combination is what makes the discovery candidate legible to the human — *"This image didn't match past winners, but it's sharp and emotionally intense — poster potential, your call."*
 
 ### Step 5 — Campaign Draft Creation
-For each top asset, agent generates:
-- Campaign draft: product specs, generated copy, platform target, timing recommendation
-- Pushes all drafts into the approval queue with `status: "pending"`
+For each top asset, agent generates a campaign draft using the **event narrative from Step 2** as copy substrate:
+
+- Headline and caption grounded in the specific event narrative angle — not generic copy
+- Product specs and platform target derived from `product_route`
+- Timing recommendation based on event `timeliness`
+- Pushes all drafts to the approval queue with `status: "pending"`
+
+The Step 2 narrative is what differentiates *"Argentina beats France — World Cup 2026 poster"* from *"Messi ends France's reign in extra-time thriller — limited edition print."*
 
 ### Step 6 — Human-in-the-Loop Review
 Human operator reviews the approval queue. For each item:

@@ -59,6 +59,7 @@ One document per image. Central state document — updated at every step.
   "content_url": "gs://bucket/images/img_0042.jpg",
   "status": "ingested | scored | campaign_draft_created | executing | published | rejected",
   "product_route": "poster | tshirt | social_only | null",
+  "queue_type": "exploitation | discovery | null",
   "embedding": [/* 3072-dim vector */],
   "scores": {
     "quality_score": 0.88,
@@ -166,6 +167,30 @@ Post-execution engagement and conversion data. Written at Step 8. Feeds vector s
 Metrics represent cumulative totals over a rolling 7-day window from `published_at` (stored as `window_days: 7`).
 Channel population follows `product_route`: poster/tshirt assets populate `shopify` + `printful`; social_only assets populate `social` only.
 
+### `player_context`
+Static reference corpus. Seeded at onboarding; read at Step 2 to ground the event narrative.
+
+```json
+{
+  "player_id": "uuid",
+  "name": "Lionel Messi",
+  "nationality": "Argentina",
+  "team": "Argentina",
+  "position": "Forward",
+  "notable_facts": [
+    "5th World Cup appearance",
+    "2022 World Cup winner",
+    "All-time leading scorer in World Cup finals"
+  ],
+  "career_milestones": "Widely regarded as final World Cup; 2022 champion",
+  "commercial_signal": "high"
+}
+```
+
+`commercial_signal` — editorial pre-rating of how much a player's presence lifts the commercial value of an image: `high | medium | low`. Set at seed time; not computed by the agent.
+
+Lookup is by team name match against `events.home_team` / `events.away_team` — plain find, no vector search. Returns all players for both squads; LLM selects the narratively significant ones.
+
 ---
 
 ## Full MongoDB MCP Call List
@@ -181,7 +206,9 @@ assets.insertMany         → bulk-insert all images, status: "ingested"
 events.findOne            → retrieve this event's record
 events.find               → find past events with same outcome_type
 performance.aggregate     → aggregate historical conversion stats for this event type
+player_context.find       → retrieve squad members for both teams (plain name match, no vector search)
 ```
+LLM output: structured event narrative (narrative angle, key figures with grounded facts, commercial timing, historical baseline) — stored in agent state, consumed by Step 5 copy generation. Player context is retrieved here, not in Step 5 — retrieval happens once per event batch, not once per asset.
 
 ### Step 3 — Similarity-Grounded Routing ← primary load-bearing step
 ```
@@ -192,9 +219,9 @@ Removing this call removes the per-channel similarity signal — routing degrade
 
 ### Step 4 — Operational Prioritization
 ```
-assets.updateMany         → write score fields to each asset document
-assets.aggregate          → group top assets by product_route
-assets.updateMany         → set status: "scored", assign product_route
+assets.updateMany         → write Gemini Vision score fields to each asset document
+assets.aggregate          → group exploitation queue by implied product_route; score discovery queue by dimensional fit
+assets.updateMany         → set status: "scored", assign product_route and queue_type ("exploitation" | "discovery")
 ```
 
 ### Step 5 — Campaign Draft Creation
