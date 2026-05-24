@@ -128,6 +128,51 @@ Unlike traditional AI media tools, this system:
 
 ---
 
+## Real-World Deployment Story
+
+### The cold-start answer
+
+A common question: *where does the historical data come from on day one?*
+
+A real customer — a World Cup media team, a sports rights holder, a creator-commerce operator — already has it. Every past tournament produced thousands of images that were commercially deployed. They know which assets became posters, which social posts drove merch sales, which photos underperformed. That data lives in their existing digital asset management system and sales analytics.
+
+Onboarding looks like this:
+1. Ingest historical images → generate embeddings via `gemini-embedding-2`
+2. Pull past sales and engagement records → load into the `performance` collection
+3. That corpus becomes the grounding layer the agent reasons from on day one of the next event
+
+The seed data is not a workaround. It is the onboarding story.
+
+### The data flywheel
+
+The system compounds across events:
+
+- **Match 1:** Agent reasons from historical archive (WC2022, WC2018, etc.)
+- **Match 1 completes:** Outcomes — what sold, what converted, what was skipped — feed back into `performance`
+- **Match 2:** Vector search is better-grounded than Match 1, now informed by same-tournament patterns
+- **Knockout rounds:** Agent is reasoning from tournament-specific signals, not just historical priors
+
+MongoDB is not just a runtime store. It is the persistent commercial memory that compounds in value across every event the system processes. This is why the MCP integration is load-bearing: remove it and the system loses its ability to learn.
+
+### The demo framing
+
+The hackathon demo uses 40 real licensed sports images (Wikimedia Commons) with synthetic but plausible conversion data. This is a compressed version of what a real customer would bring at onboarding.
+
+The honest framing for judges: *"A real customer would connect their archive. We seeded with historical-style data to show the system operating as it would on day two of a real deployment — not day one, when the corpus is empty, and not day one hundred, when the patterns are fully established."*
+
+This framing is more credible than claiming cold-start perfection. It also sets up the flywheel story naturally: the value of the system grows with every event it processes.
+
+### Who buys this
+
+- **Sports media teams** — post-match workflow automation; compress the commercial window from hours to minutes
+- **Event photographers** managing commercial rights — triage and route at scale without a dedicated ops team
+- **Creator-commerce operators** running merch drops — systematic prioritization instead of gut-feel selection
+- **Merchandising startups** on event cycles — compete with larger teams by automating the operational layer
+
+The common thread: they all face the same attention half-life problem, and they are all currently losing commercial value to manual process speed.
+
+---
+
 ## Key Risks
 
 - **Scope creep:** Supporting multiple event types, social platforms, or ecommerce systems will collapse the timeline. MVP scope is hard-limited — see `01-requirements.md`.
