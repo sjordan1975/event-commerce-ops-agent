@@ -101,13 +101,18 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 
 ### Type Safety and Models
 - Type hints on all function signatures (parameters + return types)
-- Pydantic models for all MongoDB document shapes — live in `src/models/`
+- Pydantic models for all MongoDB document shapes — live in `src/models.py`
 - Validate at system boundaries (Shopify response, Printful response, MongoDB reads) — trust internal ADK/Pydantic guarantees elsewhere
 
 ### ADK-Specific Rules
 - `LongRunningFunctionTool` is required for all HITL steps — do not use plain `FunctionTool` for Step 6
 - Model configured via `GEMINI_MODEL` env var (default: `gemini-2.5-flash-lite`) — never hardcode
 - The OTel `ValueError: Token was created in a different Context` warning on generator exit is cosmetic — do not attempt to fix it
+
+### Prompts
+- All LLM prompts live in `prompts/` as versioned subdirectories (e.g. `prompts/v1/`) — do not inline prompts in agent logic
+- A prompt loader utility (`src/prompt_loader.py`) handles file I/O and version selection — agent logic calls the loader, never reads prompt files directly
+- Active prompt version set via `PROMPT_VERSION` env var (e.g. `PROMPT_VERSION=v1`)
 
 ### Code Style
 - Docstrings on public interfaces only — one line max; no multi-paragraph docstrings
