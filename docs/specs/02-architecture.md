@@ -122,15 +122,26 @@ Post-execution engagement and conversion data. Written at Step 8. Feeds vector s
   "campaign_id": "uuid",
   "event_id": "wc2026-match-42",
   "metrics": {
-    "shopify_views": 0,
-    "shopify_conversions": 0,
-    "social_impressions": 0,
-    "social_saves": 0,
-    "revenue_usd": 0.00
+    "shopify": {
+      "views": 0,
+      "orders": 0,
+      "revenue_usd": 0.00
+    },
+    "printful": {
+      "units_fulfilled": 0
+    },
+    "social": {
+      "impressions": 0,
+      "saves": 0
+    }
   },
+  "window_days": 7,
   "recorded_at": "..."
 }
 ```
+
+Metrics represent cumulative totals over a rolling 7-day window from `published_at` (stored as `window_days: 7`).
+Channel population follows `product_route`: poster/tshirt assets populate `shopify` + `printful`; social_only assets populate `social` only.
 
 ---
 

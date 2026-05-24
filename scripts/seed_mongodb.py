@@ -413,19 +413,39 @@ def generate_performance(
     asset_id: str,
     campaign_id: str,
     event_id: str,
+    product_route: str | None,
     scores: dict,
     rng: random.Random,
 ) -> dict:
-    """Generate synthetic performance metrics correlated to asset scores."""
+    """Generate channel-split performance metrics correlated to asset scores and route.
+
+    poster/tshirt → shopify + printful metrics
+    social_only   → social metrics only
+    null          → all zeros
+    Window: rolling 7 days from published_at (per MVP assumptions).
+    """
+    noise = rng.uniform(0.7, 1.3)
     merch_factor = (scores["merch_score"] + scores["quality_score"]) / 2
     social_factor = (scores["social_score"] + scores["emotional_score"]) / 2
-    noise = rng.uniform(0.7, 1.3)
 
-    shopify_conversions = max(1, int(merch_factor * 14 * noise))
-    revenue_usd = round(shopify_conversions * rng.uniform(18.0, 42.0), 2)
-    shopify_views = shopify_conversions * int(rng.uniform(8, 22))
-    social_impressions = int(social_factor * 8000 * noise)
-    social_saves = int(social_impressions * rng.uniform(0.02, 0.06))
+    shopify: dict = {"views": 0, "orders": 0, "revenue_usd": 0.00}
+    printful: dict = {"units_fulfilled": 0}
+    social: dict = {"impressions": 0, "saves": 0}
+
+    if product_route in ("poster", "tshirt"):
+        orders = max(1, int(merch_factor * 14 * noise))
+        shopify = {
+            "views": orders * int(rng.uniform(8, 22)),
+            "orders": orders,
+            "revenue_usd": round(orders * rng.uniform(18.0, 42.0), 2),
+        }
+        printful = {"units_fulfilled": max(0, orders - int(rng.uniform(0, 2)))}
+    elif product_route == "social_only":
+        impressions = int(social_factor * 8000 * noise)
+        social = {
+            "impressions": impressions,
+            "saves": int(impressions * rng.uniform(0.02, 0.06)),
+        }
 
     return {
         "performance_id": str(uuid.uuid4()),
@@ -433,12 +453,11 @@ def generate_performance(
         "campaign_id": campaign_id,
         "event_id": event_id,
         "metrics": {
-            "shopify_views": shopify_views,
-            "shopify_conversions": shopify_conversions,
-            "social_impressions": social_impressions,
-            "social_saves": social_saves,
-            "revenue_usd": revenue_usd,
+            "shopify": shopify,
+            "printful": printful,
+            "social": social,
         },
+        "window_days": 7,
         "recorded_at": "2023-06-01T10:00:00Z",
     }
 
@@ -506,7 +525,7 @@ def main() -> None:
         })
 
         performance_docs.append(
-            generate_performance(asset_id, campaign_id, image["event_id"], scores, rng)
+            generate_performance(asset_id, campaign_id, image["event_id"], product_route, scores, rng)
         )
 
     db.performance.insert_many(performance_docs)
