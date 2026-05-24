@@ -79,9 +79,11 @@ Do not violate these without explicit user decision. Full rationale in `docs/spe
 
 ## Decision Log
 
-See `tracking.md` for all architectural decisions (D-000 through D-010) with full rationale.
+See `tracking.md` for all architectural decisions (D-000 through D-017) with full rationale.
 
-Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007).
+Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007), logistics reframe (D-014), two-queue exploration/exploitation (D-015), Step 2 event narrative + `player_context` RAG (D-016), Step 4 dual-job (D-017).
+
+**Every commit that changes `docs/specs/` must add or update a D-entry in `tracking.md`.**
 
 ---
 
