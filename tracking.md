@@ -221,7 +221,8 @@ All resolved. See decision log D-005 through D-010.
 - [x] Design the 5 collection schemas (events, assets, campaigns, approvals, performance) — see 02-architecture.md
 - [x] Provision MongoDB Atlas cluster + configure MCP server
 - [x] Create `event_commerce` database with 5 collections and 11 indexes (including vector search on `assets.embedding`)
-- [ ] Seed `performance` collection with synthetic historical campaign data for vector search to work on day one
+- [x] Seed `performance` collection with synthetic historical campaign data for vector search to work on day one
+- [x] Create `scripts/seed_mongodb.py` — 4 events (one per outcome_type), 40 assets with real gemini-embedding-2 embeddings, 40 performance records (tested + idempotent)
 - [ ] Scaffold the 8-step agent loop in chosen runtime
 - [ ] Wire first end-to-end path: ingest → score → approval queue (no execution yet)
 - [ ] Add execution layer: Shopify draft creation
