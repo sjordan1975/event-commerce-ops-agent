@@ -171,7 +171,7 @@
 
 **Reasoning:**
 - Printful: free account, mockup generator API documented, REST-based
-- Mockup API is async: `POST /mockups` to create task → `GET /mockups/{task_id}` to poll — fits cleanly into a LangGraph node
+- Mockup API is async: `POST /mockups` to create task → `GET /mockups/{task_id}` to poll — fits cleanly into an ADK retry loop via `LongRunningFunctionTool`
 - Printify personal token is fast but OAuth registration (needed for proper app integration) takes ~1 week — too slow for this timeline
 
 ---
@@ -217,9 +217,9 @@ All resolved. See decision log D-005 through D-010.
 
 ## Next Actions
 
-- [x] Choose agent runtime — **LangChain + LangGraph + Cloud Run** (D-005)
+- [x] Choose agent runtime — **Google ADK v2.1 + Cloud Run** (D-005, confirmed by D-011)
+- [x] Design the 5 collection schemas (events, assets, campaigns, approvals, performance) — see 02-architecture.md
 - [ ] Provision MongoDB Atlas cluster + configure MCP server
-- [ ] Design the 5 collection schemas (events, assets, campaigns, approvals, performance)
 - [ ] Seed `performance` collection with synthetic historical campaign data for vector search to work on day one
 - [ ] Scaffold the 8-step agent loop in chosen runtime
 - [ ] Wire first end-to-end path: ingest → score → approval queue (no execution yet)
@@ -237,13 +237,10 @@ All resolved. See decision log D-005 through D-010.
 | File | Role | Status |
 |------|------|--------|
 | `rapid_agent_hackathon_spec.md` | Hackathon rules, partner details, judging criteria | Reference — do not modify |
-| `Project Concept.md` | Original concept and demo flow | Superseded by docs/specs/ |
-| `Real-Time Event Commerce Operations Agent (MCP-Orchestrated).md` | Executive summary, problem statement | Superseded by docs/specs/ |
-| `operational orchestration infrastructure.md` | Partner analysis (concluded Elastic) | Superseded by D-001 |
-| `aesthetic optimization.md` | Key reframe: commercial intent vs. aesthetics | Superseded by docs/specs/ |
-| `"Autonomous fan-content monetization and distribution pipeline.".md` | Earliest concept iteration | Historical only |
 | `CLAUDE.md` | **Index — see docs/specs/ for spec files** | Current |
 | `docs/specs/00-overview.md` | **Vision, origin, positioning, demo narrative** | Current |
 | `docs/specs/01-requirements.md` | **Functional spec, 8-step workflow, MVP scope** | Current |
 | `docs/specs/02-architecture.md` | **System design, schemas, MCP call list** | Current |
 | `tracking.md` | **This file — decision log and task tracker** | Current |
+
+Deprecated planning docs moved to `deprecated/` (gitignored): `Project Concept.md`, `Real-Time Event Commerce Operations Agent (MCP-Orchestrated).md`, `operational orchestration infrastructure.md`, `aesthetic optimization.md`, `"Autonomous fan-content monetization and distribution pipeline.".md`
