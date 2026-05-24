@@ -219,7 +219,8 @@ All resolved. See decision log D-005 through D-010.
 
 - [x] Choose agent runtime — **Google ADK v2.1 + Cloud Run** (D-005, confirmed by D-011)
 - [x] Design the 5 collection schemas (events, assets, campaigns, approvals, performance) — see 02-architecture.md
-- [ ] Provision MongoDB Atlas cluster + configure MCP server
+- [x] Provision MongoDB Atlas cluster + configure MCP server
+- [x] Create `event_commerce` database with 5 collections and 11 indexes (including vector search on `assets.embedding`)
 - [ ] Seed `performance` collection with synthetic historical campaign data for vector search to work on day one
 - [ ] Scaffold the 8-step agent loop in chosen runtime
 - [ ] Wire first end-to-end path: ingest → score → approval queue (no execution yet)
