@@ -54,13 +54,15 @@ Agent embeds each candidate image using `gemini-embedding-2` (3072 dimensions) a
 This is the **primary load-bearing MCP step**: scoring is grounded in historical performance data, not pure LLM inference. Removing MongoDB here breaks the agent's ability to reason from evidence.
 
 ### Step 4 — Operational Prioritization
-Agent scores each asset across five dimensions (see `00-overview.md` for score definitions):
-- `emotional_score`, `merch_score`, `social_score`, `identity_score`, `timeliness_score`
+Agent scores each asset across five image-level dimensions using Gemini Vision (see `00-overview.md` for definitions):
+- `quality_score`, `emotional_score`, `social_score`, `merch_score`, `identity_score`
 
-Agent groups top assets by product route:
-- **Poster candidate** — high `merch_score`, strong silhouette, graphic potential
-- **T-shirt candidate** — high `identity_score`, wearable framing
-- **Social-only candidate** — high `social_score`, high `emotional_score`, poor merch framing
+Event-level `timeliness` is read from the `events` document (computed at ingestion — not scored per image).
+
+Agent groups top assets by product route using composite scores:
+- **Poster candidate** — top-K by `merch_score` + `quality_score` weighted against event `timeliness`
+- **T-shirt candidate** — top-K by `identity_score` + `quality_score` weighted against event `timeliness`
+- **Social-only candidate** — top-K by `social_score` + `emotional_score`, where `merch_score` is below poster threshold
 
 ### Step 5 — Campaign Draft Creation
 For each top asset, agent generates:

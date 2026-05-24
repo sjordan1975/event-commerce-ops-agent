@@ -100,6 +100,36 @@
 
 ---
 
+### D-013 — Scoring Dimension Redesign
+**Date:** 2026-05-23
+**Decision:** Restructure the 5 asset scoring dimensions; move timeliness to event level.
+
+**Changes from original design:**
+
+| Original | New | Change |
+|---|---|---|
+| `quality_score` | `quality_score` | **Added** — technical fitness gate (sharpness, exposure, printability) |
+| `emotional_score` | `emotional_score` | Kept; rubric sharpened: intrinsic moment intensity in the frame |
+| `social_score` | `social_score` | Kept; rubric sharpened: scroll-stopping visual properties at thumbnail scale |
+| `merch_score` | `merch_score` | Kept; subject suitability for physical product |
+| `identity_score` | `identity_score` | Kept; team/player recognition clarity |
+| `timeliness_score` (asset) | `timeliness` (event) | **Moved** to `events` document; computed deterministically, not via Gemini Vision |
+
+**Rationale:**
+- `timeliness_score` on assets was category confusion — it's an event property, not an image property; every image from an `upset_victory` gets the same value; computing it via LLM per image is wasteful and noisy
+- `quality_score` added because merch routing requires technical fitness — a blurry iconic image is unprintable regardless of subject matter
+- `emotional_score` and `social_score` kept separate: emotional = moment intensity (intrinsic drama); social = thumb-stopping visual properties at thumbnail scale — these diverge meaningfully for soccer photography (e.g. intimate consolation shot vs. bold action shot)
+
+**Metrics defined:**
+- p95 latency (per-asset scoring pipeline)
+- Score stability: variance < 0.1 across 5 runs at temp=0 (prerequisite for threshold-setting)
+- Precision via human approval rate (live signal from Step 6 gate)
+- Recall: acknowledged gap; requires ground-truth review of rejected pool — post-MVP
+
+**Thresholds:** Not set pre-code. Routing rule structure defined (top-K composite per route); weights tuned after first run against Wikimedia seed batch.
+
+---
+
 ### D-012 — MongoDB Schema Field Naming: Schema.org Alignment
 **Date:** 2026-05-23
 **Decision:** Align `events` and `assets` collection field names with Schema.org where a standard equivalent exists; define freely elsewhere.

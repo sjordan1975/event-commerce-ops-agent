@@ -33,11 +33,21 @@ One document per live event. Written at Step 1, read at Step 2.
   "start_date": "2026-07-14T19:00:00Z",
   "final_score": "Argentina 3–2 France",
   "outcome_type": "upset_victory",
+  "timeliness": 0.95,
   "ingested_at": "2026-07-14T21:15:00Z"
 }
 ```
 
 `outcome_type` enum: `upset_victory`, `expected_win`, `draw`, `extra_time_win`
+
+`timeliness` — computed once at ingestion; not scored per image by Gemini. Formula: `base_score × 0.5^(hours_since_kickoff / 4)`.
+
+| `outcome_type` | base score |
+|---|---|
+| `upset_victory` | 0.95 |
+| `extra_time_win` | 0.85 |
+| `expected_win` | 0.60 |
+| `draw` | 0.40 |
 
 ### `assets`
 One document per image. Central state document — updated at every step.
@@ -51,11 +61,11 @@ One document per image. Central state document — updated at every step.
   "product_route": "poster | tshirt | social_only | null",
   "embedding": [/* 3072-dim vector */],
   "scores": {
+    "quality_score": 0.88,
     "emotional_score": 0.87,
-    "merch_score": 0.72,
     "social_score": 0.91,
-    "identity_score": 0.68,
-    "timeliness_score": 0.95
+    "merch_score": 0.72,
+    "identity_score": 0.68
   },
   "similar_assets": ["asset_id_1", "asset_id_2"],
   "campaign_id": "uuid | null",

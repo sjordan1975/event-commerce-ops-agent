@@ -76,17 +76,21 @@ The demo should feel operational, not analytical. Judges should see:
 
 The agent does not pick one "best image." It scores assets across five dimensions:
 
+Five dimensions are scored per image by Gemini Vision:
+
 | Score | What it measures |
 |-------|-----------------|
-| `emotional_score` | Strength of fan emotional response — celebration, grief, identity |
+| `quality_score` | Technical fitness — sharpness, exposure, resolution, printability |
+| `emotional_score` | Intrinsic moment intensity — peak human drama visible in the frame |
+| `social_score` | Scroll-stopping probability — visual impact at thumbnail scale without context |
 | `merch_score` | Suitability for physical products: silhouette clarity, graphic potential, poster framing |
-| `social_score` | Shareability, caption potential, platform engagement likelihood |
-| `identity_score` | Fan belonging signal — likelihood fans want to wear or display it |
-| `timeliness_score` | Decay risk — how fast commercial value erodes if not deployed |
+| `identity_score` | Fan belonging signal — team colors, player number/face clearly recognizable |
+
+`timeliness` is an event-level field, not scored per image. It is computed once at ingestion from `outcome_type` and hours since kickoff, and read from the `events` document during routing.
 
 An asset may score high on `social_score` and low on `merch_score`. Routing follows the score profile, not a single ranking.
 
-A blurry but iconic winning goal celebration beats a technically perfect midfield shot — because it scores high on `emotional_score`, `identity_score`, and `timeliness_score`.
+An iconic goal celebration in sharp focus beats a technically perfect midfield shot — because it scores high on `emotional_score`, `identity_score`, and the event's `timeliness`.
 
 ---
 
