@@ -26,11 +26,12 @@ One document per live event. Written at Step 1, read at Step 2.
 ```json
 {
   "event_id": "wc2026-match-42",
-  "match": "Argentina vs France",
-  "teams": ["Argentina", "France"],
-  "venue": "MetLife Stadium",
-  "kickoff_utc": "2026-07-14T19:00:00Z",
-  "result": "Argentina 3–2 France",
+  "name": "Argentina vs France",
+  "home_team": "Argentina",
+  "away_team": "France",
+  "location": "MetLife Stadium",
+  "start_date": "2026-07-14T19:00:00Z",
+  "final_score": "Argentina 3–2 France",
   "outcome_type": "upset_victory",
   "ingested_at": "2026-07-14T21:15:00Z"
 }
@@ -45,7 +46,7 @@ One document per image. Central state document — updated at every step.
 {
   "asset_id": "uuid",
   "event_id": "wc2026-match-42",
-  "file_path": "gs://bucket/images/img_0042.jpg",
+  "content_url": "gs://bucket/images/img_0042.jpg",
   "status": "ingested | scored | campaign_draft_created | executing | published | rejected",
   "product_route": "poster | tshirt | social_only | null",
   "embedding": [/* 3072-dim vector */],
@@ -59,7 +60,7 @@ One document per image. Central state document — updated at every step.
   "similar_assets": ["asset_id_1", "asset_id_2"],
   "campaign_id": "uuid | null",
   "published_urls": {},
-  "ingested_at": "...",
+  "upload_date": "...",
   "scored_at": "...",
   "published_at": "..."
 }

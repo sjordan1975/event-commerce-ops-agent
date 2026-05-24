@@ -100,6 +100,28 @@
 
 ---
 
+### D-012 — MongoDB Schema Field Naming: Schema.org Alignment
+**Date:** 2026-05-23
+**Decision:** Align `events` and `assets` collection field names with Schema.org where a standard equivalent exists; define freely elsewhere.
+
+**Field renames applied:**
+
+| Collection | Old field | New field | Schema.org source |
+|---|---|---|---|
+| `events` | `match` | `name` | `Event.name` |
+| `events` | `teams[]` | `home_team`, `away_team` | `SportsEvent.homeTeam/awayTeam` |
+| `events` | `venue` | `location` | `Event.location` |
+| `events` | `kickoff_utc` | `start_date` | `Event.startDate` |
+| `events` | `result` | `final_score` | (custom — no Schema.org equivalent; rename for clarity) |
+| `assets` | `file_path` | `content_url` | `ImageObject.contentUrl` |
+| `assets` | `ingested_at` | `upload_date` | `ImageObject.uploadDate` |
+
+**Ruled out:** Schema.org adoption for `campaigns`, `approvals`, `performance` — no useful standard exists for those models.
+
+**Convention:** Field names use snake_case throughout (Pythonic/MongoDB convention); Schema.org alignment is by concept, not literal camelCase.
+
+---
+
 ### D-010 — Demo Assets: Wikimedia Commons
 **Date:** 2026-05-23  
 **Decision:** Source 20–50 freely licensed soccer/sports photos from Wikimedia Commons  
