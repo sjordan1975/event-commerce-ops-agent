@@ -199,7 +199,7 @@ assets.aggregate          → find assets similar to best performers (informs fu
   1. `GET /products/variant/{id}/printfiles` — get print file specs for variant
   2. `POST /mockups` — submit image + variant → returns `task_id`
   3. `GET /mockups/{task_id}` — poll until `status: "completed"`; returns mockup URLs
-- **LangGraph note:** Mockup polling maps to a LangGraph node with a retry loop
+- **ADK note:** Mockup polling maps to an ADK retry loop via `LongRunningFunctionTool`
 
 ### Social (Simulated)
 - No live API. Agent writes a complete post package to MongoDB:

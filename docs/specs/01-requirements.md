@@ -6,7 +6,7 @@
 |-------------|--------------|
 | LLM | Gemini (any version via Agent Platform) — required |
 | Partner MCP | MongoDB Atlas MCP — must be load-bearing, not cosmetic |
-| Build environment | LangChain + LangGraph (code-only path, explicitly listed in spec as valid Agent Runtime) |
+| Build environment | Google ADK v2.1 (code-only path, explicitly listed in spec as valid Agent Runtime) |
 | Hosting | Cloud Run |
 | Deliverables | Hosted project URL, public OSS repo with OSS license, ~3 min demo video, Devpost submission |
 | Submission | Devpost form, MongoDB partner track selected |
@@ -106,7 +106,7 @@ Total demo target: under 3 minutes. The story is operational velocity, not AI cl
 
 | Criterion | How we address it |
 |-----------|------------------|
-| Technological Implementation | MongoDB MCP load-bearing across all 8 steps; Gemini for reasoning and embeddings; LangGraph for stateful orchestration |
+| Technological Implementation | MongoDB MCP load-bearing across all 8 steps; Gemini for reasoning and embeddings; Google ADK v2.1 for stateful orchestration |
 | Design | Clean approval UI; operational dashboard showing workflow state; score profiles visible |
 | Potential Impact | Real economic problem — sports commerce monetization windows; scales to any live event |
 | Quality of the Idea | Commercial operations framing differentiates from commodity content tools; grounded scoring via vector search |
