@@ -94,6 +94,234 @@ SEED_EVENTS = [
 ]
 
 # ---------------------------------------------------------------------------
+# Seed players — key squad members for each team in seed events
+# Teams covered: Argentina, France, Germany, Korea Republic, Spain, Portugal
+# commercial_signal: editorial pre-rating, not computed by agent
+# ---------------------------------------------------------------------------
+
+SEED_PLAYERS = [
+    # Argentina
+    {
+        "name": "Lionel Messi",
+        "nationality": "Argentina",
+        "team": "Argentina",
+        "position": "Forward",
+        "notable_facts": [
+            "2022 World Cup winner and Golden Ball winner",
+            "All-time leading scorer in World Cup finals history",
+            "Scored twice and converted a penalty in the 2022 WC Final vs France",
+            "5th World Cup appearance in 2022",
+        ],
+        "career_milestones": "2022 World Cup winner; 8× Ballon d'Or; all-time Argentina top scorer",
+        "commercial_signal": "high",
+    },
+    {
+        "name": "Julián Álvarez",
+        "nationality": "Argentina",
+        "team": "Argentina",
+        "position": "Forward",
+        "notable_facts": [
+            "Scored 4 goals at the 2022 World Cup including two in the semifinal vs Croatia",
+            "Won the 2022 World Cup as a 22-year-old",
+            "Formed tournament-winning strike partnership with Messi",
+        ],
+        "career_milestones": "2022 World Cup winner; 2022 UEFA Champions League winner with Manchester City",
+        "commercial_signal": "medium",
+    },
+    {
+        "name": "Ángel Di María",
+        "nationality": "Argentina",
+        "team": "Argentina",
+        "position": "Winger",
+        "notable_facts": [
+            "Scored the extra-time winner in the 2014 World Cup Final vs Germany",
+            "Scored in the 2022 World Cup Final — his final international match",
+            "Won Copa América 2021 and World Cup 2022 to complete international trophy set",
+        ],
+        "career_milestones": "2014 WC Final match-winner; 2022 WC winner; retired from international football after 2022 WC Final",
+        "commercial_signal": "medium",
+    },
+    {
+        "name": "Emiliano Martínez",
+        "nationality": "Argentina",
+        "team": "Argentina",
+        "position": "Goalkeeper",
+        "notable_facts": [
+            "Won Golden Glove at the 2022 World Cup",
+            "Saved three penalties in the 2022 WC Final shootout vs France",
+            "Key figure in Argentina's penalty shootout victories throughout the 2022 tournament",
+        ],
+        "career_milestones": "2022 World Cup winner and Golden Glove; Copa América 2021 winner",
+        "commercial_signal": "medium",
+    },
+    # France
+    {
+        "name": "Kylian Mbappé",
+        "nationality": "France",
+        "team": "France",
+        "position": "Forward",
+        "notable_facts": [
+            "Scored a hat-trick in the 2022 World Cup Final, including two goals in 97 seconds",
+            "Won the 2022 World Cup Golden Boot with 8 goals",
+            "Won the 2018 World Cup aged 19",
+            "Only second player after Pelé to score in a World Cup Final as a teenager",
+        ],
+        "career_milestones": "2018 and 2022 World Cup finalist; 2022 WC Golden Boot; youngest French WC scorer",
+        "commercial_signal": "high",
+    },
+    {
+        "name": "Antoine Griezmann",
+        "nationality": "France",
+        "team": "France",
+        "position": "Forward",
+        "notable_facts": [
+            "Won the 2018 World Cup with France",
+            "Scored in the 2018 World Cup Final vs Croatia",
+            "Won the Golden Boot at Euro 2016",
+        ],
+        "career_milestones": "2018 World Cup winner; France all-time top scorer",
+        "commercial_signal": "medium",
+    },
+    {
+        "name": "Olivier Giroud",
+        "nationality": "France",
+        "team": "France",
+        "position": "Forward",
+        "notable_facts": [
+            "Became France's all-time leading scorer in 2022",
+            "Won the 2018 World Cup with France",
+            "Scored 4 goals at the 2022 World Cup",
+        ],
+        "career_milestones": "2018 World Cup winner; France all-time record goalscorer (57 goals)",
+        "commercial_signal": "medium",
+    },
+    # Germany
+    {
+        "name": "Mario Götze",
+        "nationality": "Germany",
+        "team": "Germany",
+        "position": "Attacking Midfielder",
+        "notable_facts": [
+            "Scored the winning goal in extra time of the 2014 World Cup Final vs Argentina",
+            "Entered the 2014 WC Final as a substitute and scored with a volley in the 113th minute",
+            "Was 22 years old when he won the World Cup",
+        ],
+        "career_milestones": "2014 World Cup winner and Final match-winner",
+        "commercial_signal": "medium",
+    },
+    {
+        "name": "Thomas Müller",
+        "nationality": "Germany",
+        "team": "Germany",
+        "position": "Forward",
+        "notable_facts": [
+            "Won the 2014 World Cup with Germany",
+            "Won the Golden Boot at the 2010 World Cup with 5 goals",
+            "Part of the Germany squad that beat Brazil 7-1 in the 2014 WC semifinal",
+            "One of the most prolific World Cup scorers in German history",
+        ],
+        "career_milestones": "2014 World Cup winner; 2010 WC Golden Boot; 10 World Cup goals across 4 tournaments",
+        "commercial_signal": "medium",
+    },
+    {
+        "name": "Manuel Neuer",
+        "nationality": "Germany",
+        "team": "Germany",
+        "position": "Goalkeeper",
+        "notable_facts": [
+            "Won the 2014 World Cup with Germany",
+            "Won the Golden Glove at the 2014 World Cup",
+            "Considered one of the greatest sweeper-keepers of all time",
+        ],
+        "career_milestones": "2014 World Cup winner and Golden Glove; long-time Germany captain",
+        "commercial_signal": "medium",
+    },
+    # Korea Republic
+    {
+        "name": "Son Heung-min",
+        "nationality": "South Korea",
+        "team": "Korea Republic",
+        "position": "Forward",
+        "notable_facts": [
+            "South Korea's all-time leading scorer",
+            "Shared the Premier League Golden Boot in 2021–22",
+            "Captain of the Korea Republic national team",
+            "Scored in the 2022 World Cup group stage",
+        ],
+        "career_milestones": "Korea Republic all-time top scorer; 2022 Premier League Golden Boot",
+        "commercial_signal": "high",
+    },
+    {
+        "name": "Kim Min-jae",
+        "nationality": "South Korea",
+        "team": "Korea Republic",
+        "position": "Centre-back",
+        "notable_facts": [
+            "Named Serie A Defender of the Year in 2022–23 with Napoli",
+            "Key figure in Korea Republic's 2022 World Cup round-of-16 run",
+            "Moved to Bayern Munich in 2023",
+        ],
+        "career_milestones": "2022 Serie A champion with Napoli; 2022–23 Serie A Defender of the Year",
+        "commercial_signal": "medium",
+    },
+    # Spain
+    {
+        "name": "Sergio Ramos",
+        "nationality": "Spain",
+        "team": "Spain",
+        "position": "Centre-back",
+        "notable_facts": [
+            "Part of Spain's historic 2010 World Cup winning squad",
+            "Won Euro 2008, 2012 and World Cup 2010 with Spain",
+            "Spain captain known for leadership and set-piece goals",
+        ],
+        "career_milestones": "2010 World Cup winner; 2× European Champion with Spain",
+        "commercial_signal": "medium",
+    },
+    {
+        "name": "David Silva",
+        "nationality": "Spain",
+        "team": "Spain",
+        "position": "Midfielder",
+        "notable_facts": [
+            "Part of Spain's dominant era — World Cup 2010, Euro 2008 and Euro 2012 winner",
+            "One of the most decorated Spanish midfielders of his generation",
+            "Known for technical precision and creative play",
+        ],
+        "career_milestones": "2010 World Cup winner; 2× European Champion with Spain",
+        "commercial_signal": "medium",
+    },
+    # Portugal
+    {
+        "name": "Cristiano Ronaldo",
+        "nationality": "Portugal",
+        "team": "Portugal",
+        "position": "Forward",
+        "notable_facts": [
+            "Scored a hat-trick in Portugal's 3–3 draw vs Spain at the 2018 World Cup",
+            "All-time top scorer in men's international football",
+            "Won Euro 2016 with Portugal",
+            "5× Ballon d'Or winner",
+        ],
+        "career_milestones": "Euro 2016 winner; all-time men's international top scorer; 5× Ballon d'Or",
+        "commercial_signal": "high",
+    },
+    {
+        "name": "Bruno Fernandes",
+        "nationality": "Portugal",
+        "team": "Portugal",
+        "position": "Attacking Midfielder",
+        "notable_facts": [
+            "Portugal's creative engine and penalty taker",
+            "Scored at the 2022 World Cup including a penalty vs Uruguay",
+            "Manchester United captain",
+        ],
+        "career_milestones": "Regular Portugal starter since 2019; key figure in 2022 World Cup campaign",
+        "commercial_signal": "medium",
+    },
+]
+
+# ---------------------------------------------------------------------------
 # Seed images — 40 CC-licensed photos from Wikimedia Commons
 # ~10 per event; tags drive synthetic score generation
 # ---------------------------------------------------------------------------
@@ -530,9 +758,14 @@ def main() -> None:
 
     db.performance.insert_many(performance_docs)
 
+    # Insert player_context
+    player_docs = [{"player_id": str(uuid.uuid4()), **p} for p in SEED_PLAYERS]
+    db.player_context.insert_many(player_docs)
+
     print(f"\n  {len(SEED_EVENTS)} events inserted")
     print(f"  {len(SEED_IMAGES)} assets inserted")
     print(f"  {len(performance_docs)} performance records inserted")
+    print(f"  {len(player_docs)} player_context records inserted")
     print("\nDone.")
     client.close()
 

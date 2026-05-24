@@ -18,7 +18,7 @@ from pymongo.operations import SearchIndexModel
 MONGODB_URI = os.environ.get("MONGODB_URI")
 DB_NAME = "event_commerce"
 
-COLLECTIONS = ["events", "assets", "campaigns", "approvals", "performance"]
+COLLECTIONS = ["events", "assets", "campaigns", "approvals", "performance", "player_context"]
 
 CLASSIC_INDEXES = {
     "events": [
@@ -40,6 +40,9 @@ CLASSIC_INDEXES = {
     ],
     "performance": [
         ({"asset_id": 1, "campaign_id": 1, "event_id": 1}, "asset_campaign_event"),
+    ],
+    "player_context": [
+        ({"team": 1}, "team"),
     ],
 }
 
