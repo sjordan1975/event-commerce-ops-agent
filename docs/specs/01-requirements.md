@@ -24,6 +24,77 @@ Scope creep is the primary timeline risk. Adding a second social platform, ecomm
 
 ---
 
+## MVP Assumptions
+
+These are explicit simplifying decisions made for the hackathon demo. Each one is defensible in a judge conversation: *"This is the MVP; the enterprise path is X."* Do not treat them as oversights — they are deliberate scope constraints.
+
+### Asset routing: one destination per image
+
+Each asset is assigned exactly one `product_route`. Routing is mutually exclusive:
+
+| Route | What it means |
+|---|---|
+| `poster` | Print-ready poster; listed on Shopify, fulfilled via Printful |
+| `tshirt` | Print-ready t-shirt; listed on Shopify, fulfilled via Printful |
+| `social_only` | Digital post package only; no physical product created |
+| `null` | Asset did not meet threshold for any route; no action taken |
+
+An asset with high scores on both `merch_score` and `social_score` is routed to `poster` — the higher-value commercial output wins. It is not simultaneously posted to social.
+
+**Enterprise path:** multi-route (e.g. poster + social post in parallel); one campaign document per route per asset.
+
+### Channel responsibility
+
+| Channel | Responsibility | Implementation |
+|---|---|---|
+| Shopify | Product listing, storefront, sales transaction | GraphQL Admin API — creates product draft |
+| Printful | Production and fulfillment of poster and t-shirt | REST API — async mockup → fulfillment on order |
+| Social | Post package creation and scheduling | Simulated — full post package written to MongoDB with `status: "queued"` |
+
+Shopify and Printful are always paired for physical products: Shopify owns the sale, Printful owns the production. In the demo, mockup generation is initiated by the agent; fulfillment would be triggered by Shopify's order webhook in a production deployment.
+
+### Performance metrics: schema and semantics
+
+The `performance` collection records post-execution outcomes. For the MVP:
+
+**Time window:** rolling 7 days from `published_at`. All metrics represent cumulative totals within that window. The `window_days` field is stored on each document for traceability.
+
+**Channel breakdown:** metrics are split by channel, not aggregated into a single revenue figure.
+
+```json
+{
+  "metrics": {
+    "shopify": {
+      "views": 0,
+      "orders": 0,
+      "revenue_usd": 0.00
+    },
+    "printful": {
+      "units_fulfilled": 0
+    },
+    "social": {
+      "impressions": 0,
+      "saves": 0
+    }
+  },
+  "window_days": 7
+}
+```
+
+`shopify.revenue_usd` is gross order value (pre-fulfillment-cost). `printful.units_fulfilled` tracks production completions, not orders — these lag by 1–3 days in production. For the demo, both are written simultaneously as synthetic values.
+
+**Enterprise path:** per-SKU attribution, multiple time windows (24h spike vs. 7-day long tail), net revenue after Printful fulfillment cost, cohort comparisons across events.
+
+### What this system does not track (MVP)
+
+- Refunds or order cancellations
+- Printful fulfillment cost or margin
+- Click-through rate from social post to Shopify product
+- Return on ad spend
+- Any metric requiring a live social platform API
+
+---
+
 ## Non-Goals
 
 - Not a chatbot or conversational assistant
