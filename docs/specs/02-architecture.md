@@ -90,7 +90,6 @@ One document per image. Central state document — updated at every step.
 ```
 
 `published_urls` is populated at Step 7 execution. Only the keys relevant to `product_route` are written — poster/tshirt assets get `shopify` + `printful`; social_only assets get `social`. The Printful `mockup_url` is the rendered product image — the primary visual artifact of the Printful integration in the demo.
-```
 
 ### `campaigns`
 One document per asset-campaign pairing. Written at Step 5.
@@ -120,7 +119,6 @@ One document per asset-campaign pairing. Written at Step 5.
 ```
 
 `execution` is written at Step 7 when the campaign is dispatched. It is `null` until execution completes. For social_only campaigns `shopify_product_id`, `printful_task_id`, and `printful_mockup_url` are omitted. The `printful_mockup_url` is the key demo artifact — a rendered image of the product shown in the approval and execution UI.
-```
 
 ### `approvals`
 Approval queue. Written at Step 5, updated by human at Step 6.
@@ -185,12 +183,12 @@ events.find               → find past events with same outcome_type
 performance.aggregate     → aggregate historical conversion stats for this event type
 ```
 
-### Step 3 — Commercial Signal Detection ← primary load-bearing step
+### Step 3 — Similarity-Grounded Routing ← primary load-bearing step
 ```
 assets.vectorSearch       → embed candidate image with gemini-embedding-2;
-                            find visually similar past assets with known scores
+                            find visually similar past assets with known per-channel performance
 ```
-Removing this call removes the evidential grounding for all scoring decisions.
+Removing this call removes the per-channel similarity signal — routing degrades to pure LLM inference.
 
 ### Step 4 — Operational Prioritization
 ```

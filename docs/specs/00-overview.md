@@ -27,13 +27,15 @@ This is an **attention half-life** problem. Sports moments decay commercially ve
 
 ## The Solution Framing
 
-The agent is not a content creator. It is a **commercial operations coordinator**.
+The agent is not a content creator. It is a **commercial logistics coordinator**.
 
 The system does not ask: *"What image is prettiest?"*
 
-It asks: *"What asset is most likely to produce downstream economic action — and what is the fastest path to getting it in front of a buyer?"*
+It asks: *"Which assets look like past winners for each channel — and what is the fastest path to getting them in front of a buyer?"*
 
-This distinction is load-bearing. It determines every scoring decision, every routing decision, and every MCP call the agent makes.
+The answer comes from per-channel image similarity against past performers, not novel AI reasoning. Find assets that look like past poster winners and route them to Shopify. Find assets that look like past social winners and queue them for posting. Get both to market before the attention window closes.
+
+This framing is load-bearing. It determines every routing decision and every MCP call the agent makes. The value is operational speed and execution pipeline — not the sophistication of the scoring.
 
 ---
 
@@ -44,7 +46,7 @@ This distinction is load-bearing. It determines every scoring decision, every ro
 The demo should feel operational, not analytical. Judges should see:
 
 1. A batch of event photos arrives
-2. The agent reasons about commercial potential, not aesthetics
+2. The agent finds assets similar to past channel winners and assigns routing — poster, t-shirt, or social
 3. Workflows are created, queued, and routed
 4. A human approves
 5. The world changes — products exist, posts are queued, fulfillment is staged
@@ -99,11 +101,12 @@ An iconic goal celebration in sharp focus beats a technically perfect midfield s
 | Wrong framing | Right framing |
 |--------------|---------------|
 | "AI for creators" | "Real-time event commerce operations agent" |
-| "AI picks your best photos" | "AI coordinates monetization workflows from live event media" |
-| "AI marketing optimization platform" | "Operational prioritization under time pressure" |
-| "Predicts virality" | "Operationalizes historically correlated signals to prioritize high-potential commercial assets" |
+| "AI picks your best photos" | "AI routes assets similar to past channel winners to market at operational speed" |
+| "AI marketing optimization platform" | "Operational logistics under time pressure" |
+| "Predicts virality" | "Image similarity to past performers, deployed before the attention window closes" |
+| "Detects commercial intent" | "Finds what worked before and gets it to market faster than a human team" |
 
-The last row is the language to use with judges. Never claim virality prediction. It's pseudoscientific and unvalidatable in a hackathon demo.
+Never claim virality prediction or intent detection. The honest claim is logistics and speed: similarity search surfaces the candidates, the pipeline executes the deployment.
 
 ---
 
@@ -120,11 +123,12 @@ The last row is the language to use with judges. Never claim virality prediction
 ## Differentiation
 
 Unlike traditional AI media tools, this system:
-- Operates on **commercial conversion logic**, not aesthetics
+
+- Routes on **per-channel similarity to past performers**, not aesthetic ranking
 - Executes **real-world workflows via MCP** at every step
 - Coordinates **multi-system actions** (MongoDB, Shopify, Printful) as a single orchestrated pipeline
 - Optimizes for **operational speed**, not content quality scores
-- Grounds scoring decisions in **historical performance data** via vector search — not pure LLM inference
+- Uses **image similarity to channel-specific past winners** as the scoring engine — not LLM inference about what might work
 
 ---
 
@@ -179,3 +183,4 @@ The common thread: they all face the same attention half-life problem, and they 
 - **Engagement prediction trap:** Claiming to predict virality weakens credibility. Frame all scoring as "historically correlated signal" language.
 - **MCP decorativeness:** If MongoDB could be removed without breaking the demo, the partner integration fails the judging test. Every MongoDB call must be load-bearing.
 - **Demo complexity:** If the demo requires explaining the architecture, the demo has failed. The workflow should be self-evident.
+- **Exploration vs. exploitation gap:** Pure similarity ranking removes novel content from human consideration before the queue is populated — the HITL gate is downstream of the filter and cannot correct for it. **Addressed in MVP via a 10% random discovery queue:** randomly sampled candidates bypass the similarity filter and reach the human regardless of score. Random is the maximally honest exploration strategy; it cannot structurally exclude anything. The exploration rate and sampling method (random, low-similarity tail, diversity-constrained) are deliberately left as customer and implementation decisions — different operators want different discovery behavior. See `01-requirements.md` for the full tuning space.

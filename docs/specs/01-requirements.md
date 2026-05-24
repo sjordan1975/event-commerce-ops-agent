@@ -93,6 +93,29 @@ The `performance` collection records post-execution outcomes. For the MVP:
 - Return on ad spend
 - Any metric requiring a live social platform API
 
+### Routing strategy: exploitation with random exploration budget
+
+The MVP uses similarity-based prioritization for the main approval queue, with an explicit 10% random exploration budget routed to a parallel **discovery queue**.
+
+**Main queue (90%):** top-K assets by per-channel similarity score — the exploitation path. Assets that resemble past performers.
+
+**Discovery queue (10%):** randomly sampled from remaining candidates regardless of similarity score. Random is the maximally honest form of exploration: it cannot structurally exclude any candidate by definition. Some discovery slots will go to mediocre images — that is the honest cost of genuine exploration.
+
+The human operator reviews both queues and decides. The algorithm surfaces candidates; editorial judgment advances them.
+
+**Why random for the MVP:** any filter — even "bottom-similarity tail" — reintroduces an exclusion criterion and recreates the structural problem at a smaller scale. Random makes no such claim.
+
+**Expected to be tuned by customer and implementation:**
+
+The right exploration strategy is a configuration decision, not a fixed design. Different operators have different discovery preferences:
+
+- **Random (MVP default):** maximally honest; any candidate can surface regardless of how divergent
+- **Low-similarity tail:** biased toward visually distinct outliers; for customers who specifically want to see the most divergent images
+- **Diversity constraints:** force the top-K to include assets dissimilar from each other — broader coverage without full random selection
+- **Novelty-scored queue:** score candidates explicitly for divergence from the existing corpus; algorithmically curated surprise for customers who want that signal
+
+**Framing for judges:** *"We ship random as the default because it makes no assumptions about what novelty looks like. The right exploration strategy is a customer decision — some want genuine outliers, some want serendipitous discovery, some may want no exploration budget at all."*
+
 ---
 
 ## Non-Goals
@@ -119,10 +142,10 @@ Agent retrieves the event record and queries historical events of the same outco
 
 Reasoning output: expected engagement profile, attention spike duration, likely product demand profile.
 
-### Step 3 — Commercial Signal Detection
-Agent embeds each candidate image using `gemini-embedding-2` (3072 dimensions) and runs vector search against the `assets` collection to find visually/semantically similar past assets with known commercial performance scores.
+### Step 3 — Similarity-Grounded Routing
+Agent embeds each candidate image using `gemini-embedding-2` (3072 dimensions) and runs vector search against the `assets` collection to find visually/semantically similar past assets with known per-channel performance data.
 
-This is the **primary load-bearing MCP step**: scoring is grounded in historical performance data, not pure LLM inference. Removing MongoDB here breaks the agent's ability to reason from evidence.
+This is the **primary load-bearing MCP step**: the engine is per-channel image similarity to past performers. Images similar to past poster winners are candidates for poster routing; images similar to past social winners are candidates for social_only routing. Removing MongoDB removes this signal — routing degrades to pure LLM inference with no historical grounding.
 
 ### Step 4 — Operational Prioritization
 Agent scores each asset across five image-level dimensions using Gemini Vision (see `00-overview.md` for definitions):
