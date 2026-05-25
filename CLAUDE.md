@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Pre-code — all decisions locked, implementation not started.**
+**Implementation in progress.**
 
-Next action: Scaffold the 8-step agent loop in ADK.  
+Next action: Implement Step 0 (Foundation) — see `docs/plans/step-0-foundation.md`, tasks in `docs/tasks/step-0-tasks.md`  
 Update this line before ending each session — it is the single source of truth for session orientation.  
 Deadline: June 11, 2026 @ 2:00 PM PDT.
 
@@ -39,7 +39,11 @@ project-root/
 │   ├── 00-overview.md          ← vision, origin, positioning, demo narrative
 │   ├── 01-requirements.md      ← functional spec, 8-step workflow, MVP scope
 │   └── 02-architecture.md      ← system design, MongoDB schemas, MCP call list
-└── [code — not yet created]
+├── docs/plans/                  ← per-step implementation plans (one file per step)
+├── docs/tasks/                  ← per-step atomic task lists (one file per step)
+├── spike/                       ← validated ADK spikes (adk_hitl_test.py, adk_mcp_raw_test.py)
+├── scripts/                     ← provisioning and seed scripts (setup_mongodb.py, seed_mongodb.py)
+└── [src/, tests/, prompts/ — created during Step 0]
 ```
 
 Planning documents (historical, superseded by docs/specs/):
@@ -64,7 +68,22 @@ Do not violate these without explicit user decision. Full rationale in `docs/spe
 
 ## Build Commands
 
-*(Not yet established — project is pre-code.)*
+```bash
+# Install dependencies
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+
+# Run all tests
+.venv/bin/python -m pytest tests/ -v
+
+# Run a single test file
+.venv/bin/python -m pytest tests/test_foundation.py -v
+
+# Verify agent shell imports
+.venv/bin/python -c "from src.agent import build_agent; print('ok')"
+
+# Run a spike
+.venv/bin/python spike/adk_mcp_raw_test.py
+```
 
 ---
 
@@ -80,9 +99,9 @@ Do not violate these without explicit user decision. Full rationale in `docs/spe
 
 ## Decision Log
 
-See `tracking.md` for all architectural decisions (D-000 through D-017) with full rationale.
+See `tracking.md` for all architectural decisions (D-000 through D-018) with full rationale.
 
-Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007), logistics reframe (D-014), two-queue exploration/exploitation (D-015), Step 2 event narrative + `player_context` RAG (D-016), Step 4 dual-job (D-017).
+Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007), logistics reframe (D-014), two-queue exploration/exploitation (D-015), Step 2 event narrative + `player_context` RAG (D-016), Step 4 dual-job (D-017), raw McpToolset for all MongoDB ops (D-018).
 
 **Every commit that changes `docs/specs/` must add or update a D-entry in `tracking.md`.**
 
@@ -138,3 +157,13 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 ## Git
 
 - Never add `Co-Authored-By` or any Claude attribution to commit messages
+
+### Branch-per-step workflow
+
+- `main` is always green — all verification checkpoints in the step's task file pass before merging
+- One branch per step: `step/{N}-{name}` (e.g. `step/0-foundation`, `step/1-ingestion`)
+- Each branch carries its own `docs/plans/step-N-*.md` and `docs/tasks/step-N-tasks.md` alongside the implementation code — plans and tasks are living documents that may be updated if implementation reveals spec gaps
+- Merge to `main` only when all `Verify:` commands in the task file pass
+- Update the "Next action" line in `CLAUDE.md` as part of the merge commit
+- Never commit implementation code directly to `main`
+- Plans/tasks files for future steps exist on disk (uncommitted) until their branch is cut

@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Phase:** Pre-code — architecture decided, seed data in Atlas, implementation not started  
+**Phase:** Implementation in progress — Step 0 (foundation) and Step 1 (ingestion) next  
 **Deadline:** June 11, 2026 @ 2:00 PM PDT  
 **Partner track:** MongoDB
 
@@ -274,6 +274,34 @@
 *Discovery queue:* no per-channel similarity signal is available. Step 4 is the **sole routing suggestion** — technical fitness confirms the frame is viable; commercial signal indicates whether the image has qualities worth surfacing despite low similarity. The contrast signal (low similarity + high dimensional score) is the human-facing value: *"This image didn't match past winners, but it's sharp and emotionally intense — poster potential, your call."*
 
 **Language discipline:** "commercial signal" or "commercially correlated qualities" — never "commercial intent" (overclaim) and never "physical properties only" (overcorrection).
+
+---
+
+### D-018 — Tool Surface: Raw McpToolset for MongoDB, FunctionTool for Non-MongoDB
+**Date:** 2026-05-24  
+**Decision:** Agent calls raw MongoDB MCP tools directly (find, insert-many, update-many, aggregate, vectorSearch). Python `FunctionTool` is reserved for non-MongoDB capabilities only.
+
+**Spike results** (`spike/adk_mcp_raw_test.py`):
+- Find with filter (outcome_type = upset_victory on event_commerce.events): **PASS** — agent called correct tool with correct database, collection, and filter shape
+- Insert document (7-field event document): **PASS** — agent called `insert-many` with all fields correct; insertion confirmed in Atlas
+- Cleanup delete: **PASS** — document removed
+- Model: `gemini-2.5-flash-lite` (same as D-011 spike)
+
+**What belongs in FunctionTool:**
+- `compute_timeliness(outcome_type, kickoff_ts) -> float` — pure math, no DB
+- Shopify GraphQL calls (not MCP)
+- Printful REST calls (not MCP)
+- `LongRunningFunctionTool` at Step 6 HITL gate (ADK requirement)
+
+**What belongs in raw MCP:**
+- All MongoDB reads and writes across all 8 steps
+- Vector search (`vectorSearch`) in Step 3
+- Aggregation (`aggregate`) in Steps 2, 4, 8
+
+**Why this matters for the demo:**  
+MongoDB operations appear in the agent's reasoning trace — judges can see the agent planning which collection to query, which filter to apply, what data to insert. Hiding MongoDB inside Python wrappers would make it invisible. Raw MCP is what "load-bearing, not cosmetic" means.
+
+**Rejected alternative:** `ingest_event` FunctionTool that wraps `events.insertOne` + `assets.insertMany` in one call. This hides MongoDB from the trace and contradicts the hackathon's "partner superpowers" framing.
 
 ---
 
