@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Implementation in progress.**
 
-Next action: Implement Step 0 (Foundation) — see `docs/plans/step-0-foundation.md`, tasks in `docs/tasks/step-0-tasks.md`  
+Next action: Implement Step 1 (Event Ingestion) — see `docs/plans/step-1-event-ingestion.md`, tasks in `docs/tasks/step-1-tasks.md`  
 Update this line before ending each session — it is the single source of truth for session orientation.  
 Deadline: June 11, 2026 @ 2:00 PM PDT.
 
@@ -43,7 +43,9 @@ project-root/
 ├── docs/tasks/                  ← per-step atomic task lists (one file per step)
 ├── spike/                       ← validated ADK spikes (adk_hitl_test.py, adk_mcp_raw_test.py)
 ├── scripts/                     ← provisioning and seed scripts (setup_mongodb.py, seed_mongodb.py)
-└── [src/, tests/, prompts/ — created during Step 0]
+├── src/                         ← agent code (agent.py, prompt_loader.py, models added each step)
+├── tests/                       ← test suite (test_foundation.py, expanded each step)
+└── prompts/v1/                  ← versioned system prompt (agent_system.md)
 ```
 
 Planning documents (historical, superseded by docs/specs/):
