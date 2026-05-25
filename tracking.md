@@ -277,8 +277,9 @@
 
 ---
 
-### D-018 — Tool Surface: Raw McpToolset for MongoDB, FunctionTool for Non-MongoDB
+### D-018 — Tool Surface: Raw McpToolset for MongoDB, FunctionTool for Non-MongoDB (superseded)
 **Date:** 2026-05-24  
+**Superseded by:** D-019  
 **Decision:** Agent calls raw MongoDB MCP tools directly (find, insert-many, update-many, aggregate, vectorSearch). Python `FunctionTool` is reserved for non-MongoDB capabilities only.
 
 **Spike results** (`spike/adk_mcp_raw_test.py`):
@@ -302,6 +303,76 @@
 MongoDB operations appear in the agent's reasoning trace — judges can see the agent planning which collection to query, which filter to apply, what data to insert. Hiding MongoDB inside Python wrappers would make it invisible. Raw MCP is what "load-bearing, not cosmetic" means.
 
 **Rejected alternative:** `ingest_event` FunctionTool that wraps `events.insertOne` + `assets.insertMany` in one call. This hides MongoDB from the trace and contradicts the hackathon's "partner superpowers" framing.
+
+---
+
+### D-019 — Tool Surface: Domain Wrappers over MongoDB MCP (supersedes D-018)
+**Date:** 2026-05-25  
+**Decision:** The agent's tool surface is a set of domain-named Python `FunctionTool` wrappers (e.g. `get_player_context`, `find_similar_assets`, `record_ingested_event`). Each wrapper calls MongoDB MCP internally via the McpToolset client. Raw MCP tools are not exposed to the agent.
+
+**What changed from D-018:**
+- D-018 reasoned that exposing raw MCP to the agent would showcase MongoDB as load-bearing in the trace. That argument conflated two things: (A) MongoDB doing genuinely important work in the system, and (B) the agent reasoning in raw MongoDB terms. (A) is what "load-bearing" means; (B) is performative. The tool-call shape carries no information about which database is behind it — `get_player_context(team)` and `find({"team": team})` are indistinguishable as evidence of "MongoDB integration." MongoDB is showcased by the architecture, vector index, schema design, and demo narrative — not by the agent constructing raw filters.
+- The D-018 spike (`spike/adk_mcp_raw_test.py`) is not invalidated. It demonstrated that the model *can* construct correct MCP calls when given the schema. D-019 chooses not to put that capability on the agent's runtime path because the engineering trade-offs (token cost, schema-drift fragility, hallucination surface, debuggability) favor wrappers even though raw works.
+
+**Three project phases this clarifies:**
+1. **Discovery** (out-of-band, engineering time) — read MongoDB MCP server docs; understand the tools it exposes (find, insert-many, update-many, aggregate, vectorSearch, etc.); decide which we'll use internally. *The naive trap is treating this as a runtime concern where the agent "figures it out."*
+2. **Build** (engineering time) — implement domain wrappers in `src/db/` that map to project semantics (`get_player_context`, `find_similar_assets`, `record_ingested_event`, etc.). Wrappers handle field names, normalization, Pydantic validation, and call MongoDB MCP through the McpToolset client.
+3. **Runtime** (demo day) — agent calls only domain wrappers. McpToolset is still wired (Step 0) but is infrastructure under the wrappers, not a tool surface for the agent.
+
+**System prompt still carries schema — at the conceptual level, not the field-construction level:**
+
+The agent benefits from knowing the data model (what kinds of records exist, how they relate) so it can reason about which wrapper to call. It does *not* need field-level detail for filter construction — that's the wrapper's job. Example style for the prompt:
+
+```text
+Schema overview:
+- Event records are stored in the `events` collection; each event has a unique event_id.
+- Image records are stored in the `assets` collection; each asset references one event via event_id.
+- Player biographical facts are stored in the `player_context` collection, keyed by team name.
+- Past performance data drives vector search via the `find_similar_assets` tool.
+```
+
+**What belongs in domain wrappers:**
+- All MongoDB reads, writes, updates, aggregates, and vector searches across all 8 steps
+- Document construction guarded by Pydantic models
+- Field-name discipline contained in one layer
+
+**What stays as direct FunctionTools (non-MongoDB):**
+- `compute_timeliness(outcome_type, kickoff_ts) -> float` — pure math
+- Shopify GraphQL calls
+- Printful REST calls
+- `LongRunningFunctionTool` at Step 6 HITL gate (ADK requirement)
+- Gemini embedding generation (Vertex AI, not MongoDB)
+
+**Naming discipline so MongoDB's distinctive work stays legible:**
+Wrappers around the load-bearing MongoDB features should be named such that a reader of the code or architecture doc can see what MongoDB feature is behind them. `find_similar_assets` (clearly vector search), not `get_recommendations` (database-agnostic). Wrapping is fine; obscuring is not.
+
+**Trade-offs accepted:**
+- Less of the agent's MongoDB knowledge visible in the trace. Replaced by architecture diagram + index definitions + named wrappers in the codebase. Net: demo narrative is at least as strong, more robust.
+- Up-front engineering cost to build the wrapper layer before Step 1. Recovered by shorter prompts, fewer hallucination paths, simpler tests.
+
+**Full wrapper inventory:** see `docs/plans/db-wrapper-inventory.md`.
+
+---
+
+### D-020 — Evaluation is a First-Class Engineering Concern
+**Date:** 2026-05-25  
+**Decision:** Trace-based evals (per-step + integration + repetition for failure rate) are required for every workflow step. They are not optional, not "if we have time," and not replaced by manual smoke tests.
+
+**Why this decision exists:**
+Agentic systems fail statistically, not deterministically. A smoke test that passes once is not evidence the system works — a single passing run on `gemini-2.5-flash-lite` says nothing about pass rate across 20 runs, or behavior under a prompt change, or robustness when the tool surface grows. The cost of treating evals as optional is a demo that fails on stage from a failure mode that was always present but never measured.
+
+**What this commits us to:**
+- Every step's `Verify` checkpoints include at least one trace-based eval (under `tests/evals/`)
+- Failures dump full traces (tool calls + args + outputs + LLM reasoning text) for diagnosis
+- Pass rate ≥ 95% across 20 repetitions is the ship gate per step; rates below trigger remediation (prompt tightening → docstring tightening → surface change → hybrid wrapper defense → model swap)
+- The five failure categories (tool selection, sequencing, argument, output handling, end-state) each have a detection mechanism
+
+**Specific connection to D-019 Q#6 (timeliness chain):**
+The agent calls `compute_timeliness` explicitly and chains the result into `record_event` because that chain demonstrates the agentic premise. The risk of that decision (the agent could hallucinate the value or skip the call) is mitigated by the trace eval, not by hiding the computation in the wrapper. If the eval shows < 90% pass rate, the hybrid fallback wrapper kicks in. This is the pattern for every decision where we trade agentic legibility against statistical reliability — evals are the instrument that tells us which side wins.
+
+**Full framework:** see `docs/plans/evaluation-strategy.md`.
+
+**What we are explicitly not doing for MVP:** LLM-as-judge for quality, cross-model behavioral diffs, statistical significance testing, adversarial probes, cost budgets. Listed in the strategy doc so we don't accidentally pretend to have them.
 
 ---
 

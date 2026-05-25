@@ -101,9 +101,9 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
 ## Decision Log
 
-See `tracking.md` for all architectural decisions (D-000 through D-018) with full rationale.
+See `tracking.md` for all architectural decisions (D-000 through D-020) with full rationale.
 
-Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007), logistics reframe (D-014), two-queue exploration/exploitation (D-015), Step 2 event narrative + `player_context` RAG (D-016), Step 4 dual-job (D-017), raw McpToolset for all MongoDB ops (D-018).
+Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007), logistics reframe (D-014), two-queue exploration/exploitation (D-015), Step 2 event narrative + `player_context` RAG (D-016), Step 4 dual-job (D-017), raw McpToolset spike (D-018), domain wrappers over MongoDB MCP supersede raw (D-019), evaluation is first-class engineering (D-020).
 
 **Every commit that changes `docs/specs/` must add or update a D-entry in `tracking.md`.**
 
@@ -122,6 +122,13 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 - **Conftest helpers:** `build_valid_asset()`, `build_valid_campaign()`, etc. — return valid model instances for reuse across test files
 - **LLM scaffolding tests:** validate prompt structure and output parsing without live API calls; mock at the `Runner` boundary, not inside agent logic
 - Test runner: `pytest` — run with `.venv/bin/python -m pytest`
+
+### Evaluation (agentic behavior — distinct from unit tests)
+- **Trace-based evals are required for every workflow step** — not optional, not "if we have time" (D-020). Live under `tests/evals/`.
+- **A passing smoke test is not evidence the system works.** Repetition matters: pass rate ≥ 95% across 20 runs per step is the ship gate. A test that passes 5/5 in CI but 18/20 manually is a flake we should be nervous about.
+- **When an eval surfaces a partial result or failure, run the remediation playbook top-to-bottom before declaring "acceptable":** prompt language → tool docstring → tool surface → hybrid wrapper → model swap. Never settle on "acceptable for MVP" with a cheap rung untried. See `docs/plans/evaluation-strategy.md`.
+- **Failure traces must include LLM reasoning text.** The "Before each tool call, briefly state why" directive in the system prompt is load-bearing for this — confirmed by `spike/adk_event_capture.py`. Do not remove it without re-verifying reasoning text still surfaces under the full production prompt.
+- **Five failure categories to assert on per step:** tool selection, tool sequencing, tool arguments, tool-output handling (the hallucination case), end-state.
 
 ### Type Safety and Models
 - Type hints on all function signatures (parameters + return types)
