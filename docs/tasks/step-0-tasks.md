@@ -30,6 +30,8 @@ Files: `prompts/v1/agent_system.md`
 Acceptance: File contains the mission statement (capabilities-available framing, not phase framing); includes `events` and `assets` document field schemas so agent can construct MCP insert documents; includes database name `event_commerce`  
 Verify: File readable; manually confirm schema sections present
 
+> Note (D-019, 2026-05-25): field-level schemas in the prompt are superseded by domain wrappers. The Step 0.5 refactor replaces them with a conceptual schema block and adds the CoT directive required for trace-eval diagnosis (D-020).
+
 ---
 
 ## T-0.5: Create agent shell
@@ -37,6 +39,8 @@ Verify: File readable; manually confirm schema sections present
 Files: `src/agent.py`  
 Acceptance: `build_agent()` returns an `LlmAgent` with `McpToolset` wired via `StdioServerParameters`; model read from `GEMINI_MODEL` env var; system prompt loaded via `prompt_loader`; `tools=[]` placeholder ready to receive `FunctionTool` additions in later steps  
 Verify: `.venv/bin/python -c "from src.agent import build_agent; print('ok')"`
+
+> Note (D-019, 2026-05-25): McpToolset is no longer wired into `agent.tools`. The Step 0.5 refactor moves it to `src/db/client.py` as a programmatic client (`MongoMCPClient`). `build_agent()`'s tool list starts empty and is extended only with domain `FunctionTool` wrappers as later steps add them.
 
 ---
 

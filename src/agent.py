@@ -1,4 +1,10 @@
-"""Agent shell: LlmAgent wired with McpToolset and versioned system prompt."""
+"""Agent shell: LlmAgent with versioned system prompt; tools provided by callers.
+
+Per D-019, MongoDB MCP is *not* registered in `agent.tools`. It is used
+programmatically via `src/db/client.py` by domain wrappers. The agent's tool
+list contains only domain FunctionTools (and the LongRunningFunctionTool at
+the HITL gate, added in Step 6).
+"""
 
 import os
 
@@ -6,9 +12,6 @@ from dotenv import load_dotenv
 from google.adk.agents import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
-from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
-from mcp import StdioServerParameters
 
 from src.prompt_loader import load_prompt
 
@@ -17,33 +20,13 @@ load_dotenv()
 APP_NAME = "event_commerce_ops_agent"
 
 
-def _mcp_toolset() -> McpToolset:
-    return McpToolset(
-        connection_params=StdioConnectionParams(
-            server_params=StdioServerParameters(
-                command="npx",
-                args=["-y", "mongodb-mcp-server@latest"],
-                env={
-                    "MDB_MCP_CONNECTION_STRING": os.environ["MONGODB_URI"],
-                    "MDB_MCP_API_CLIENT_ID": os.environ.get("MDB_MCP_API_CLIENT_ID", ""),
-                    "MDB_MCP_API_CLIENT_SECRET": os.environ.get("MDB_MCP_API_CLIENT_SECRET", ""),
-                },
-            )
-        )
-    )
-
-
 def build_agent(extra_tools: list | None = None) -> LlmAgent:
-    """Build and return the operations agent with MCP toolset wired."""
-    tools: list = [_mcp_toolset()]
-    if extra_tools:
-        tools.extend(extra_tools)
-
+    """Build and return the operations agent. Tools are provided by callers."""
     return LlmAgent(
         model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"),
         name=APP_NAME,
         instruction=load_prompt("agent_system"),
-        tools=tools,
+        tools=list(extra_tools or []),
     )
 
 
