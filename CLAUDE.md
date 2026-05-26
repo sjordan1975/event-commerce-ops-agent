@@ -116,12 +116,13 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 - Fix root causes, not symptoms; never suppress errors to unblock tests
 - Test utility scripts with both happy path and intentional failure inputs before wiring into agent steps
 
-### Testing
+### Testing (unit + scaffolding — distinct from evals)
 - **TDD for all core logic:** Pydantic models, scoring functions, prompt construction, output parsing
 - **Stub pattern:** stubs raise `NotImplementedError`; tests fail on assertions, not imports — never use `pytest.importorskip` for core modules
 - **Conftest helpers:** `build_valid_asset()`, `build_valid_campaign()`, etc. — return valid model instances for reuse across test files
 - **LLM scaffolding tests:** validate prompt structure and output parsing without live API calls; mock at the `Runner` boundary, not inside agent logic
 - Test runner: `pytest` — run with `.venv/bin/python -m pytest`
+- **Framing:** see `docs/plans/testing-model.md` for the three-category model (unit / scaffolding / eval) — defines the boundary between this section and § Evaluation
 
 ### Evaluation (agentic behavior — distinct from unit tests)
 - **Trace-based evals are required for every workflow step** — not optional, not "if we have time" (D-020). Live under `tests/evals/`.
