@@ -84,3 +84,17 @@ async def test_runner_processes_event_stream():
     assert len(tool_calls) > 0, "No tool calls observed in event stream"
     assert tool_calls[0] == "_echo"
     assert len(trace_parts) > 0, "Reasoning trace is empty"
+
+
+def test_agent_does_not_expose_mcp_directly():
+    """D-019: agent.tools must contain only domain FunctionTools, never McpToolset."""
+    from src.agent import build_agent
+    from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
+
+    agent = build_agent()
+    for tool in agent.tools:
+        assert not isinstance(tool, McpToolset), (
+            "McpToolset found in agent.tools — violates D-019. "
+            "MongoDB MCP must be used programmatically via src/db/client.py, "
+            "not registered as an agent tool."
+        )

@@ -7,7 +7,7 @@
 | LLM | Gemini (Vertex AI) | Required by hackathon — reasoning and vision |
 | Embeddings | `gemini-embedding-2` (Vertex AI) | 3072 dimensions, multimodal (image + text) |
 | Orchestration | Google ADK v2.1 | `LlmAgent` + `Workflow` graph for 8-step state machine |
-| MCP integration | `McpToolset` (built into ADK) | Native ADK adapter; connects MongoDB MCP server as agent tools |
+| MCP integration | `McpToolset` (built into ADK) | Native ADK adapter; used by domain wrappers as a programmatic client (D-019) — not registered in `agent.tools` |
 | Database / state | MongoDB Atlas | Partner MCP track; all state, queues, vector search, memory |
 | Ecommerce | Shopify GraphQL Admin API | Partners dev store (free); products + draft orders |
 | Print-on-demand | Printful REST API | Async mockup generation; free account |
@@ -295,7 +295,7 @@ ingest → contextualize → score → prioritize → draft_campaigns →
 
 Key ADK primitives used:
 - **`LongRunningFunctionTool`** at `human_review` — returns `None` to suspend; runner emits `long_running_tool_ids`; resumes when caller sends `FunctionResponse` with matching `id`
-- **`McpToolset(StdioConnectionParams(...))`** — connects MongoDB MCP server (`npx mongodb-mcp-server`) as native ADK tools; discovered and proxied automatically
+- **`McpToolset(StdioConnectionParams(...))`** — connects MongoDB MCP server (`npx mongodb-mcp-server`). Per D-019, owned by `src/db/client.py` as a programmatic client — not registered in `agent.tools`. Discovered tools are invoked by domain wrappers via `MongoMCPClient.call(tool_name, args)`.
 - **`InMemorySessionService`** for local dev; swap to persistent session service for Cloud Run
 - **State persistence** via MongoDB `assets` collection — every step writes status before returning so workflow is resumable across ADK sessions
 - **Retry logic** in execute step for Printful async mockup polling (`POST /mockups` → poll `GET /mockups/{task_id}`)
