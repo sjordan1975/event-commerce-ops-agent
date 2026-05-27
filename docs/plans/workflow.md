@@ -36,13 +36,13 @@ One document covering:
 - Verification checkpoints (commands + pass criteria)
 - Output consumed by (what downstream capability reads this step's output)
 
-**→ Human review gate.** Discuss, validate, revise before moving on.
+**→ Consult advisor, then human review gate.** Advisor sees the full plan in context and catches the misses that compound expensively if carried into tasks/implementation — spec-ordering bugs, under-typed contracts, missing assertions, novelty traps. Revise against advisor feedback before the human gate. Discuss, validate, revise before moving on.
 
 ### 4. Write the task list (`docs/tasks/step-N-tasks.md`)
 
 Atomic, numbered tasks (T-N.1, T-N.2, …) derived from the plan. Each task names the file, the change, and any test that validates it. Tasks are the implementation contract — implementation should not deviate from them without updating the task file first.
 
-**→ Human review gate.** Discuss, validate, revise before moving on.
+**→ Human review gate.** Discuss, validate, revise before moving on. Advisor consultation is recommended (not required) when the plan→tasks translation involves judgment calls — batching vs. splitting wrappers, where test coverage breaks naturally, surprising dependency orderings. Skip the advisor call when tasks are mechanically derived and obvious.
 
 ### 5. Implement
 
@@ -53,21 +53,26 @@ Work through tasks in dependency order. Run verification checkpoints after each 
 ### 6. Commit and merge
 
 - All verification checkpoints pass (unit tests + trace eval pass-rate gate ≥ 95% / 20 runs)
+- **Consult advisor before declaring done** — independent read on whether the implementation matches the plan, whether evals exercise what they claim to, and whether anything was quietly cut to make tests pass. Make the deliverable durable first (commit before calling) so the result persists if the session ends mid-call.
 - Commit on the step branch
 - Merge to `main`
 - Return to Phase 1
+
+During implementation, advisor self-invocation guidance still applies — call when stuck (errors recurring, approach not converging), when considering a change of approach, or when about to commit to a non-obvious interpretation. No additional formal gate.
 
 ---
 
 ## What each gate is for
 
-| Gate | What it catches |
-| --- | --- |
-| After plan | Spec gaps, implicit assumptions, missing downstream consumers, wrong abstraction level |
-| After tasks | Tasks that don't cover the plan, tasks that are too coarse or too fine, missing test coverage |
-| After implementation | Deviations from plan/tasks, regressions, eval flakiness, docstring mismatches |
+| Gate | What advisor catches | What human review catches |
+| --- | --- | --- |
+| After plan | Spec-ordering bugs, under-typed contracts, missing assertions, novelty traps, model-default discipline | Spec gaps, implicit assumptions, missing downstream consumers, wrong abstraction level, alignment with product intent |
+| After tasks (advisor optional) | Coverage holes when plan→tasks translation involves judgment | Tasks that don't cover the plan, tasks too coarse or too fine, missing test coverage |
+| Before declaring done (advisor) + after implementation (human) | Quiet test-rewrites, eval claims that don't match what evals do, plan→code drift | Deviations from plan/tasks, regressions, eval flakiness, docstring mismatches |
 
-The plan → tasks → implementation sequence is not bureaucratic overhead. Step 1's operator interaction model assumption (the agent extracts structured metadata from natural language chat) was implicit in every prior doc and only surfaced during the plan-review gate. That kind of miss is cheap to fix in a plan and expensive to fix after implementation.
+The plan → tasks → implementation sequence is not bureaucratic overhead. Step 1's operator interaction model assumption (the agent extracts structured metadata from natural language chat) was implicit in every prior doc and only surfaced during the plan-review gate. Step 2's spec-ordering bug (D-016 spec departure landing as "follow-up after merge" instead of "branch housekeeping before implementation") surfaced during the advisor call on the plan. That kind of miss is cheap to fix in a plan and expensive to fix after implementation.
+
+Advisor calls are *consultations*, not approvals — the call surfaces issues; revision and the human gate decide what to do with them.
 
 ---
 
