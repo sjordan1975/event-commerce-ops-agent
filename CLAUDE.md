@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Step 1 (event ingestion) complete — 16/16 tests green, 20/20 pass-rate gate cleared. Ready for Step 2.**
 
-Next action: Cut `step/2-context` branch from `main` (after merging step/1-ingestion) and implement Step 2 against `docs/tasks/step-2-tasks.md`. Step 2 delivers `build_event_context` — event narrative construction + player context RAG from MongoDB `player_context` collection (D-016).
+Next action: Cut `step/2-context` branch from `main`, write `docs/plans/step-2-context.md`, review, then write `docs/tasks/step-2-tasks.md`. Step 2 delivers `build_event_context` — event narrative construction + player context RAG from MongoDB `player_context` collection (D-016). Follow `docs/plans/workflow.md` for the full phase sequence.
 
 Reference: `docs/plans/strategic-agent-reframe.md` § Propagation plan for the full ordered list; `tracking.md` D-021 for the design rationale.
 
@@ -42,7 +42,7 @@ project-root/
 │   ├── 00-overview.md          ← vision, origin, positioning, demo narrative
 │   ├── 01-requirements.md      ← functional spec, 9 capabilities + queue assembly (D-021), MVP scope
 │   └── 02-architecture.md      ← system design, MongoDB schemas, MCP call list, ADK architecture
-├── docs/plans/                  ← per-step implementation plans + cross-cutting design docs (agentic-model, testing-model, evaluation-strategy, safety-measures, strategic-agent-reframe, db-wrapper-inventory)
+├── docs/plans/                  ← per-step implementation plans + cross-cutting design docs (agentic-model, testing-model, evaluation-strategy, safety-measures, strategic-agent-reframe, db-wrapper-inventory, workflow)
 ├── docs/tasks/                  ← per-step atomic task lists (one file per step)
 ├── spike/                       ← validated ADK spikes (adk_hitl_test.py, adk_mcp_raw_test.py, adk_event_capture.py)
 ├── scripts/                     ← provisioning and seed scripts (setup_mongodb.py, seed_mongodb.py)
