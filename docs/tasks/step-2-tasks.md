@@ -59,11 +59,14 @@ Verify: `.venv/bin/python -c "from tests.conftest import build_valid_player, bui
 
 ---
 
-## T-2.5: Implement `get_event` wrapper
+## T-2.5: Implement `get_event` wrapper (FIRST READ WRAPPER — pins the MCP read envelope parsing pattern)
 
 Files: `src/db/events.py` (extend), `tests/test_step_2.py` (new file)
-Acceptance: `get_event(event_id: str) -> Event | None` is async; calls `get_client().call("find", {"database": "event_commerce", "collection": "events", "filter": {"event_id": event_id}})`; parses the MongoDB MCP envelope (`{"content": [{"text": "..."}]}` per existing client pattern); returns first-match as `Event` via `Event.model_validate(doc)`, or `None` if no match.
-Unit test monkeypatches `src.db.events.get_client` to return a `MagicMock`; asserts (a) the call args (`database`, `collection`, `filter` shape); (b) returns `Event` on match; (c) returns `None` on empty result.
+Acceptance: `get_event(event_id: str) -> Event | None` is async; calls `get_client().call("find", {"database": "event_commerce", "collection": "events", "filter": {"event_id": event_id}})`; parses the MongoDB MCP envelope and returns first-match as `Event` via `Event.model_validate(doc)`, or `None` if no match.
+
+**This is the first read wrapper in the project** — Step 1's wrappers only call `insert-many` and discard the response, so the exact shape of MongoDB MCP `find` responses is established here. The implementer must (a) call the live MCP server once during implementation to confirm the envelope shape (is it a single JSON-encoded array in one text part, or one document per part, or something else?); (b) add a one-line comment in `src/db/events.py` next to the parse documenting the shape; (c) write a small parse helper (likely `_parse_find_response(envelope) -> list[dict]`) co-located in `src/db/events.py` (or `src/db/__init__.py` if T-2.6/T-2.8/T-2.9 will reuse — promote on second reuse, not first). T-2.6, T-2.8, T-2.9 must use the same parsing pattern.
+
+Unit test monkeypatches `src.db.events.get_client` to return a `MagicMock` whose `call()` returns an envelope of the documented shape; asserts (a) the call args (`database`, `collection`, `filter` shape); (b) returns `Event` on match; (c) returns `None` on empty result.
 Verify: `.venv/bin/python -m pytest tests/test_step_2.py::test_get_event -v`
 
 ---
@@ -91,11 +94,11 @@ Verify: `.venv/bin/python -m pytest tests/test_step_2.py::test_update_event_narr
 Files: `src/db/performance.py` (new), `tests/test_step_2.py` (extend)
 Acceptance: `aggregate_performance_for_events(event_ids: list[str]) -> dict` is async; calls `get_client().call("aggregate", {"database": "event_commerce", "collection": "performance", "pipeline": [...]})` with a pipeline that:
 1. `$match` documents with `event_id` in `event_ids`.
-2. Joins each performance doc to its corresponding asset's `product_route` (either via `$lookup` on `assets`, or by including `product_route` in `performance` if the schema already carries it — choose the path consistent with the existing performance collection shape in `02-architecture.md` § `performance`).
-3. `$group` by `product_route`, summing `metrics.shopify.orders` and `metrics.social.impressions`, counting docs.
+2. `$lookup` against `assets` collection (local field `asset_id` → foreign field `asset_id`) to bring `product_route` onto each performance document. The `performance` schema (per `02-architecture.md` § `performance`) does **not** carry `product_route` — it lives on `assets` — so `$lookup` is the required join path, not an option.
+3. `$unwind` the lookup result; `$group` by `product_route`, summing `metrics.shopify.orders` and `metrics.social.impressions`, counting docs.
 4. `$sort` by total orders desc; take the top entry for `top_product_route`.
 
-Returns: `{"past_event_count": int, "top_product_route": str | None, "total_orders": int, "total_impressions": int, "asset_count": int}`. When `event_ids` is empty or no matches found, returns `{"past_event_count": 0, "top_product_route": None, "total_orders": 0, "total_impressions": 0, "asset_count": 0}`.
+Returns: `{"past_event_count": int, "top_product_route": str | None, "total_orders": int, "total_impressions": int, "asset_count": int}`. When `event_ids` is empty or no matches found, returns `{"past_event_count": 0, "top_product_route": None, "total_orders": 0, "total_impressions": 0, "asset_count": 0}`. `past_event_count` equals `len(event_ids)` regardless of how many had performance docs.
 
 Unit tests: (a) wrapper passes correct pipeline shape; (b) empty-result path returns zeroed baseline; (c) populated-result path parses envelope and surfaces the top product_route.
 Verify: `.venv/bin/python -m pytest tests/test_step_2.py -v -k aggregate_performance`
@@ -147,7 +150,7 @@ Acceptance: `build_event_context(event_id: str) -> dict` is async. Behavior per 
 3. `baseline = await aggregate_performance_for_events([e.event_id for e in past_events])` — wrap as `HistoricalBaseline(outcome_type=event.outcome_type, ...)`.
 4. `players = await find_players_for_teams(event.home_team, event.away_team)`.
 5. Format prompt via `load_prompt("build_event_context").format(event=event, cohort_summary=..., baseline=baseline, player_block=...)`. When cohort or players are empty, prompt uses the "(no past events…)" / "(no seeded players…)" branches per the template.
-6. `narrative = _run_narrative_llm(prompt, EventNarrative)` (likely wrapped in `asyncio.to_thread` if called from async).
+6. `narrative = await asyncio.to_thread(_run_narrative_llm, prompt, EventNarrative)` — `_run_narrative_llm` is synchronous (per T-2.11 / plan), `build_event_context` is async, so the wrap is required (not optional). Returns the parsed `EventNarrative` instance.
 7. `await update_event_narrative(event_id, narrative)` (per D-022).
 8. `return narrative.model_dump(mode="json")`.
 
@@ -174,18 +177,20 @@ Verify: `.venv/bin/python -c "from src.capabilities import all_function_tools; n
 
 ## T-2.14: Extend eval scaffolding for multi-collection mock dispatch
 
-Files: `tests/evals/conftest.py` (modify)
-Acceptance: `_MockMCPClient` (introduced in Step 1) is extended with a small dispatch table keyed by `(tool_name, collection)` so tests can register expected reads explicitly per call shape. Specifically:
+Files: `tests/evals/conftest.py` (modify), `tests/evals/test_mock_dispatch.py` (new — smoke test)
+Acceptance: `_MockMCPClient` (introduced in Step 1) is extended with a dispatch table keyed by `(tool_name, collection)` so tests can register expected reads explicitly per call shape. Specifically:
 - `find` against `events` with filter by `event_id` returns the seeded event document.
 - `find` against `events` with filter by `outcome_type` returns the seeded past-event cohort.
 - `aggregate` against `performance` returns the seeded baseline pipeline result.
 - `find` against `player_context` with filter by `team` returns the seeded player list.
 - `update-many` against `events` setting `event_narrative` is recorded (no-op return; assertion target).
 
+**Envelope shape (load-bearing for read-wrapper compatibility):** the Step 1 mock returned a literal `{"content": [{"type": "text", "text": "ok"}]}` for every call — fine for `insert-many` (response discarded) but would crash Step 2's read wrappers, which JSON-parse documents out of the envelope (pattern pinned by T-2.5). The extended mock must encode each dispatched read result as JSON in the `text` field of the envelope, matching the shape T-2.5 documents from the real MongoDB MCP server. Test code that registers seeded reads passes Python dicts/lists; the mock serializes them with `json.dumps` before returning the envelope.
+
 The existing `src.db.events.get_client` and `src.db.assets.get_client` patch surfaces extend to two new module bindings: `src.db.performance.get_client` and `src.db.player_context.get_client`. `build_runner_with_mock_db()` returns the same mock client wired into all four modules so a single recorded `.calls` list captures every wrapper call across the capability surface.
 
-Unit-style smoke test (not a trace eval): `build_runner_with_mock_db()` returns successfully; the mock client returns seeded results for each of the four read shapes; the `update-many` call shape is captured in `.calls`.
-Verify: `.venv/bin/python -m pytest tests/evals/ -v -k mock_dispatch`
+Smoke test (not a trace eval; lives at `tests/evals/test_mock_dispatch.py`): registers one seeded read of each shape, instantiates the mock client directly (no agent runner needed), invokes each Step 2 wrapper, asserts the wrapper returns the correctly-parsed Pydantic models from the seeded data, and asserts the `update-many` call shape is captured verbatim in `.calls`.
+Verify: `.venv/bin/python -m pytest tests/evals/test_mock_dispatch.py -v`
 
 ---
 
@@ -235,7 +240,9 @@ Verify: `grep -q "GEMINI_NARRATIVE_MODEL" .env.example && echo "ok"`
 Files: (no new files)
 Acceptance: All tests in `tests/` (including `tests/evals/`) pass with no errors. Includes:
 - Step 1 carry-forward: 16 tests (5 foundation + 2 models + 3 errors + 1 timeliness + 3 step_1 + 2 trace evals).
-- Step 2 additions: models tests (Player + 3 narrative types + Event.event_narrative field) + 5 wrapper tests + 4 capability tests + 1 mock dispatch test + 2 trace evals (single-run + pass-rate).
+- Step 2 additions: ~19 tests (1 Player model + 3 narrative-type models + 3 Event.event_narrative scenarios + 5 wrappers + 4 capability scenarios + 1 mock-dispatch smoke + 2 trace evals — single-run + pass-rate).
+
+**Approximate total after Step 2: ~35 passing tests.** (Approximate because conftest helper test counts depend on how `-k` filters break individual cases — the canonical anchor is "no failures, no errors, pass-rate gate ≥ 19/20".)
 
 Then run the pass-rate gate (`EVAL_REPEAT=20`) — must hit ≥ 19/20.
 
