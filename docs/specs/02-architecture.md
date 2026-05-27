@@ -1,6 +1,8 @@
 # 02 — Architecture: System Design
 
 > **Updated for D-021** (2026-05-26) — the agent is reframed as **strategist composing 9 capabilities** with queue assembly as the one strategic decision. The pre-pivot "8-step workflow" framing is superseded. Sections updated: tech stack notes, MongoDB collection intros (capability references replace step references), MongoDB MCP call list (reorganized by capability), ADK Agent Architecture (workflow diagram replaced with capability composition framing), Hard Constraint #1. Sections unchanged: collection JSON schemas, external integrations, all other hard constraints. Full design rationale: `docs/plans/strategic-agent-reframe.md`; D-021 in `tracking.md`.
+>
+> **Updated for D-022** (2026-05-27) — `build_event_context` persists the LLM-composed `EventNarrative` onto the producing `events` document (new `event_narrative` field). The `events` JSON example and the `build_event_context` MCP call list reflect the new write. Full rationale: `tracking.md` D-022; design context: `docs/plans/step-2-context.md` § "Persistence: `event_narrative` field on `events`".
 
 ## Tech Stack
 
@@ -36,9 +38,12 @@ One document per live event. Written by `ingest_event_batch`; read by `build_eve
   "final_score": "Argentina 3–2 France",
   "outcome_type": "upset_victory",
   "timeliness": 0.95,
-  "ingested_at": "2026-07-14T21:15:00Z"
+  "ingested_at": "2026-07-14T21:15:00Z",
+  "event_narrative": null
 }
 ```
+
+`event_narrative` — populated by `build_event_context` once the LLM composes the typed narrative (per D-022). Shape: `EventNarrative` (`narrative_angle`, `key_figures[]`, `commercial_timing`, `historical_baseline`); `null` between ingestion and context build. See `docs/plans/step-2-context.md` § "The `EventNarrative` model (D-016 contract)" for full type definition.
 
 `outcome_type` enum: `upset_victory`, `expected_win`, `draw`, `extra_time_win`
 
@@ -211,8 +216,9 @@ events.findOne            → retrieve this event's record
 events.find               → find past events with same outcome_type
 performance.aggregate     → aggregate historical conversion stats for this event type
 player_context.find       → retrieve squad members for both teams (plain name match, no vector search)
+events.update-many        → persist the LLM-composed event_narrative onto the event document (per D-022)
 ```
-LLM output: structured event narrative (narrative angle, key figures with grounded facts, commercial timing, historical baseline) — returned to agent state, consumed by `draft_campaigns_for_queue`. Player context is retrieved here, once per event batch — not once per asset.
+LLM output: structured event narrative (narrative angle, key figures with grounded facts, commercial timing, historical baseline). Persisted onto the producing `events` document under `event_narrative` (per D-022) and returned to agent state. Read by `propose_review_queue` as a hard precondition (capability 5) and by `draft_campaigns_for_queue` as copy substrate (capability 6 per D-016). Player context is retrieved here, once per event batch — not once per asset.
 
 ### `find_similar_assets` ← primary load-bearing MCP step
 ```
