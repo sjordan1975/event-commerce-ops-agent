@@ -1,5 +1,7 @@
 # 01 — Requirements: Functional Specification
 
+> **Updated for D-021** (2026-05-26) — the agent's job is reframed as **strategic queue assembly** composed of 9 capabilities. The pre-pivot "8-step workflow" framing is superseded. Sections updated: routing strategy, agent capabilities (was: 8-step workflow), demo flow, judging alignment, success metrics. Sections unchanged: hackathon non-negotiables, MVP scope, asset routing, channel responsibility, performance metrics, non-goals. Full design rationale: `docs/plans/strategic-agent-reframe.md`; D-021 in `tracking.md`.
+
 ## Hackathon Non-Negotiables
 
 | Requirement | Specification |
@@ -93,28 +95,29 @@ The `performance` collection records post-execution outcomes. For the MVP:
 - Return on ad spend
 - Any metric requiring a live social platform API
 
-### Routing strategy: exploitation with random exploration budget
+### Routing strategy: similarity-driven exploitation + agent-driven exploration
 
-The MVP uses similarity-based prioritization for the main approval queue, with an explicit 10% random exploration budget routed to a parallel **discovery queue**.
+The MVP uses similarity-based prioritization for the main exploitation queue, with a 10% exploration budget surfaced by **agent-driven novelty selection** (per D-021, superseding D-015's random-sampling default for the MVP demo).
 
-**Main queue (90%):** top-K assets by per-channel similarity score — the exploitation path. Assets that resemble past performers.
+**Exploitation queue (90%):** top-K assets by per-channel similarity score — the exploitation path. Assets that resemble past performers. Routing implied by similarity. The agent orders the queue based on event-narrative fit (per-item reasoning attached to each surfaced item).
 
-**Discovery queue (10%):** randomly sampled from remaining candidates regardless of similarity score. Random is the maximally honest form of exploration: it cannot structurally exclude any candidate by definition. Some discovery slots will go to mediocre images — that is the honest cost of genuine exploration.
+**Exploration queue (10%):** assets that did *not* match past winners by similarity, selected by the agent for surfacing to the operator. Each selection carries the agent's one-sentence rationale for why it is worth the operator's time despite the similarity miss. This is the one place in the system where the agent reasons without a deterministic crutch — no similarity signal, no past-performer template, just an image and a judgment call.
 
-The human operator reviews both queues and decides. The algorithm surfaces candidates; editorial judgment advances them.
+The human operator reviews both queues and decides. The algorithm surfaces exploitation candidates; **the agent surfaces exploration candidates with reasoning**; editorial judgment advances them.
 
-**Why random for the MVP:** any filter — even "bottom-similarity tail" — reintroduces an exclusion criterion and recreates the structural problem at a smaller scale. Random makes no such claim.
+**Why agent-driven exploration for the demo:** the exploration queue is the canonical judgment-under-bounded-ambiguity case. Random selection (D-015's default) is honest but produces no visible reasoning. Agent-driven selection surfaces the agent's judgment — *"this is worth your time despite the miss because X"* — which is the load-bearing demonstration of strategic AI value (per `docs/plans/strategic-agent-reframe.md`).
 
-**Expected to be tuned by customer and implementation:**
+**Tuning space (customer/implementation decision):**
 
-The right exploration strategy is a configuration decision, not a fixed design. Different operators have different discovery preferences:
+The right exploration strategy is a configuration decision, not a fixed design. The MVP demo uses agent-driven novelty; alternatives remain valid configurations:
 
-- **Random (MVP default):** maximally honest; any candidate can surface regardless of how divergent
-- **Low-similarity tail:** biased toward visually distinct outliers; for customers who specifically want to see the most divergent images
-- **Diversity constraints:** force the top-K to include assets dissimilar from each other — broader coverage without full random selection
-- **Novelty-scored queue:** score candidates explicitly for divergence from the existing corpus; algorithmically curated surprise for customers who want that signal
+- **Agent-driven novelty (MVP demo default — D-021):** the LLM picks exploration candidates with per-image reasoning. Visible judgment; structurally biased by whatever criteria the agent uses.
+- **Random sampling (D-015 documented fallback):** maximally honest — any candidate can surface regardless of how divergent. No visible reasoning.
+- **Low-similarity tail:** biased toward visually distinct outliers; for customers who specifically want to see the most divergent images.
+- **Diversity constraints:** force the top-K to include assets dissimilar from each other — broader coverage without full random selection.
+- **Novelty-scored queue:** score candidates explicitly for divergence from the existing corpus; algorithmically curated surprise.
 
-**Framing for judges:** *"We ship random as the default because it makes no assumptions about what novelty looks like. The right exploration strategy is a customer decision — some want genuine outliers, some want serendipitous discovery, some may want no exploration budget at all."*
+**Framing for judges:** *"Exploration is where the agent earns its keep. Without a similarity signal to lean on, the agent has to reason: which images are worth the operator's time despite not matching past winners? That reasoning is on screen, per-item, throughout the demo. The right exploration strategy is a customer decision — we ship agent-driven novelty as the demo default; random remains a valid fallback."*
 
 ---
 
@@ -128,116 +131,162 @@ The right exploration strategy is a configuration decision, not a fixed design. 
 
 ---
 
-## Agent Workflow — 8 Steps
+## Agent Capabilities and the Strategic Decision
 
-### Step 1 — Ingestion
-Operator uploads a batch of event photos. Agent receives:
-- Image batch (paths or blob references)
-- Event metadata: match result, teams, venue, kick-off time, outcome type (e.g., `upset_victory`, `expected_win`, `draw`)
+The agent composes **nine mid-granularity capabilities** to take a batch of event photos through to approved, published campaigns. Eight of them are mechanical, LLM-at-the-node, HITL, or external-API in kind — they do what they say with bounded reasoning. The ninth, `propose_review_queue`, is the **one strategic decision** the agent makes per event: how to assemble the operator review queue.
 
-Agent stores event record and bulk-inserts all images into MongoDB with `status: "ingested"`.
+Capability ordering is dependency-aware (you cannot draft for a non-existent queue), but the middle three computational capabilities (`build_event_context`, `find_similar_assets`, `score_assets_with_vision`) have no order constraint among themselves — the agent picks. Preconditions are enforced by wrapper-level validation (`PreconditionError`); the agent receives a self-correcting error if it calls a capability before its data dependencies are met. Order among independent operations stays emergent.
 
-### Step 2 — Event Context Understanding
-Agent retrieves the event record, aggregates historical conversion performance for events of the same outcome type, and looks up squad members for both teams from the `player_context` collection.
+Full design rationale: `docs/plans/strategic-agent-reframe.md`. Loop shape and exit conditions: `docs/plans/agentic-model.md`.
 
-The LLM produces a structured **event narrative** — not prose, but a typed output carried into Step 5:
+### The strategic decision: queue assembly
+
+Given a batch of photos for an event, `propose_review_queue` outputs *a ranked, reasoned queue tailored to this event*:
+
+- **Exploration selection** — which assets that did *not* match past winners by similarity are still worth surfacing, and why. The canonical judgment-under-bounded-ambiguity surface. Replaces D-015's random-sampling default per D-021 (random retained as fallback config).
+- **Exploitation ordering** — similarity gives a top-K set; the order in which they reach the operator is the agent's judgment, based on event-narrative fit, reviewer workflow, or other domain reasoning.
+- **Per-item reasoning** — every queued item, exploitation or exploration, carries a one-sentence rationale the operator can read. Exploitation items get "narrative fit" reasoning; exploration items get "why this is worth your time despite the miss" reasoning. This is what makes the agent's strategy legible.
+
+This is type-2 agentic value: judgment under bounded ambiguity in a small action space. The agent is not exploring the Internet; it is deciding *"given this event, what is the right operator review queue?"*
+
+### The nine capabilities
+
+| # | Capability | Kind | What it does |
+| --- | --- | --- | --- |
+| 1 | `ingest_event_batch` | computational | Records the event document (with computed `timeliness`) and bulk-inserts all images at `status: "ingested"`. |
+| 2 | `build_event_context` | computational + LLM | Aggregates event, past-performance, and `player_context` data; produces a structured **event narrative** consumed by `draft_campaigns_for_queue`. |
+| 3 | `find_similar_assets` | computational | Embeds candidate images and runs vector search against the `assets` collection — the **primary load-bearing MCP step**. |
+| 4 | `score_assets_with_vision` | computational + LLM | Runs Gemini Vision on each asset, writing 5-dimensional scores (`quality`, `emotional`, `social`, `merch`, `identity`). |
+| 5 | **`propose_review_queue`** | **strategic — the one decision** | Takes similarity results + scores + narrative; outputs ranked queue with exploration selection, exploitation ordering, and per-item reasoning. |
+| 6 | `draft_campaigns_for_queue` | LLM | Generates copy per queue item using the event narrative as substrate; creates campaign documents and approval records. Handles the redraft case (takes operator edit notes when present). |
+| 7 | `request_human_approval` | HITL — `LongRunningFunctionTool` | Suspends. Resumes with approved / rejected / edit_requested decisions per item. |
+| 8 | `execute_approved_campaigns` | external APIs | Shopify GraphQL + Printful REST + social-queue write. Internal retry on Printful mockup polling. |
+| 9 | `record_outcomes` | computational | Writes post-execution metrics to the `performance` collection — feeds similarity search in future runs. |
+
+### What each capability accomplishes (the substance)
+
+**1. `ingest_event_batch`** — Operator provides the image batch (paths or blob references) plus event metadata (match result, teams, venue, kick-off time, outcome type from `upset_victory | extra_time_win | expected_win | draw`). The capability computes the event-level `timeliness` (`base_score × 0.5^(hours_since_kickoff / 4)`), writes the event document, and bulk-inserts all images with `status: "ingested"`. Internal wrappers (`compute_timeliness`, `record_event`, `record_assets`) handle the sub-operations; the agent does not see them as separate tools.
+
+**2. `build_event_context`** — Retrieves the event record, aggregates historical conversion performance for events of the same outcome type, and looks up squad members for both teams from the `player_context` collection. The LLM produces a structured **event narrative** — not prose, but a typed output:
 
 - **Narrative angle:** the story the event tells ("upset victory," "extra-time drama," "defending champions eliminated")
 - **Key figures:** players with grounded biographical facts retrieved from `player_context` — not inferred by the LLM
 - **Commercial timing:** aggressiveness of the routing window given `timeliness` and outcome type
 - **Historical baseline:** which product types performed best for this outcome type in past events
 
-Player context is retrieved here — once per event batch — not in Step 5 where it would repeat once per asset. This output is not consumed by routing (Steps 3–4 are mechanical). Its downstream consumer is Step 5 copy generation. It is what makes campaign headlines specific and factually grounded rather than generic or hallucinated.
+Player context is retrieved here — once per event batch — not per asset. Downstream consumer is `draft_campaigns_for_queue`; the narrative is what makes campaign headlines specific and factually grounded rather than generic or hallucinated.
 
-### Step 3 — Similarity-Grounded Routing
-Agent embeds each candidate image using `gemini-embedding-2` (3072 dimensions) and runs vector search against the `assets` collection to find visually/semantically similar past assets with known per-channel performance data.
+**3. `find_similar_assets`** — Embeds each candidate image using `gemini-embedding-2` (3072 dimensions) and runs vector search against the `assets` collection to find visually/semantically similar past assets with known per-channel performance data. **Primary load-bearing MCP step.** The engine is per-channel image similarity to past performers. Results carry `product_route` from past assets, so channel routing is implied by majority-channel of nearest neighbors. Removing MongoDB removes this signal — routing degrades to pure LLM inference with no historical grounding.
 
-This is the **primary load-bearing MCP step**: the engine is per-channel image similarity to past performers. Every image in the batch is embedded and similarity-scored. Results carry `product_route` from past assets, so channel routing is implied by majority-channel of nearest neighbors.
+The top-K by similarity score form the **exploitation queue** candidate set. The remainder — images whose similarity score fell below the exploitation cutoff — form the candidate pool that `propose_review_queue` reasons over for exploration selection.
 
-The top-K by similarity score form the **exploitation queue**. The remainder — images whose similarity score fell below the exploitation cutoff — form the candidate pool from which the 10% random **discovery queue** is drawn. Removing MongoDB removes this signal — routing degrades to pure LLM inference with no historical grounding.
+**4. `score_assets_with_vision`** — Gemini Vision scores every image across five dimensions, split into two types per D-017:
 
-### Step 4 — Operational Prioritization
-Gemini Vision scores every image across five dimensions. These split into two distinct types:
-
-**Technical fitness** (near-objective, observable properties):
+*Technical fitness* (near-objective, observable properties):
 - `quality_score` — sharpness, exposure, resolution, printability
 - `merch_score` — silhouette clarity, graphic potential, poster framing
 
-**Commercial signal** (interpretive assessment of observable qualities that correlate with commercial outcomes):
+*Commercial signal* (interpretive assessment of observable qualities that correlate with commercial outcomes):
 - `emotional_score` — moment intensity, peak human drama visible in the frame
 - `social_score` — scroll-stop probability at thumbnail scale
 - `identity_score` — fan belonging signal, team colors, player recognizability
 
 Event-level `timeliness` is read from the `events` document (computed at ingestion — not scored per image).
 
-Step 4 serves different purposes for the two queues:
+Scores serve different purposes per queue: for the exploitation half, technical fitness is the quality gate that catches compositionally-similar-but-technically-unfit images; commercial signal provides ranking refinement. For the exploration half (assembled by `propose_review_queue`), technical fitness confirms the frame is viable and commercial signal indicates whether the image has qualities worth surfacing despite low similarity.
 
-**Exploitation queue (top-K by similarity):**
-Channel routing is largely implied by similarity results — past assets carry `product_route`, so majority channel of nearest neighbors indicates the route. Step 4 adds a **quality gate**: technical fitness dimensions (`quality_score`, `merch_score`) catch images that are compositionally similar to past winners but technically unfit for production (motion blur, low resolution, cluttered background). Within a channel, all five dimensional scores provide ranking refinement weighted against event `timeliness`.
+**5. `propose_review_queue`** — **The strategic decision.** Takes similarity results (from `find_similar_assets`), scores (from `score_assets_with_vision`), and narrative (from `build_event_context`); outputs the ranked review queue. Hard-refuses if any of those four preconditions are missing, with self-correcting errors that tell the agent what to call next.
 
-**Discovery queue (random sample from low-similarity remainder):**
-No per-channel similarity signal is available. Step 4 provides the **sole routing suggestion** using both dimension types: technical fitness confirms the frame is viable; commercial signal dimensions indicate whether the image has qualities worth surfacing despite low similarity. The combination is what makes the discovery candidate legible to the human — *"This image didn't match past winners, but it's sharp and emotionally intense — poster potential, your call."*
+The agent's reasoning shapes both halves of the queue:
+- For exploitation, order surfaced items by event-narrative fit; attach per-item rationale.
+- For exploration, select which non-similar items merit surfacing; attach per-item rationale ("this didn't match past winners but captures X — worth your time").
 
-### Step 5 — Campaign Draft Creation
-For each top asset, agent generates a campaign draft using the **event narrative from Step 2** as copy substrate:
+This is where AI judgment beats heuristics.
 
+**6. `draft_campaigns_for_queue`** — For each queued asset, generate a campaign draft using the event narrative from capability 2 as copy substrate:
 - Headline and caption grounded in the specific event narrative angle — not generic copy
-- Product specs and platform target derived from `product_route`
+- Product specs and platform target derived from `product_route` (or the exploration item's per-item reasoning)
 - Timing recommendation based on event `timeliness`
 - Pushes all drafts to the approval queue with `status: "pending"`
 
-The Step 2 narrative is what differentiates *"Argentina beats France — World Cup 2026 poster"* from *"Messi ends France's reign in extra-time thriller — limited edition print."*
+The narrative is what differentiates *"Argentina beats France — World Cup 2026 poster"* from *"Messi ends France's reign in extra-time thriller — limited edition print."*
 
-### Step 6 — Human-in-the-Loop Review
-Human operator reviews the approval queue. For each item:
-- **Approved** → moves to execution
-- **Rejected** → discarded, asset status updated
-- **Edit requested** → draft returned for revision
+Handles the redraft case: when called with operator edit notes from a prior `request_human_approval` cycle, generates revised drafts informed by those notes.
 
-No execution occurs until this gate is passed.
+**7. `request_human_approval`** — HITL via `LongRunningFunctionTool`. Suspends. Operator reviews the approval queue; for each item, decision is `approved`, `rejected`, or `edit_requested`. No execution occurs until this gate is passed.
 
-### Step 7 — Execution
-For approved items, agent executes:
-- **Shopify:** Creates product draft via GraphQL Admin API
-- **Printful:** Initiates async mockup generation (`POST /mockups` → poll `GET /mockups/{task_id}`)
-- **Social:** Writes complete post package to MongoDB with `status: "queued"` (simulated — no live API call)
+When the tool resumes with decisions:
+- All approved → agent calls `execute_approved_campaigns` on the batch
+- Any rejected → those items drop; executable subset proceeds
+- Any edit-requested → agent calls `draft_campaigns_for_queue` with the edit notes, then loops back to `request_human_approval`
 
-### Step 8 — Feedback Loop
-Post-execution, engagement and conversion metrics are written back to the `performance` collection. On subsequent runs, vector search in Step 3 returns richer signals because past assets now carry real performance data.
+The edit-requested loop is the agent's reasoning, not a separate capability. A revision cap (per `docs/plans/safety-measures.md`) lives in the system prompt or the tool's contract to prevent infinite revision cycles.
 
-This is how the system improves over time without retraining.
+**8. `execute_approved_campaigns`** — For approved items:
+- **Shopify:** create product draft via GraphQL Admin API
+- **Printful:** initiate async mockup generation (`POST /mockups` → poll `GET /mockups/{task_id}`); polling is internal to this capability
+- **Social:** write complete post package to MongoDB with `status: "queued"` (simulated — no live API call)
+
+**9. `record_outcomes`** — Engagement and conversion metrics are written back to the `performance` collection. On subsequent runs, vector search in `find_similar_assets` returns richer signals because past assets now carry real performance data. This is how the system improves over time without retraining.
 
 ---
 
 ## Demo Flow (Judge-Facing Narrative)
 
-1. Upload 20–50 World Cup match photos + match metadata
-2. Agent clusters and scores assets — show reasoning, not just scores
-3. Show top-ranked assets with their score profiles and product routing
-4. Agent generates campaign drafts for top candidates
-5. Human approval queue appears — operator approves/rejects
-6. Agent executes: Shopify draft created, Printful mockup initiated, social post queued
-7. Show MongoDB state after execution — assets at `status: "published"`, campaigns logged
+Two contrasting events demonstrate that the agent reasons strategically rather than running a fixed pipeline. Event 1 carries the full flow; Event 2 focuses on how the strategy differs. **Pacing target: ~3 minutes total.** Full pacing breakdown and reproducibility plan: `docs/plans/strategic-agent-reframe.md` § Demo coherence.
 
-Total demo target: under 3 minutes. The story is operational velocity, not AI cleverness.
+### Event 1 — Upset victory at peak timeliness (~90 seconds)
+
+Argentina vs. France 3–2 (or similar high-profile upset), match concluded ~20 minutes ago. `outcome_type: upset_victory`.
+
+Full flow on screen:
+- Ingest 30–50 photos + event metadata
+- Build event context (narrative + `player_context` retrieval — MongoDB visible)
+- Find similar assets (vector search — primary load-bearing MCP step, visible)
+- Score assets (Gemini Vision)
+- **`propose_review_queue` with per-item reasoning shown on screen — the strategic-agent moment**
+- Generate campaign drafts
+- HITL: operator scrolls the queue briefly, approves
+- Execute: Shopify draft created, Printful mockup initiated, social post queued
+- MongoDB collections populated
+
+Expected agent strategy: rich exploitation queue (many similarity matches against historical-winner archetypes), narrow but pointed exploration picks (*"the candid bench-celebration shot did not match past winners but captures the disbelief — worth your time"*).
+
+### Event 2 — Group-stage draw at moderate timeliness (~45 seconds)
+
+A 1–1 group-stage match, ~2 hours post-final-whistle. `outcome_type: draw`.
+
+Skip-ahead montage through ingest, context, similarity, scoring. Focus on **how queue assembly differs from Event 1**:
+- Thin exploitation queue (similarity engine has few historical matches)
+- Exploration emphasis — agent has to actively justify why anything is worth surfacing
+- Different per-item reasoning, different queue shape
+
+The contrast event — proves the agent reasons strategically rather than running a fixed pipeline.
+
+### Closing (~15 seconds)
+
+MongoDB final state across both events. Performance metrics. Title card with stack and partners.
+
+The story is operational velocity *and* visible strategic judgment — not just "watch the workflow run"; "watch the agent decide differently for two different events."
 
 ---
 
 ## Judging Criteria Alignment
 
 | Criterion | How we address it |
-|-----------|------------------|
-| Technological Implementation | MongoDB MCP load-bearing across all 8 steps; Gemini for reasoning and embeddings; Google ADK v2.1 for stateful orchestration |
-| Design | Clean approval UI; operational dashboard showing workflow state; score profiles visible |
+| --- | --- |
+| Technological Implementation | MongoDB MCP load-bearing across all 9 capabilities — vector search in `find_similar_assets` (primary load-bearing call), reads/writes on `events`, `assets`, `campaigns`, `approvals`, `performance`, `player_context`; Gemini for narrative reasoning, vision scoring, and embeddings; Google ADK v2.1 hosting the strategic agent with HITL via `LongRunningFunctionTool` |
+| Design | Clean approval UI showing per-item reasoning for every queued asset; operational dashboard showing capability composition and queue-assembly results; score profiles visible |
 | Potential Impact | Real economic problem — sports commerce monetization windows; scales to any live event |
-| Quality of the Idea | Commercial operations framing differentiates from commodity content tools; grounded scoring via vector search |
+| Quality of the Idea | Strategic agent that composes capabilities into per-event campaign strategies — type-2 agentic value (judgment under bounded ambiguity), not procedural workflow enactment; grounded scoring via vector search; visible per-item reasoning |
 
 ---
 
 ## Success Metrics
 
 - Time from event upload → approval queue populated (target: under 60 seconds for 50-image batch)
-- Human approval rate on generated candidates
+- **Queue-assembly coherence:** for a given event type, does the agent produce a queue whose composition matches expected strategy (per-event-type assertion class in trace evals, per `docs/plans/evaluation-strategy.md`)
+- Human approval rate on agent-surfaced candidates (both exploitation and exploration)
 - Shopify draft creation success rate
 - Printful mockup generation completion rate
-- Demonstrability: can the full 8-step flow run end-to-end in a single demo session without errors
+- Demonstrability: the full capability composition runs end-to-end in a single demo session without errors; per-capability trace-eval pass rate ≥ 95% across 20 reps (D-020)

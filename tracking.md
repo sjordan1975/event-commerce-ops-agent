@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Phase:** Implementation in progress — Step 0 (foundation) and Step 1 (ingestion) next  
+**Phase:** Strategic-agent reframe complete (D-021); propagation in progress. Step 0/0.5 foundation merged; Step 1 docs being rewritten against the new capability surface before implementation begins.  
 **Deadline:** June 11, 2026 @ 2:00 PM PDT  
 **Partner track:** MongoDB
 
@@ -219,9 +219,9 @@
 
 ---
 
-### D-015 — Exploration vs. Exploitation: Two-Queue Architecture
-**Date:** 2026-05-24  
-**Decision:** 90% exploitation queue (top-K by similarity) + 10% random discovery queue (sampled from low-similarity remainder). Random is the MVP default.
+### D-015 — Exploration vs. Exploitation: Two-Queue Architecture (exploration default updated by D-021)
+**Date:** 2026-05-24 (updated 2026-05-26)  
+**Decision:** 90% exploitation queue (top-K by similarity) + 10% random discovery queue (sampled from low-similarity remainder). Random was the MVP default until D-021; the two-queue structure persists, and random remains the documented fallback configuration. The MVP demo now uses agent-driven novelty selection for the discovery queue per D-021.
 
 **Problem addressed:** Pure similarity ranking systematically excludes novel content before the human sees it. The HITL gate is downstream of the filter and cannot correct for this exclusion.
 
@@ -376,15 +376,71 @@ The agent calls `compute_timeliness` explicitly and chains the result into `reco
 
 ---
 
+### D-021 — Strategic-Agent Reframe: Procedural → Strategist with Queue Assembly
+**Date:** 2026-05-26  
+**Decision:** The agent is reframed from procedural enacter of an 8-step workflow to **strategist that assembles the operator review queue** for a given event, then executes against the approved queue. The 8 steps become 9 mid-granularity capabilities the agent composes; **queue assembly is the single strategic decision**.
+
+**Updates:** D-015 — exploration queue's selection mechanism changes from random sampling to agent-driven novelty selection for the MVP demo; random retained as the documented fallback config. The two-queue structure itself is unchanged.
+
+**What changed and why:**
+
+The pre-reframe design treated the 8-step workflow as the agent's job — the agent re-derived, every run, what we already wrote down in tool docstrings (*"call X before Y"*). That is not where agentic value lives. Most of the strategic surface was already mechanized by D-015 (two-queue split), D-016 (Step 2 narrative + `player_context` RAG), and the similarity-grounded routing of Step 3 — the agent's role collapsed to enacting a known path. We were forcing an agentic shape onto a workflow-shaped problem.
+
+The reframe exposes the one place where the existing spec admits it has no deterministic answer: the exploration queue. The agent's strategic job becomes **assembling the operator review queue** — exploration selection (which non-similar assets to surface, with per-image reasoning), exploitation ordering (the agent's fingerprints on similarity results), and per-item reasoning throughout. This is type-2 agentic value (judgment under bounded ambiguity), not type-1 (large-surface exploration).
+
+**Headline consequences:**
+
+- **Capability surface:** 9 mid-granularity capabilities the agent composes — `ingest_event_batch`, `build_event_context`, `find_similar_assets`, `score_assets_with_vision`, `propose_review_queue`, `draft_campaigns_for_queue`, `request_human_approval`, `execute_approved_campaigns`, `record_outcomes`. `find_similar_assets` and `score_assets_with_vision` are explicit (not bundled into queue assembly) — preserves MongoDB demo legibility and separates computation from judgment.
+- **Strategic decision:** `propose_review_queue` is the one strategic call. All other capabilities are computational, LLM-at-the-node, HITL, or external-API in kind.
+- **Preconditions:** enforce data dependencies as hard-refuse with informative errors (`PreconditionError` with self-correcting message format); leave order among independent operations to the agent. The middle three capabilities (context, similarity, scoring) have no order constraint among themselves.
+- **Demo shape:** two contrasting events (upset victory + group-stage draw); Event 1 full flow + Event 2 strategic-differences only; ~3-minute pacing; reproducibility via 95% pass-rate + multiple takes + curated asset corpus.
+- **Step 1 reconciliation:** no implementation code exists yet, so reconciliation is doc rewrite only. `compute_timeliness`, `record_event`, `record_assets` survive as internal Python wrappers but are no longer agent-facing `FunctionTool`s. `ingest_event_batch` becomes the single Step 1 capability. Trace eval shifts from sequencing-shaped to outcome-shaped.
+- **D-015 update:** structure unchanged (two-queue split persists). Default for exploration changes from random sampling to agent-driven novelty selection for the demo. Random retained as documented fallback configuration. D-015's own framing (*"expected to be tuned by customer and implementation"*) anticipated this — the change is a configuration choice, not a structural reversal.
+- **Hard Constraint #1 in `CLAUDE.md` revises:** *"Do not simplify or merge the 8-step workflow"* → *"Do not remove capabilities or collapse the queue-assembly decision into a heuristic."*
+
+**Full design rationale, capability table, precondition table, demo pacing, Step 1 reconciliation plan, and three-phase propagation plan:** see `docs/plans/strategic-agent-reframe.md`. Companion docs: `docs/plans/agentic-model.md` (agent loop shape) and `docs/plans/safety-measures.md` (loop and spend bounds).
+
+**What this is not:**
+- Not a pivot of the problem domain. Real-time event commerce, sports merchandise monetization windows, MongoDB-grounded similarity all unchanged.
+- Not a framework change. ADK + MongoDB MCP + Gemini stack unchanged.
+- Not a tear-up of existing code. Step 0/0.5 foundation reusable; Step 1 docs rewrite without code revert.
+- Not an expansion of MVP scope. One strategic decision is *less* surface than the original 8-step framing implied. The agent's surface narrows even as its substance deepens.
+- Not "every step is strategic." Most capabilities remain LLM-at-the-node-level. Agentic-strategic-ness lives in queue assembly. That is enough.
+
+---
+
 ## Planning Document Index
 
+### Specs and meta
+
 | File | Role | Status |
-|------|------|--------|
+| --- | --- | --- |
 | `rapid_agent_hackathon_spec.md` | Hackathon rules, partner details, judging criteria | Reference — do not modify |
-| `CLAUDE.md` | Index — see docs/specs/ for spec files | Current |
-| `docs/specs/00-overview.md` | Vision, origin, positioning, demo narrative | Current |
-| `docs/specs/01-requirements.md` | Functional spec, 8-step workflow, MVP scope | Current |
-| `docs/specs/02-architecture.md` | System design, schemas, MCP call list | Current |
+| `CLAUDE.md` | Project index; orientation; build practices | Current |
 | `tracking.md` | This file — decision log | Current |
+| `docs/specs/00-overview.md` | Vision, origin, positioning, demo narrative | Current |
+| `docs/specs/01-requirements.md` | Functional spec, MVP scope, workflow | **Pending revision per D-021** (Phase A) |
+| `docs/specs/02-architecture.md` | System design, schemas, MCP call list, ADK architecture | **Pending revision per D-021** (Phase A) |
+
+### Cross-cutting design docs (`docs/plans/`)
+
+| File | Role | Status |
+| --- | --- | --- |
+| `strategic-agent-reframe.md` | D-021 design doc — strategic-agent pivot, queue assembly, capability surface, preconditions, demo coherence, propagation plan | Current |
+| `agentic-model.md` | What kind of agent this is — loop shape, exit conditions, HITL framing | **Pending revision per D-021** (pre-pivot framing) |
+| `safety-measures.md` | Loop bound + spend bound — operational safety follow-ups | Current |
+| `testing-model.md` | Three-category test model (unit / scaffolding / eval) | Current |
+| `evaluation-strategy.md` | Trace-eval framework, failure categories, remediation playbook | **Pending revision per D-021** (gains *strategy coherence* failure category) |
+| `db-wrapper-inventory.md` | Domain wrapper inventory under D-019 — internal MongoDB MCP plumbing | Current (wrappers themselves unchanged; agent-facing surface grouping changes per D-021) |
+
+### Per-step plans and tasks
+
+| File | Role | Status |
+| --- | --- | --- |
+| `docs/plans/step-0-foundation.md` | Step 0 — agent shell, MCP wiring, smoke tests | Complete — merged to `main` |
+| `docs/tasks/step-0-tasks.md` | Step 0 task list | Complete |
+| `docs/plans/step-0.5-refactor.md` | Step 0.5 — D-019 enforcement (no raw MCP in `agent.tools`) | Complete — merged to `main` |
+| `docs/plans/step-1-event-ingestion.md` | Step 1 — event + asset ingestion | **Pending rewrite per D-021** (Phase B) |
+| `docs/tasks/step-1-tasks.md` | Step 1 task list | **Pending rewrite per D-021** (Phase B) |
 
 Deprecated planning docs moved to `deprecated/` (gitignored).

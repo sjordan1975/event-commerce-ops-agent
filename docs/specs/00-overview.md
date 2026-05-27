@@ -1,5 +1,7 @@
 # 00 — Overview: Vision, Origin, and Positioning
 
+> **Updated for D-021** (2026-05-26) — minor revisions: Demo Narrative (two-event contrast replaces single-event linear list), "Why This Demo Works" (bullets 1 + 3 reframed for the capability surface), Key Risks (exploration/exploitation gap — agent-driven novelty is now the MVP demo default; random retained as documented fallback). Positioning, problem framing, scoring philosophy, target users, differentiation, and data flywheel sections are unchanged — D-021 is *how* the logistics gets done, not what the system is.
+
 ## Origin
 
 This project is a submission for the [Google Cloud Rapid Agent Hackathon](https://rapid-agent.devpost.com/) (deadline: June 11, 2026, $60,000 prize pool, ~9,100 registered participants). The hackathon requires agents that *accomplish tasks* — not chatbots that answer questions — built on Gemini + Google Cloud Agent Builder (or SDK) + one partner MCP server as a load-bearing capability.
@@ -35,21 +37,20 @@ It asks: *"Which assets look like past winners for each channel — and what is 
 
 The answer comes from per-channel image similarity against past performers, not novel AI reasoning. Find assets that look like past poster winners and route them to Shopify. Find assets that look like past social winners and queue them for posting. Get both to market before the attention window closes.
 
-This framing is load-bearing. It determines every routing decision and every MCP call the agent makes. The value is operational speed and execution pipeline — not the sophistication of the scoring.
+This framing is load-bearing. It determines every capability the agent invokes and every MCP call those capabilities make. The value is operational speed and execution pipeline — not the sophistication of the scoring.
 
 ---
 
 ## The Demo Narrative
 
-> "A chaotic post-match media workflow became operationally organized by an AI agent."
+> "A chaotic post-match media workflow became operationally organized by an AI agent — and the agent reasoned differently for two different events."
 
-The demo should feel operational, not analytical. Judges should see:
+The demo runs **two contrasting events** to show that the agent's strategy varies with the situation. Full pacing and design in `01-requirements.md` § Demo Flow and `docs/plans/strategic-agent-reframe.md` § Demo coherence:
 
-1. A batch of event photos arrives
-2. The agent finds assets similar to past channel winners and assigns routing — poster, t-shirt, or social
-3. Workflows are created, queued, and routed
-4. A human approves
-5. The world changes — products exist, posts are queued, fulfillment is staged
+1. **Event 1 — Upset victory at peak timeliness** (~90s, full flow on screen). Rich exploitation queue (many similarity matches), narrow-but-pointed exploration picks with per-item reasoning. HITL approval, execution, MongoDB collections populated.
+2. **Event 2 — Group-stage draw at moderate timeliness** (~45s, strategic differences only). Thin exploitation queue, exploration emphasis, agent has to actively justify why anything is worth surfacing.
+
+The contrast is the story. Per-item reasoning — visible on screen for every queued item — is the throughline.
 
 **What to avoid in the demo:**
 - Long explanations or narration
@@ -59,15 +60,15 @@ The demo should feel operational, not analytical. Judges should see:
 - AI talking about itself
 
 **What to show:**
-- Ingestion → triage → orchestration → execution. Fast. Operational.
+- Ingestion → context → similarity → scoring → **queue assembly with per-item reasoning** → drafting → approval → execution. Fast. Operational. And visibly different for the two events.
 
 ---
 
 ## Why This Demo Works for the Hackathon
 
-1. **Multi-step planning** — not a single prompt-response
+1. **Strategic judgment under bounded ambiguity** — the agent composes capabilities and makes one judgment-rich decision (queue assembly) per event; visible per-item reasoning is the demo's centerpiece, and the two-event contrast proves the strategy varies with the situation
 2. **Operational orchestration** — coordinates workflows across systems
-3. **Meaningful MCP usage** — MongoDB is runtime infrastructure, called at every step
+3. **Meaningful MCP usage** — MongoDB is runtime infrastructure, called by every capability; vector search in `find_similar_assets` is the primary load-bearing call
 4. **Human-in-the-loop governance** — approval gate before execution; builds credibility
 5. **Real economic objective** — commercial conversion, not engagement vanity metrics
 6. **Visible execution** — products, posts, and listings are actually created (or credibly simulated)
@@ -183,4 +184,4 @@ The common thread: they all face the same attention half-life problem, and they 
 - **Engagement prediction trap:** Claiming to predict virality weakens credibility. Frame all scoring as "historically correlated signal" language.
 - **MCP decorativeness:** If MongoDB could be removed without breaking the demo, the partner integration fails the judging test. Every MongoDB call must be load-bearing.
 - **Demo complexity:** If the demo requires explaining the architecture, the demo has failed. The workflow should be self-evident.
-- **Exploration vs. exploitation gap:** Pure similarity ranking removes novel content from human consideration before the queue is populated — the HITL gate is downstream of the filter and cannot correct for it. **Addressed in MVP via a 10% random discovery queue:** randomly sampled candidates bypass the similarity filter and reach the human regardless of score. Random is the maximally honest exploration strategy; it cannot structurally exclude anything. The exploration rate and sampling method (random, low-similarity tail, diversity-constrained) are deliberately left as customer and implementation decisions — different operators want different discovery behavior. See `01-requirements.md` for the full tuning space.
+- **Exploration vs. exploitation gap:** Pure similarity ranking removes novel content from human consideration before the queue is populated — the HITL gate is downstream of the filter and cannot correct for it. **Addressed in MVP via a 10% exploration queue surfaced by agent-driven novelty selection** (per D-021): the agent reasons about which non-similar assets are worth the operator's time and attaches per-item rationale. This is the demo's clearest signal of strategic AI value — judgment without a similarity crutch. Replaces D-015's earlier random-sampling default for the MVP demo; random retained as the documented fallback configuration. Other tuning options (random, low-similarity tail, diversity-constrained, novelty-scored) are deliberately left as customer and implementation decisions — different operators want different discovery behavior. See `01-requirements.md` for the full tuning space.

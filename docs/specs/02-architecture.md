@@ -1,12 +1,14 @@
 # 02 — Architecture: System Design
 
+> **Updated for D-021** (2026-05-26) — the agent is reframed as **strategist composing 9 capabilities** with queue assembly as the one strategic decision. The pre-pivot "8-step workflow" framing is superseded. Sections updated: tech stack notes, MongoDB collection intros (capability references replace step references), MongoDB MCP call list (reorganized by capability), ADK Agent Architecture (workflow diagram replaced with capability composition framing), Hard Constraint #1. Sections unchanged: collection JSON schemas, external integrations, all other hard constraints. Full design rationale: `docs/plans/strategic-agent-reframe.md`; D-021 in `tracking.md`.
+
 ## Tech Stack
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
 | LLM | Gemini (Vertex AI) | Required by hackathon — reasoning and vision |
 | Embeddings | `gemini-embedding-2` (Vertex AI) | 3072 dimensions, multimodal (image + text) |
-| Orchestration | Google ADK v2.1 | `LlmAgent` + `Workflow` graph for 8-step state machine |
+| Orchestration | Google ADK v2.1 | Single `LlmAgent` composing 9 capability tools; `LongRunningFunctionTool` at the HITL gate. No `Workflow` graph — the agent loops calling tools until terminal text (see `docs/plans/agentic-model.md`) |
 | MCP integration | `McpToolset` (built into ADK) | Native ADK adapter; used by domain wrappers as a programmatic client (D-019) — not registered in `agent.tools` |
 | Database / state | MongoDB Atlas | Partner MCP track; all state, queues, vector search, memory |
 | Ecommerce | Shopify GraphQL Admin API | Partners dev store (free); products + draft orders |
@@ -21,7 +23,7 @@
 ## MongoDB Collections
 
 ### `events`
-One document per live event. Written at Step 1, read at Step 2.
+One document per live event. Written by `ingest_event_batch`; read by `build_event_context` and downstream capabilities that need event metadata.
 
 ```json
 {
@@ -50,7 +52,7 @@ One document per live event. Written at Step 1, read at Step 2.
 | `draw` | 0.40 |
 
 ### `assets`
-One document per image. Central state document — updated at every step.
+One document per image. Central state document — touched by nearly every capability (ingestion → scoring → queue assignment → campaign linkage → execution → published URLs).
 
 ```json
 {
@@ -90,10 +92,10 @@ One document per image. Central state document — updated at every step.
 }
 ```
 
-`published_urls` is populated at Step 7 execution. Only the keys relevant to `product_route` are written — poster/tshirt assets get `shopify` + `printful`; social_only assets get `social`. The Printful `mockup_url` is the rendered product image — the primary visual artifact of the Printful integration in the demo.
+`published_urls` is populated by `execute_approved_campaigns`. Only the keys relevant to `product_route` are written — poster/tshirt assets get `shopify` + `printful`; social_only assets get `social`. The Printful `mockup_url` is the rendered product image — the primary visual artifact of the Printful integration in the demo.
 
 ### `campaigns`
-One document per asset-campaign pairing. Written at Step 5.
+One document per asset-campaign pairing. Written by `draft_campaigns_for_queue`; execution fields updated by `execute_approved_campaigns`.
 
 ```json
 {
@@ -119,10 +121,10 @@ One document per asset-campaign pairing. Written at Step 5.
 }
 ```
 
-`execution` is written at Step 7 when the campaign is dispatched. It is `null` until execution completes. For social_only campaigns `shopify_product_id`, `printful_task_id`, and `printful_mockup_url` are omitted. The `printful_mockup_url` is the key demo artifact — a rendered image of the product shown in the approval and execution UI.
+`execution` is written by `execute_approved_campaigns` when the campaign is dispatched. It is `null` until execution completes. For social_only campaigns `shopify_product_id`, `printful_task_id`, and `printful_mockup_url` are omitted. The `printful_mockup_url` is the key demo artifact — a rendered image of the product shown in the approval and execution UI.
 
 ### `approvals`
-Approval queue. Written at Step 5, updated by human at Step 6.
+Approval queue. Written by `draft_campaigns_for_queue`; updated by the human via `request_human_approval`.
 
 ```json
 {
@@ -137,7 +139,7 @@ Approval queue. Written at Step 5, updated by human at Step 6.
 ```
 
 ### `performance`
-Post-execution engagement and conversion data. Written at Step 8. Feeds vector search scoring in future runs.
+Post-execution engagement and conversion data. Written by `record_outcomes`. Feeds vector search in `find_similar_assets` on future runs — past assets carry real performance data.
 
 ```json
 {
@@ -168,7 +170,7 @@ Metrics represent cumulative totals over a rolling 7-day window from `published_
 Channel population follows `product_route`: poster/tshirt assets populate `shopify` + `printful`; social_only assets populate `social` only.
 
 ### `player_context`
-Static reference corpus. Seeded at onboarding; read at Step 2 to ground the event narrative.
+Static reference corpus. Seeded at onboarding; read by `build_event_context` to ground the event narrative.
 
 ```json
 {
@@ -195,59 +197,71 @@ Lookup is by team name match against `events.home_team` / `events.away_team` —
 
 ## Full MongoDB MCP Call List
 
-### Step 1 — Ingestion
+Organized by capability. Per D-019, the agent does not call MongoDB directly — domain wrappers under each capability call `MongoMCPClient` (which wraps `McpToolset`) internally. The MCP operations below are what runs *inside* each capability.
+
+### `ingest_event_batch`
 ```
-events.insertOne          → store event metadata
+events.insertOne          → store event metadata (with computed timeliness)
 assets.insertMany         → bulk-insert all images, status: "ingested"
 ```
 
-### Step 2 — Event Context Understanding
+### `build_event_context`
 ```
 events.findOne            → retrieve this event's record
 events.find               → find past events with same outcome_type
 performance.aggregate     → aggregate historical conversion stats for this event type
 player_context.find       → retrieve squad members for both teams (plain name match, no vector search)
 ```
-LLM output: structured event narrative (narrative angle, key figures with grounded facts, commercial timing, historical baseline) — stored in agent state, consumed by Step 5 copy generation. Player context is retrieved here, not in Step 5 — retrieval happens once per event batch, not once per asset.
+LLM output: structured event narrative (narrative angle, key figures with grounded facts, commercial timing, historical baseline) — returned to agent state, consumed by `draft_campaigns_for_queue`. Player context is retrieved here, once per event batch — not once per asset.
 
-### Step 3 — Similarity-Grounded Routing ← primary load-bearing step
+### `find_similar_assets` ← primary load-bearing MCP step
 ```
 assets.vectorSearch       → embed candidate image with gemini-embedding-2;
                             find visually similar past assets with known per-channel performance
 ```
 Removing this call removes the per-channel similarity signal — routing degrades to pure LLM inference.
 
-### Step 4 — Operational Prioritization
+### `score_assets_with_vision`
 ```
 assets.updateMany         → write Gemini Vision score fields to each asset document
-assets.aggregate          → group exploitation queue by implied product_route; score discovery queue by dimensional fit
-assets.updateMany         → set status: "scored", assign product_route and queue_type ("exploitation" | "discovery")
+                            (5 dimensions per D-017: quality, merch, emotional, social, identity)
 ```
 
-### Step 5 — Campaign Draft Creation
+### `propose_review_queue` ← the one strategic decision
 ```
-campaigns.insertOne       → per top asset: campaign draft with copy, specs, platform target
+(consumes similarity results + scores + narrative from agent state)
+assets.aggregate          → rank candidates; combine similarity (exploitation half) + agent judgment (exploration half)
+assets.updateMany         → set status: "scored"; assign product_route and queue_type ("exploitation" | "discovery")
+                            with per-item reasoning attached
+```
+Per D-021, the exploration-half selection is agent-driven (not random per D-015's MVP default). Each surfaced item carries a one-sentence rationale the operator can read. Hard-refuses (via `PreconditionError`) if event, scores, similarity results, or narrative are missing.
+
+### `draft_campaigns_for_queue`
+```
+campaigns.insertOne       → per queued asset: campaign draft with copy, specs, platform target
 assets.updateOne          → set status: "campaign_draft_created"
 approvals.insertMany      → push all drafts to queue, status: "pending"
 ```
+On a redraft cycle (operator `edit_requested`), called with the original queue + operator notes — overwrites the corresponding `campaigns` documents and recreates `approvals` entries.
 
-### Step 6 — Human-in-the-Loop Review
+### `request_human_approval`
 ```
 approvals.find            → { status: "pending" } — fetch queue for display
 approvals.updateOne       → record human decision (approved / rejected / edit_requested)
 assets.updateOne          → sync status back to asset document
 ```
+HITL via `LongRunningFunctionTool` — suspends after pending fetch, resumes when decisions arrive.
 
-### Step 7 — Execution
+### `execute_approved_campaigns`
 ```
 approvals.find            → { status: "approved" } — fetch approved items
 assets.updateOne          → set status: "executing"
-[external: Shopify GraphQL, Printful REST]
+[external: Shopify GraphQL, Printful REST (with internal mockup polling)]
 assets.updateOne          → set status: "published", write platform URLs + timestamps
 campaigns.updateOne       → record execution outcome
 ```
 
-### Step 8 — Feedback Loop
+### `record_outcomes`
 ```
 performance.insertMany    → store engagement + conversion metrics
 assets.aggregate          → find assets similar to best performers (informs future runs)
@@ -283,25 +297,45 @@ assets.aggregate          → find assets similar to best performers (informs fu
 
 ## ADK Agent Architecture
 
-The 8-step workflow is implemented as an ADK `LlmAgent` with `LongRunningFunctionTool` for the human approval gate.
+The system is a **single ADK `LlmAgent`** with 9 capability tools registered, looping until terminal text. There is no `Workflow` graph — capability ordering is the agent's plan, not the framework's orchestration. The agent's strategic moment is one tool call (`propose_review_queue`); the rest are computational, LLM-at-the-node, HITL, or external-API capability invocations. Full loop semantics and exit conditions: `docs/plans/agentic-model.md`.
+
+### Capability composition (typical trajectory)
 
 ```
-ingest → contextualize → score → prioritize → draft_campaigns →
-  human_review [LongRunningFunctionTool — suspends] →
-    approved → execute → record_performance → END
-    rejected → END
-    edit_requested → draft_campaigns (loop back)
+ingest_event_batch
+        │
+        ▼
+[ build_event_context  ∥  find_similar_assets  ∥  score_assets_with_vision ]
+        │              (independent — agent picks order; preconditions enforced by wrappers)
+        ▼
+propose_review_queue                    ← the one strategic decision
+        │
+        ▼
+draft_campaigns_for_queue
+        │
+        ▼
+request_human_approval  ← LongRunningFunctionTool, suspends
+        │
+        ├─ all approved   ─→ execute_approved_campaigns ─→ record_outcomes ─→ terminal text
+        ├─ any rejected   ─→ those items drop; subset proceeds to execute
+        └─ edit_requested ─→ draft_campaigns_for_queue (with operator notes) ─→ request_human_approval (loop)
 ```
 
-Key ADK primitives used:
-- **`LongRunningFunctionTool`** at `human_review` — returns `None` to suspend; runner emits `long_running_tool_ids`; resumes when caller sends `FunctionResponse` with matching `id`
-- **`McpToolset(StdioConnectionParams(...))`** — connects MongoDB MCP server (`npx mongodb-mcp-server`). Per D-019, owned by `src/db/client.py` as a programmatic client — not registered in `agent.tools`. Discovered tools are invoked by domain wrappers via `MongoMCPClient.call(tool_name, args)`.
-- **`InMemorySessionService`** for local dev; swap to persistent session service for Cloud Run
-- **State persistence** via MongoDB `assets` collection — every step writes status before returning so workflow is resumable across ADK sessions
-- **Retry logic** in execute step for Printful async mockup polling (`POST /mockups` → poll `GET /mockups/{task_id}`)
-- **Model:** `gemini-2.5-flash-lite` (confirmed working; `gemini-2.0-flash` deprecated for new API users)
+This is the **expected trajectory** — not a state machine. The agent could deviate; wrappers refuse (with self-correcting `PreconditionError`) if data dependencies are missing, but no framework-level guard prevents reordering among independent capabilities. Per D-021, this is by design: the agent's surface is `propose_review_queue`'s strategic call plus whatever ordering it picks among the supporting capabilities.
 
-Spike code at `spike/adk_hitl_test.py` — confirmed PASS on both HITL checks (2026-05-23).
+### Key ADK primitives
+
+- **Single `LlmAgent`** with 9 `FunctionTool`s registered (one is `LongRunningFunctionTool`). No `SequentialAgent`, no `Workflow` graph — the agent loop is the orchestration.
+- **`LongRunningFunctionTool`** at `request_human_approval` — returns `None` to suspend; runner emits `long_running_tool_ids`; resumes when caller sends `FunctionResponse` with matching `id`.
+- **`McpToolset(StdioConnectionParams(...))`** — connects MongoDB MCP server (`npx mongodb-mcp-server`). Per D-019, owned by `src/db/client.py` as a programmatic client — not registered in `agent.tools`. Discovered tools are invoked by domain wrappers inside each capability via `MongoMCPClient.call(tool_name, args)`.
+- **`InMemorySessionService`** for local dev; swap to persistent session service for Cloud Run.
+- **State persistence** via MongoDB `assets` collection — most capabilities write `status` updates so the trajectory is resumable across ADK sessions.
+- **Retry logic** internal to `execute_approved_campaigns` for Printful async mockup polling (`POST /mockups` → poll `GET /mockups/{task_id}`).
+- **`PreconditionError`** — wrapper-level exception with self-correcting message format (*"Cannot do X for Y: missing Z (call Z-producer first)"*). Used by every capability that has data dependencies; first usage is `ingest_event_batch`'s input validation. See `docs/plans/strategic-agent-reframe.md` § Enforced vs. emergent.
+- **Loop and spend bounds** — ADK's iteration cap and `max_output_tokens` are the operational safety bounds. Explicit values + cap on the `edit_requested` redraft loop are tracked in `docs/plans/safety-measures.md`.
+- **Model:** `gemini-2.5-flash-lite` (confirmed working; `gemini-2.0-flash` deprecated for new API users).
+
+Spike code at `spike/adk_hitl_test.py` — confirmed PASS on both HITL checks (2026-05-23). Event-capture pattern for trace evals at `spike/adk_event_capture.py`.
 
 ---
 
@@ -309,7 +343,7 @@ Spike code at `spike/adk_hitl_test.py` — confirmed PASS on both HITL checks (2
 
 These must not be changed without explicit user decision:
 
-1. **Do not simplify the 8-step workflow.** Do not merge steps or skip steps to reduce complexity. Each step exists for a reason documented in `01-requirements.md`.
+1. **Do not remove capabilities or collapse the queue-assembly decision into a heuristic.** The 9 capabilities each exist for a reason documented in `01-requirements.md`; `propose_review_queue` is the one strategic decision and may not be replaced with deterministic ranking. (Revised per D-021 — was previously *"Do not simplify the 8-step workflow."*)
 2. **MongoDB is the partner MCP.** Do not substitute Elastic, Pinecone, or any other vector store.
 3. **Gemini is the LLM backbone.** Do not substitute OpenAI, Anthropic, or any non-GCP model.
 4. **`gemini-embedding-2` is the embedding model.** Do not substitute Voyage AI or any non-GCP embedding provider.
