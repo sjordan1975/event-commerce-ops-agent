@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Strategic-agent reframe (D-021) — Phase A + Phase B complete. Ready for Phase C implementation.**
+**Step 1 (event ingestion) complete — 16/16 tests green, 20/20 pass-rate gate cleared. Ready for Step 2.**
 
-Next action: Begin Phase C — implement Step 1 against the rewritten task list at `docs/tasks/step-1-tasks.md`. Start with T-1.1 (`Event` Pydantic model in `src/models.py`) and proceed in the listed order. New file conventions introduced in Step 1: `src/capabilities/` for agent-facing capabilities (`ingest_event_batch` lands here); `src/errors.py` for `PreconditionError` (cross-cutting foundation). 16 tests total at green; outcome-shaped trace eval at T-1.13; pass-rate gate at T-1.14 (≥19/20 across 20 reps per D-020).
+Next action: Cut `step/2-context` branch from `main` (after merging step/1-ingestion) and implement Step 2 against `docs/tasks/step-2-tasks.md`. Step 2 delivers `build_event_context` — event narrative construction + player context RAG from MongoDB `player_context` collection (D-016).
 
 Reference: `docs/plans/strategic-agent-reframe.md` § Propagation plan for the full ordered list; `tracking.md` D-021 for the design rationale.
 
