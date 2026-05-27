@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Step 1 (event ingestion) complete — 16/16 tests green, 20/20 pass-rate gate cleared. Ready for Step 2.**
 
-Next action: Cut `step/2-context` branch from `main`, write `docs/plans/step-2-context.md`, review, then write `docs/tasks/step-2-tasks.md`. Step 2 delivers `build_event_context` — event narrative construction + player context RAG from MongoDB `player_context` collection (D-016). Follow `docs/plans/workflow.md` for the full phase sequence.
+Next action: On branch `step/2-context`. `docs/plans/step-2-context.md` is written and human-approved. Resume with the branch housekeeping commit (new D-entry capturing `event_narrative` persistence on the events doc + `02-architecture.md` update + Planning Document Index stale-line fix for Step 1), then write `docs/tasks/step-2-tasks.md`. Step 2 delivers `build_event_context` — event narrative construction + player context RAG from MongoDB `player_context` collection (D-016). Follow `docs/plans/workflow.md` for the full phase sequence; see § "Branch housekeeping" in the step-2 plan for the doc-change sequence that must land before implementation commits.
 
 Reference: `docs/plans/strategic-agent-reframe.md` § Propagation plan for the full ordered list; `tracking.md` D-021 for the design rationale.
 
