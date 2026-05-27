@@ -13,6 +13,7 @@ from google.adk.agents import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 
+from src.capabilities import all_function_tools
 from src.prompt_loader import load_prompt
 
 load_dotenv()
@@ -21,12 +22,13 @@ APP_NAME = "event_commerce_ops_agent"
 
 
 def build_agent(extra_tools: list | None = None) -> LlmAgent:
-    """Build and return the operations agent. Tools are provided by callers."""
+    """Build and return the operations agent with production tools auto-wired."""
+    tools = list(all_function_tools) + list(extra_tools or [])
     return LlmAgent(
         model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"),
         name=APP_NAME,
         instruction=load_prompt("agent_system"),
-        tools=list(extra_tools or []),
+        tools=tools,
     )
 
 

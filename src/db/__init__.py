@@ -7,4 +7,15 @@ through it and are themselves exposed to the agent as FunctionTools.
 
 from src.db.client import MongoMCPClient
 
-__all__ = ["MongoMCPClient"]
+_client: MongoMCPClient | None = None
+
+
+def get_client() -> MongoMCPClient:
+    """Return the module-level lazy singleton MongoMCPClient."""
+    global _client
+    if _client is None:
+        _client = MongoMCPClient()
+    return _client
+
+
+__all__ = ["MongoMCPClient", "get_client"]
