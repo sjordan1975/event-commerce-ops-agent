@@ -28,7 +28,9 @@ async def ingest_event_batch(images: list[str], event_metadata: dict) -> dict:
     with status='ingested'. Returns {"event_id": str, "asset_ids": list[str]}.
 
     Required fields in event_metadata:
-        - name, home_team, away_team, final_score (strings)
+        - name, final_score (strings)
+        - home_team: team listed first in fixture notation (e.g. "X vs Y" → X is home)
+        - away_team: team listed second in fixture notation
         - start_date (ISO 8601 UTC string, e.g. "2026-07-14T19:00:00Z")
         - outcome_type: categorize the result —
             upset_victory  → underdog/lower-ranked team won

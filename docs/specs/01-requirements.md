@@ -131,6 +131,29 @@ The right exploration strategy is a configuration decision, not a fixed design. 
 
 ---
 
+## Operator Interaction Model
+
+The operator submits a batch via a natural language chat message — describing the event outcome in sports vocabulary, providing photo file paths, and giving any relevant context. The agent extracts structured `event_metadata` (teams, score, start time, outcome type) from that message before calling `ingest_event_batch`.
+
+**Sample batch submission:**
+
+```text
+Argentina pulled off the upset, beating France 3-2.
+Photos at /tmp/wc-final/. Match started 19:00 UTC. Ingest this batch.
+```
+
+This design assumes a **sports-fluent operator**: someone who naturally uses domain vocabulary ("upset", "extra time", "draw") rather than selecting from a structured form. The agent's `outcome_type` extraction relies on that vocabulary — it is a one-hop classification from the operator's own framing, not an inference from team rankings or historical data. If the operator's message lacks a classification cue, the agent should ask before proceeding.
+
+**Bidirectional agency:** the agent does not merely respond to operator prompts — it initiates clarification when inputs are ambiguous. Both directions (operator-to-agent submission and agent-to-operator clarification) require operator presence.
+
+**Operator presence assumption:** the MVP assumes the operator is present for the full batch lifecycle — submission, optional clarification, and approval. The agent does not time out HITL waits; it holds until the operator responds.
+
+**Home/away convention:** in "X vs Y" fixture notation, X is the home team (following FIFA fixture listing convention). This applies even at neutral-site tournaments — FIFA formally assigns home/away status to every fixture regardless of geography.
+
+**Enterprise path:** structured batch submission form with dropdown `outcome_type` selection; natural language description becomes optional annotation rather than the classification source; and unattended batched processing (no clarification path).
+
+---
+
 ## Agent Capabilities and the Strategic Decision
 
 The agent composes **nine mid-granularity capabilities** to take a batch of event photos through to approved, published campaigns. Eight of them are mechanical, LLM-at-the-node, HITL, or external-API in kind — they do what they say with bounded reasoning. The ninth, `propose_review_queue`, is the **one strategic decision** the agent makes per event: how to assemble the operator review queue.
