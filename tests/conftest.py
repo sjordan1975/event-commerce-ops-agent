@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from src.models import Asset, Event
+from src.models import Asset, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player
 
 
 def build_valid_event(**overrides) -> Event:
@@ -34,3 +34,51 @@ def build_valid_asset(**overrides) -> Asset:
     }
     base.update(overrides)
     return Asset(**base)
+
+
+def build_valid_player(**overrides) -> Player:
+    """Return a valid Player instance with defaults matching the player_context JSON example."""
+    base = {
+        "player_id": "player-uuid-001",
+        "name": "Lionel Messi",
+        "nationality": "Argentina",
+        "team": "Argentina",
+        "position": "Forward",
+        "notable_facts": [
+            "5th World Cup appearance",
+            "2022 World Cup winner",
+            "All-time leading scorer in World Cup finals",
+        ],
+        "career_milestones": "Widely regarded as final World Cup; 2022 champion",
+        "commercial_signal": "high",
+    }
+    base.update(overrides)
+    return Player(**base)
+
+
+def build_valid_event_narrative(**overrides) -> EventNarrative:
+    """Return a valid EventNarrative instance with at least one KeyFigure and a populated HistoricalBaseline."""
+    baseline = HistoricalBaseline(
+        outcome_type="upset_victory",
+        past_event_count=3,
+        top_product_route="poster",
+        total_orders=450,
+        total_impressions=22000,
+        notes="3 past upsets; poster routes dominated conversion",
+    )
+    kf = KeyFigure(
+        name="Lionel Messi",
+        team="Argentina",
+        relevance="Scored the decisive penalty in the shootout",
+        grounded_facts=["2022 World Cup winner", "5th World Cup appearance"],
+        commercial_signal="high",
+    )
+    base = {
+        "event_id": "test-event-001",
+        "narrative_angle": "Messi crowns legendary career as Argentina defeats France on penalties",
+        "key_figures": [kf],
+        "commercial_timing": "Aggressive — timeliness 0.87, ~6h window remaining",
+        "historical_baseline": baseline,
+    }
+    base.update(overrides)
+    return EventNarrative(**base)

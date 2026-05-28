@@ -435,6 +435,24 @@ The reframe exposes the one place where the existing spec admits it has no deter
 
 ---
 
+### D-023 — Recognized Architectural Debt: LLM-Driven vs Graph-Driven Orchestration
+**Date:** 2026-05-27  
+**Decision:** Accept LLM-driven tool selection for MVP; flag graph-based orchestration as the correct post-hackathon direction.
+
+**Context:** Evals on Step 1 and Step 2 surfaced a reliability failure mode: after ingesting a batch, the agent sometimes chains to `build_event_context` even when the operator explicitly says "stop after ingestion." Root cause is that a single `LlmAgent` with all tools registered treats tool selection as a judgment call every turn — including decisions that are structurally determined.
+
+**The transferable concept (LangGraph's `add_node`/`add_edge`):** In LangGraph, you wire execution order explicitly in the graph structure. The ADK equivalent is `SequentialAgent` for ordered pipelines and a coordinator `LlmAgent` for branch points. This approach makes deterministic steps deterministic — the graph enforces them, not the prompt.
+
+**Why most of this workflow would benefit from graph structure:** Ingest → build context → find similar assets → score assets is a data-dependency pipeline, not a judgment call. Only `propose_review_queue` genuinely requires LLM judgment (exploitation/exploration selection and per-item reasoning). The rest is operational sequencing.
+
+**Why we're not doing it now:** Switching `LlmAgent` to a `SequentialAgent` + strategic coordinator touches agent architecture, eval setup, and the HITL suspension pattern (which requires specific ADK handling for `LongRunningFunctionTool`). Scope risk against a tight deadline outweighs the reliability gain for a demo context.
+
+**Mitigation for MVP:** System prompt now makes workflow steps explicitly numbered and adds "the operator drives the workflow — only proceed when instructed." Combined with PreconditionError enforcement, this reduces (but does not eliminate) unwanted chaining. Prompt-based control with N=5 pass-rate gates is the acceptance criterion.
+
+**Post-hackathon direction:** Refactor to a coordinator `LlmAgent` that routes to specialized sub-agents or a `SequentialAgent` pipeline for the deterministic steps, with `LlmAgent` reserved for `propose_review_queue`. This eliminates the entire class of "agent chains to next step when it shouldn't" failures.
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta

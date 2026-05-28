@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Step 1 (event ingestion) complete — 16/16 tests green, 20/20 pass-rate gate cleared. Ready for Step 2.**
+**Step 2 (build_event_context) complete — 35/35 tests green (unit + scaffolding + evals), N=20 pass-rate gates cleared for both Step 1 and Step 2. Ready for Step 3.**
 
-Next action: On branch `step/2-context`. Branch housekeeping commit landed (D-022 added; `02-architecture.md` reflects `event_narrative` persistence + updated MCP call list; Planning Document Index Step 1 lines marked complete). `docs/tasks/step-2-tasks.md` (T-2.1 through T-2.18) is committed and awaiting human review per `docs/plans/workflow.md` Phase 4. After review + any revisions, begin implementation in dependency order starting with T-2.1 (Pydantic models). Step 2 delivers `build_event_context` — event narrative construction + player context RAG from MongoDB `player_context` collection (D-016) + narrative persistence on the events document (D-022).
+Next action: On branch `step/2-context`. All T-2.1 through T-2.18 tasks implemented and verified. Commit Step 2 work, then merge to `main`. Cut `step/3-similarity` branch for the next capability (`find_similar_assets` — vector embedding + similarity search via MongoDB Atlas Vector Search). Key architectural note logged in D-023: LLM-driven tool selection is MVP-acceptable but graph-based orchestration (`SequentialAgent` / coordinator pattern) is the correct post-hackathon direction for the deterministic pipeline steps.
 
 Reference: `docs/plans/strategic-agent-reframe.md` § Propagation plan for the full ordered list; `tracking.md` D-021 for the design rationale.
 
