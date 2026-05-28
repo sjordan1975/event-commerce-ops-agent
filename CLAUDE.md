@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Step 4 plan + tasks landed on `step/4-vision` (2026-05-28). Housekeeping commit on branch. Ready to begin implementation at T-4.1.**
+**Step 4 implementation complete on `step/4-vision` (2026-05-28). T-4.1 → T-4.14 all done; T-4.13 single-run trace eval passed; T-4.14 pass-rate gate passed at N=5.**
 
-Next action: Implement Step 4 starting at T-4.1 (`AssetScores` Pydantic model). Work through T-4.1 → T-4.14 in `docs/tasks/step-4-tasks.md` dependency order; do not skip the trace-eval gate (T-4.13 + T-4.14) before merging to `main`.
+Next action: Run `EVAL_REPEAT=20 .venv/bin/python -m pytest tests/evals/test_step_4_trace.py -v` to satisfy the D-020 ship gate (≥19/20), then merge `step/4-vision` → `main` with an updated "Next action" line pointing at Step 5 (`propose_review_queue`).
 
 Key Step 4 decisions baked in (D-026 / D-027 / D-028): Vision capability emits typed `AssetScores` + `detected_subjects: list[str]` per asset; `Asset.scores` retyped from `dict[str, Any]` to `AssetScores | None`; new env var `GEMINI_VISION_MODEL` defaults to `gemini-2.5-flash` (not flash-lite — judgment density + hallucination surface). Per-asset Vision call, idempotent skip on `asset.scores is None`. Step 4 does **not** write `product_route` or `queue_type` (Step 5's boundary). Workflow chain extends to `START → ingest → context → similarity → scoring`; `scored_assets` lands in session state for `propose_review_queue`.
 

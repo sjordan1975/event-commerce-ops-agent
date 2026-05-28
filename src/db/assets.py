@@ -3,7 +3,7 @@
 import os
 
 from src.db import _parse_docs_response, get_client
-from src.models import Asset, SimilarAsset
+from src.models import Asset, AssetScores, SimilarAsset
 
 NUM_CANDIDATES_MULTIPLIER = 10  # numCandidates = NUM_CANDIDATES_MULTIPLIER * top_k (Atlas guidance for high-recall vector search)
 
@@ -95,4 +95,22 @@ async def save_similar_assets(asset_id: str, similar_asset_ids: list[str]) -> No
         "collection": "assets",
         "filter": {"asset_id": asset_id},
         "update": {"$set": {"similar_assets": similar_asset_ids}},
+    })
+
+
+async def save_asset_scores(
+    asset_id: str,
+    scores: AssetScores,
+    detected_subjects: list[str],
+) -> None:
+    """Persist scores + detected_subjects + status transition in one update."""
+    await get_client().call("update-many", {
+        "database": "event_commerce",
+        "collection": "assets",
+        "filter": {"asset_id": asset_id},
+        "update": {"$set": {
+            "scores": scores.model_dump(mode="json"),
+            "detected_subjects": detected_subjects,
+            "status": "scored",
+        }},
     })

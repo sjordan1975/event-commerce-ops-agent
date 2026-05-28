@@ -14,7 +14,7 @@ from typing import Any, Callable, Union
 from unittest.mock import patch
 
 from src.agent import APP_NAME, build_coordinator, build_runner
-from tests.conftest import build_embedding_fixture
+from tests.conftest import build_embedding_fixture, build_valid_vision_scoring_output
 
 
 def _make_mcp_envelope(docs: list[dict]) -> dict:
@@ -96,14 +96,41 @@ class _MockMCPClient:
         return {"content": [{"type": "text", "text": "ok"}]}
 
 
+def _default_vision_fixture_provider(image_url: str, event_context: dict):
+    """Default Vision helper stub: populates detected_subjects from key_figure_names.
+
+    Splits the comma-joined key_figure_names string into individual names so
+    the hallucination-guard assertion in T-4.13 passes by construction.
+    Pass a custom fixture_provider to build_runner_with_mock_db() to override.
+
+    Note: save_asset_scores calls update-many on the assets collection.
+    The _MockMCPClient default "ok" handler covers this write — no explicit
+    dispatch handler is required for scoring writes.
+    """
+    key_figure_names = event_context.get("key_figure_names", "(none)")
+    if key_figure_names == "(none)":
+        subjects = []
+    else:
+        subjects = [n.strip() for n in key_figure_names.split(", ") if n.strip()]
+    return build_valid_vision_scoring_output(detected_subjects=subjects)
+
+
 @contextmanager
-def build_runner_with_mock_db():
+def build_runner_with_mock_db(vision_fixture_provider=None):
     """Context manager that yields (runner, mock_client) with MongoDB patched out.
 
-    Patches all four db module get_client bindings and patches
+    Patches all four db module get_client bindings, patches
     src.capabilities.similarity._compute_image_embedding to return a
-    deterministic 3072-dim fixture — no live Gemini calls during trace evals.
+    deterministic 3072-dim fixture, and patches
+    src.capabilities.scoring._score_asset_with_vision to return a deterministic
+    VisionScoringOutput — no live Gemini calls during trace evals.
+
+    vision_fixture_provider: callable(image_url, event_context) -> VisionScoringOutput.
+    Defaults to _default_vision_fixture_provider (splits key_figure_names).
     """
+    if vision_fixture_provider is None:
+        vision_fixture_provider = _default_vision_fixture_provider
+
     mock_client = _MockMCPClient()
     with (
         patch("src.db.events.get_client", return_value=mock_client),
@@ -113,6 +140,10 @@ def build_runner_with_mock_db():
         patch(
             "src.capabilities.similarity._compute_image_embedding",
             return_value=build_embedding_fixture(),
+        ),
+        patch(
+            "src.capabilities.scoring._score_asset_with_vision",
+            side_effect=vision_fixture_provider,
         ),
     ):
         agent = build_coordinator()
