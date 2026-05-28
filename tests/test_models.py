@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.models import Asset, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player
+from src.models import Asset, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, SimilarAsset, SimilarityResult
 
 
 def test_event():
@@ -331,3 +331,107 @@ def test_asset():
     assert asset_default.embedding is None
     assert asset_default.scores is None
     assert asset_default.campaign_id is None
+    assert asset_default.similar_assets is None
+
+    # similar_assets accepts a list of strings
+    asset_with_neighbors = Asset(
+        asset_id="ast-003",
+        event_id="evt-001",
+        content_url="/tmp/photo3.jpg",
+        upload_date="2026-07-14T21:00:00Z",
+        similar_assets=["asset-1", "asset-2"],
+    )
+    assert asset_with_neighbors.similar_assets == ["asset-1", "asset-2"]
+
+    # similar_assets rejects non-string list elements
+    with pytest.raises(ValidationError):
+        Asset(
+            asset_id="ast-004",
+            event_id="evt-001",
+            content_url="/tmp/photo4.jpg",
+            upload_date="2026-07-14T21:00:00Z",
+            similar_assets=[123],
+        )
+
+
+def test_similar_asset():
+    # Happy-path construction
+    sa = SimilarAsset(
+        asset_id="past-asset-1",
+        event_id="evt-past-1",
+        similarity=0.85,
+        product_route="poster",
+        scores={"quality_score": 0.9},
+    )
+    assert sa.asset_id == "past-asset-1"
+    assert sa.similarity == 0.85
+    assert sa.product_route == "poster"
+
+    # product_route=None accepted
+    sa_no_route = SimilarAsset(
+        asset_id="past-asset-2",
+        event_id="evt-past-1",
+        similarity=0.7,
+        product_route=None,
+        scores=None,
+    )
+    assert sa_no_route.product_route is None
+    assert sa_no_route.scores is None
+
+    # similarity below 0.0 rejected
+    with pytest.raises(ValidationError):
+        SimilarAsset(
+            asset_id="x", event_id="y", similarity=-0.1,
+            product_route=None, scores=None,
+        )
+
+    # similarity above 1.0 rejected
+    with pytest.raises(ValidationError):
+        SimilarAsset(
+            asset_id="x", event_id="y", similarity=1.1,
+            product_route=None, scores=None,
+        )
+
+    # extra fields rejected
+    with pytest.raises(ValidationError):
+        SimilarAsset(
+            asset_id="x", event_id="y", similarity=0.5,
+            product_route=None, scores=None, bad_field="oops",
+        )
+
+
+def test_similarity_result():
+    sa = SimilarAsset(
+        asset_id="past-asset-1",
+        event_id="evt-past-1",
+        similarity=0.85,
+        product_route="poster",
+        scores=None,
+    )
+
+    # Happy-path with neighbors
+    sr = SimilarityResult(
+        asset_id="current-asset-1",
+        neighbors=[sa],
+        inferred_route="poster",
+    )
+    assert sr.asset_id == "current-asset-1"
+    assert len(sr.neighbors) == 1
+    assert sr.inferred_route == "poster"
+
+    # Empty neighbors accepted
+    sr_empty = SimilarityResult(
+        asset_id="current-asset-2",
+        neighbors=[],
+        inferred_route=None,
+    )
+    assert sr_empty.neighbors == []
+    assert sr_empty.inferred_route is None
+
+    # inferred_route="poster" accepted
+    sr_routed = SimilarityResult(
+        asset_id="current-asset-3",
+        neighbors=[],
+        inferred_route="poster",
+    )
+    assert sr_routed.inferred_route == "poster"

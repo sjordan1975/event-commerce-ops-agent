@@ -200,6 +200,20 @@ Lookup is by team name match against `events.home_team` / `events.away_team` —
 
 ---
 
+## Atlas Vector Search indexes
+
+One Atlas Vector Search index defined on the `assets` collection. Used by `find_similar_assets` (capability 3) — see D-025 for the Step 3 architectural choices.
+
+| Index | Collection | Field path | Dimensions | Similarity | Type |
+|---|---|---|---|---|---|
+| `assets_embedding_index` | `assets` | `embedding` | 3072 | `cosine` | `vectorSearch` |
+
+Dimension matches `gemini-embedding-2` output (D-006). Cosine is the standard for Gemini multimodal embeddings; cosine ≈ dotProduct on L2-normalized outputs. Index name is overridable via the `VECTOR_INDEX_NAME` env var so eval and live deployments can use different indexes if needed.
+
+**Provisioning:** one-time idempotent setup via `scripts/setup_vector_index.py`. Atlas index creation is asynchronous (~minutes); not done at runtime. Re-running the script no-ops if the index already exists.
+
+---
+
 ## Full MongoDB MCP Call List
 
 Organized by capability. Per D-019, the agent does not call MongoDB directly — domain wrappers under each capability call `MongoMCPClient` (which wraps `McpToolset`) internally. The MCP operations below are what runs *inside* each capability.
@@ -222,10 +236,19 @@ LLM output: structured event narrative (narrative angle, key figures with ground
 
 ### `find_similar_assets` ← primary load-bearing MCP step
 ```
-assets.vectorSearch       → embed candidate image with gemini-embedding-2;
-                            find visually similar past assets with known per-channel performance
+(per asset in the event, if asset.embedding is None:)
+[external] Vertex AI gemini-embedding-2 → compute 3072-dim image embedding
+assets.update-many        → persist embedding (permanent; idempotent skip on re-run)
+
+(per asset in the event:)
+assets.aggregate          → $vectorSearch on assets_embedding_index (path: embedding,
+                            queryVector: asset.embedding, numCandidates: 10 × top_k,
+                            limit: top_k) → $match excluding current event_id →
+                            $project asset_id, event_id, product_route, scores,
+                            similarity ($meta: vectorSearchScore)
+assets.update-many        → persist neighbor asset_ids onto current asset (similar_assets)
 ```
-Removing this call removes the per-channel similarity signal — routing degrades to pure LLM inference.
+Top-K defaults to 5 (D-025). Removing the `$vectorSearch` call removes the per-channel similarity signal — routing degrades to pure LLM inference. The current event's assets get embedded and persisted, so today's batch becomes tomorrow's similarity corpus (the feedback-loop seed).
 
 ### `score_assets_with_vision`
 ```

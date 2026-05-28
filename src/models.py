@@ -74,3 +74,20 @@ class Asset(BaseModel):
     embedding: list[float] | None = None
     scores: dict[str, Any] | None = None
     campaign_id: str | None = None
+    similar_assets: list[str] | None = None
+
+
+class SimilarAsset(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_id: str
+    event_id: str
+    similarity: float = Field(..., ge=0.0, le=1.0)
+    product_route: str | None
+    scores: dict[str, Any] | None
+
+
+class SimilarityResult(BaseModel):
+    asset_id: str
+    neighbors: list[SimilarAsset]
+    inferred_route: str | None

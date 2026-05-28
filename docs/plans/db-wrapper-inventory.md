@@ -162,7 +162,7 @@ The two MongoDB writes here are *not* inseparable. Embedding is permanent work t
 
 | Wrapper | Internal MCP calls | Notes |
 |---|---|---|
-| `vector_search_assets(embedding: list[float], top_k: int = 20, channel: str \| None = None) -> list[SimilarAsset]` | `assets aggregate` ($vectorSearch) | The load-bearing MongoDB call. Naming makes the Atlas Vector Search feature explicit at the wrapper layer. Optional `channel` narrows the candidate pool. *(Renamed from `find_similar_assets` per D-021 — the capability keeps that name.)* |
+| `vector_search_assets(embedding: list[float], top_k: int = 5, exclude_event_id: str \| None = None) -> list[SimilarAsset]` | `assets aggregate` ($vectorSearch) | The load-bearing MongoDB call. Naming makes the Atlas Vector Search feature explicit at the wrapper layer. `exclude_event_id` prevents an event's own assets from being returned as their own neighbors. *(Renamed from `find_similar_assets` per D-021. Signature revised per D-025: `channel` dropped — per-channel routing is `propose_review_queue`'s judgment surface, not a wrapper concern; neighbors' `product_route` is surfaced in the result for Step 5 to compose over. Default `top_k` lowered from 20 to 5.)* |
 | `save_asset_embedding(asset_id: str, embedding: list[float]) -> None` | `assets update-many` | Permanent — once written, never recomputed. |
 | `save_similar_assets(asset_id: str, similar_asset_ids: list[str]) -> None` | `assets update-many` | Analytical result; could be recomputed if the corpus grows. |
 

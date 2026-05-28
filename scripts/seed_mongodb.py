@@ -700,7 +700,44 @@ def is_seeded(db) -> bool:
 # Main
 # ---------------------------------------------------------------------------
 
+
+def vector_only(db, genai_client: genai.Client) -> None:
+    """Re-embed any asset in the corpus that is missing an embedding.
+
+    Fail-fast: if an image is unreachable, aborts with the asset_id in the error.
+    """
+    assets = list(db.assets.find({"embedding": None}, {"asset_id": 1, "content_url": 1}))
+    if not assets:
+        print("All assets already have embeddings — nothing to do.")
+        return
+    print(f"Re-embedding {len(assets)} assets without embeddings ...")
+    for asset in assets:
+        asset_id = asset["asset_id"]
+        url = asset["content_url"]
+        try:
+            print(f"  embedding asset {asset_id}: {url}")
+            embedding = embed_image(genai_client, url)
+        except Exception as exc:
+            print(
+                f"ERROR: failed to embed asset_id={asset_id!r} content_url={url!r}: {exc}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        db.assets.update_one({"asset_id": asset_id}, {"$set": {"embedding": embedding}})
+    print(f"Done. Embedded {len(assets)} assets.")
+
+
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Seed event_commerce with historical World Cup data.")
+    parser.add_argument(
+        "--vector-only",
+        action="store_true",
+        help="Re-embed assets that are missing embeddings without re-seeding.",
+    )
+    args = parser.parse_args()
+
     if not MONGODB_URI:
         print("Error: MONGODB_URI is not set.", file=sys.stderr)
         sys.exit(1)
@@ -710,13 +747,18 @@ def main() -> None:
 
     client = MongoClient(MONGODB_URI)
     db = client[DB_NAME]
+    genai_client = genai.Client(api_key=GOOGLE_API_KEY)
+
+    if args.vector_only:
+        vector_only(db, genai_client)
+        client.close()
+        return
 
     if is_seeded(db):
         print("Seed data already present — nothing to do.")
         client.close()
         return
 
-    genai_client = genai.Client(api_key=GOOGLE_API_KEY)
     rng = random.Random(42)
 
     # Insert events
@@ -726,14 +768,22 @@ def main() -> None:
         db.events.insert_one(event_doc)
         print(f"  inserted event: {event['event_id']} ({event['outcome_type']})")
 
-    # Insert assets and collect performance docs
+    # Insert assets with embeddings (fail-fast on unreachable image)
     performance_docs = []
     for i, image in enumerate(SEED_IMAGES):
         print(f"  [{i + 1}/{len(SEED_IMAGES)}] embedding: {image['description']}")
-        embedding = embed_image(genai_client, image["url"])
+        asset_id = str(uuid.uuid4())
+        try:
+            embedding = embed_image(genai_client, image["url"])
+        except Exception as exc:
+            print(
+                f"ERROR: failed to embed asset_id={asset_id!r} content_url={image['url']!r}: {exc}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
         scores = generate_scores(image["tags"], rng)
         product_route = assign_product_route(scores)
-        asset_id = str(uuid.uuid4())
         campaign_id = str(uuid.uuid4())
 
         db.assets.insert_one({
@@ -763,7 +813,7 @@ def main() -> None:
     db.player_context.insert_many(player_docs)
 
     print(f"\n  {len(SEED_EVENTS)} events inserted")
-    print(f"  {len(SEED_IMAGES)} assets inserted")
+    print(f"  {len(SEED_IMAGES)} assets inserted (each with a 3072-dim embedding)")
     print(f"  {len(performance_docs)} performance records inserted")
     print(f"  {len(player_docs)} player_context records inserted")
     print("\nDone.")

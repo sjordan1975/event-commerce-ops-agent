@@ -489,6 +489,37 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 ---
 
+### D-025 — Step 3 Architectural Choices: Vector Search Configuration + Embedding Auth Path
+
+**Date:** 2026-05-28
+**Decision:** Five locked-in choices for the Step 3 `find_similar_assets` capability, captured here so they are searchable rather than buried in the step plan.
+
+1. **Similarity metric: `cosine`.** Standard for Gemini multimodal image embeddings. `gemini-embedding-2` outputs are L2-normalizable, so cosine ≈ dotProduct in practice. Atlas Vector Search also supports `euclidean`; rejected — different geometry, no benefit for normalized embeddings.
+
+2. **Default `top_k = 5`** (lowered from `db-wrapper-inventory.md`'s original `top_k = 20`). Keeps trace logs scannable and matches typical "show me the top few" UI expectations. Revisitable in Step 5 planning if the exploitation queue feels brittle. `numCandidates = 10 × top_k = 50` per Atlas guidance for high-recall vector search.
+
+3. **Vector index provisioned at setup time, not lazily.** One-time idempotent `scripts/setup_vector_index.py` creates `assets_embedding_index`. Lazy creation rejected — couples runtime to the Atlas Admin API and adds minutes of cold-start latency on first call (Atlas vector-index creation is asynchronous, ~minutes).
+
+4. **Embedding auth path: `google.genai` SDK + `GOOGLE_API_KEY`** (Google AI Studio surface), matching Step 2's existing path (`src/capabilities/context.py:22`). **Reconciles D-006's "Vertex AI" framing** — same model (`gemini-embedding-2`), different SDK surface. The `google.genai` SDK supports both AI Studio (`api_key=...`) and Vertex (`vertexai=True, project=..., location=...`); flipping to Vertex auth later is a one-line client-construction change behind the `_compute_image_embedding` helper. Chose AI Studio for Step 3 to keep the auth surface consistent with the rest of the codebase rather than introducing GCP ADC + project/location config for one helper.
+
+5. **Current event's assets get embedded and persisted** — not only historical assets. Today's ingested batch becomes tomorrow's similarity corpus (the feedback-loop seed). Skipping this would scope Step 3 to "search against pre-existing corpus only" and defer corpus growth to Step 9 (`record_outcomes`); rejected because the embedding compute is already happening for the search, so the persisted column makes the corpus grow for free.
+
+**Wrapper signature consequence:** `vector_search_assets(embedding, top_k=5, exclude_event_id=None)` deviates from the pre-D-025 inventory entry `vector_search_assets(embedding, top_k=20, channel=None)`. The `channel` parameter is dropped — it was a candidate-pool **pre-filter** ("only search past posters"), useful only when we already know the asset's product type before searching, which we don't at MVP. `exclude_event_id` is added to prevent an event's own assets from being returned as their own neighbors. `db-wrapper-inventory.md` updated to match.
+
+**Routing inference belongs to Step 3, not Step 5.** Per `docs/specs/01-requirements.md` line 202 and `docs/plans/strategic-agent-reframe.md`, **routing for the exploitation queue is mechanical, not judgment**: aggregate the neighbors' `product_route`, dominant route wins (plurality, similarity-weighted tie-break). Step 3 produces this as a derived field `inferred_route: str | None` on each `SimilarityResult` (`None` when `neighbors` is empty — the discovery-queue candidate path). The capability `find_similar_assets` gains a tiny private helper `_infer_route_from_neighbors`; no wrapper signature changes.
+
+**What Step 5 actually decides** (correcting the prior misframing): for exploitation items, Step 5 *uses* `inferred_route` without re-deriving — its judgment is the quality gate (Vision scores from Step 4 catching compositionally-similar-but-technically-unfit), commercial-signal ranking, event-narrative fit ordering, and per-item reasoning. For exploration items (no similarity match), Step 5 assigns `product_route` itself based on Vision + narrative + image content. The persistence boundary stays Step 5's `assign_asset_to_queue(asset_id, queue_type, product_route, reasoning)` per the wrapper inventory — so Step 5 can override Step 3's inference if Vision flags the asset as unprintable, or pick a route for items Step 3 left as `None`.
+
+**Channel cardinality (clarification):** the spec uses three terms that are easy to conflate. *Distribution channels* = 2 (commerce via Shopify+Printful; social, simulated). *`product_route` values* = 3 (`poster | tshirt | social_only`). Poster and tshirt share the commerce channel but are distinct product decisions. Performance metrics break out by `shopify` / `printful` / `social` (`docs/specs/02-architecture.md` § `performance`, line 175). There is no explicit `high_performer` flag — high vs. low is derived from raw metrics (views, orders, revenue, impressions, saves).
+
+**Identity-routing concern (Messi-shots problem)** captured in `docs/plans/step-3-similarity.md` risks table for Step 5 planning to inherit: cosine on a multimodal embedding may not preserve subject identity as the dominant similarity signal. Mitigation lands downstream — Step 4 (Vision scoring) extracts identity as structured fields (`detected_subjects`, `recognizable_jersey`); Step 5 (`propose_review_queue`) composes identity + similarity + narrative `key_figures`. Step 3 stays purely "embed + vector search + mechanical routing inference, no judgment."
+
+**Verification:** N/A at decision time — Step 3 implementation has not started. Verification is the trace-eval gate in `docs/tasks/step-3-tasks.md` § T-3.14 / T-3.15.
+
+**Refines:** D-006 (embedding provider — reconciles the SDK surface), D-021 (capability surface — locks in the explicit `find_similar_assets` wrapper signature).
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta
