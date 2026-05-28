@@ -62,8 +62,8 @@ async def _run_agent(runner) -> list:
             new_message=msg,
         ):
             events.append(event)
-    except ValueError:
-        pass  # ADK raises ValueError for unknown tool names — return partial trace
+    except Exception:
+        pass  # ADK may propagate tool errors (ValueError, PreconditionError, etc.) — partial traces still useful
     return events
 
 

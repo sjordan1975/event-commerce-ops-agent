@@ -409,6 +409,50 @@ The reframe exposes the one place where the existing spec admits it has no deter
 
 ---
 
+### D-022 — Persist Event Narrative on the `events` Document (refines D-016)
+**Date:** 2026-05-27  
+**Decision:** `build_event_context` writes the structured `EventNarrative` onto the producing `events` document as a new `event_narrative` field, in addition to returning the narrative to agent state for the current turn.
+
+**Refines:** D-016. D-016's substance is unchanged — narrative is still a typed structured artifact, player facts are still retrieved from `player_context` by team-name match, and `draft_campaigns_for_queue` still consumes it as copy substrate. The framing that changes is the in-state-only paragraph carried forward into `docs/specs/02-architecture.md` § `build_event_context` (*"returned to agent state, consumed by `draft_campaigns_for_queue`"*) — now superseded by "persisted on the events doc and read by downstream capabilities from there."
+
+**Why this matters:**
+- `propose_review_queue` (capability 5 per D-021) has four hard preconditions, of which `event_narrative` is one. With persistence, the precondition check is a cheap `event.event_narrative is None` on a document the wrapper already has to read. Without persistence, the agent would have to pass the multi-hundred-token narrative payload as a tool-call argument every time queue assembly runs — inflating token cost, increasing the surface for the agent to lose/garble the artifact across turns, and forcing the same payload through any other downstream tool call that also needs it.
+- Persistence also makes the narrative survive session reset: a resumed agent run reads the narrative from `events`, rather than having to recompute or be re-handed it.
+- Cost is one additional `events.update-many` per `build_event_context` invocation — sub-100ms in practice and dominated by the network round-trip the capability already pays for its reads.
+
+**Schema impact:**
+- `events` documents gain optional `event_narrative` field (nullable; absent for events that have been ingested but not yet had context built).
+- `Event` Pydantic model in `src/models.py` gains `event_narrative: EventNarrative | None = None`. Pydantic validates the nested shape at insert/update boundaries — a malformed narrative fails at write time, which is the bug-surface we want.
+- `EventNarrative` and its nested types (`KeyFigure`, `HistoricalBaseline`) live in the same `src/models.py` file — no import cycle.
+
+**MCP call list impact:** `build_event_context` adds one `events.update-many` call (filter by `event_id`, `$set: {event_narrative: ...}`). MongoDB MCP exposes `update-many` but not `update-one`; the filter is unique by `event_id`, so the semantics collapse to a single-document update.
+
+**Out of scope:**
+- D-022 does not change the narrative's typed structure, the LLM call shape (direct `google.genai` with `response_schema=EventNarrative`), the player_context retrieval strategy, or the downstream consumer in Step 5/6. It only changes *where the narrative lives between producer and consumers.*
+- D-022 does not change agent-facing surface — `build_event_context` still returns the narrative dict from the FunctionTool call. Persistence is additive to the return.
+
+**Full design context:** `docs/plans/step-2-context.md` § "Persistence: `event_narrative` field on `events`".
+
+---
+
+### D-023 — Recognized Architectural Debt: LLM-Driven vs Graph-Driven Orchestration
+**Date:** 2026-05-27  
+**Decision:** Accept LLM-driven tool selection for MVP; flag graph-based orchestration as the correct post-hackathon direction.
+
+**Context:** Evals on Step 1 and Step 2 surfaced a reliability failure mode: after ingesting a batch, the agent sometimes chains to `build_event_context` even when the operator explicitly says "stop after ingestion." Root cause is that a single `LlmAgent` with all tools registered treats tool selection as a judgment call every turn — including decisions that are structurally determined.
+
+**The transferable concept (LangGraph's `add_node`/`add_edge`):** In LangGraph, you wire execution order explicitly in the graph structure. The ADK equivalent is `SequentialAgent` for ordered pipelines and a coordinator `LlmAgent` for branch points. This approach makes deterministic steps deterministic — the graph enforces them, not the prompt.
+
+**Why most of this workflow would benefit from graph structure:** Ingest → build context → find similar assets → score assets is a data-dependency pipeline, not a judgment call. Only `propose_review_queue` genuinely requires LLM judgment (exploitation/exploration selection and per-item reasoning). The rest is operational sequencing.
+
+**Why we're not doing it now:** Switching `LlmAgent` to a `SequentialAgent` + strategic coordinator touches agent architecture, eval setup, and the HITL suspension pattern (which requires specific ADK handling for `LongRunningFunctionTool`). Scope risk against a tight deadline outweighs the reliability gain for a demo context.
+
+**Mitigation for MVP:** System prompt now makes workflow steps explicitly numbered and adds "the operator drives the workflow — only proceed when instructed." Combined with PreconditionError enforcement, this reduces (but does not eliminate) unwanted chaining. Prompt-based control with N=5 pass-rate gates is the acceptance criterion.
+
+**Post-hackathon direction:** Refactor to a coordinator `LlmAgent` that routes to specialized sub-agents or a `SequentialAgent` pipeline for the deterministic steps, with `LlmAgent` reserved for `propose_review_queue`. This eliminates the entire class of "agent chains to next step when it shouldn't" failures.
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta
@@ -440,7 +484,7 @@ The reframe exposes the one place where the existing spec admits it has no deter
 | `docs/plans/step-0-foundation.md` | Step 0 — agent shell, MCP wiring, smoke tests | Complete — merged to `main` |
 | `docs/tasks/step-0-tasks.md` | Step 0 task list | Complete |
 | `docs/plans/step-0.5-refactor.md` | Step 0.5 — D-019 enforcement (no raw MCP in `agent.tools`) | Complete — merged to `main` |
-| `docs/plans/step-1-event-ingestion.md` | Step 1 — event + asset ingestion | **Pending rewrite per D-021** (Phase B) |
-| `docs/tasks/step-1-tasks.md` | Step 1 task list | **Pending rewrite per D-021** (Phase B) |
+| `docs/plans/step-1-event-ingestion.md` | Step 1 — event + asset ingestion | Complete — merged to `main` |
+| `docs/tasks/step-1-tasks.md` | Step 1 task list | Complete — merged to `main` |
 
 Deprecated planning docs moved to `deprecated/` (gitignored).
