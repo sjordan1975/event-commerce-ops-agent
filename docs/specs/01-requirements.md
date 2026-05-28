@@ -216,6 +216,8 @@ The top-K by similarity score form the **exploitation queue** candidate set. The
 
 Event-level `timeliness` is read from the `events` document (computed at ingestion — not scored per image).
 
+In addition to the five scores, `score_assets_with_vision` emits a `detected_subjects: list[str]` per asset — the names of recognizable players/people visible in the frame (empty when none). This is the structural fix for the identity-blind-cosine concern (per D-026): Step 5's `propose_review_queue` composes `detected_subjects` against the narrative's `key_figures` to upweight identity-matched neighbors over generic-scene matches when assembling the exploitation queue.
+
 Scores serve different purposes per queue: for the exploitation half, technical fitness is the quality gate that catches compositionally-similar-but-technically-unfit images; commercial signal provides ranking refinement. For the exploration half (assembled by `propose_review_queue`), technical fitness confirms the frame is viable and commercial signal indicates whether the image has qualities worth surfacing despite low similarity.
 
 **5. `propose_review_queue`** — **The strategic decision.** Takes similarity results (from `find_similar_assets`), scores (from `score_assets_with_vision`), and narrative (from `build_event_context`); outputs the ranked review queue. Hard-refuses if any of those four preconditions are missing, with self-correcting errors that tell the agent what to call next.

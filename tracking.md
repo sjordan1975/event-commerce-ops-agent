@@ -520,6 +520,54 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 ---
 
+### D-026 — `detected_subjects` Extraction in Step 4 + Identity Composition in Step 5
+
+**Date:** 2026-05-28
+**Decision:** `score_assets_with_vision` (Step 4) emits a `detected_subjects: list[str]` per asset alongside the 5-dim score block. `propose_review_queue` (Step 5) composes this list against the narrative's `key_figures` to upweight identity-matched neighbors when assembling the exploitation queue.
+
+**Promotes:** the Messi-shots risk row from `docs/plans/step-3-similarity.md` (cosine on a multimodal embedding does not preserve subject identity as the dominant similarity signal) to a formal architectural commitment. Step 3 stays purely "embed + vector search + mechanical routing inference, no judgment"; the identity fix lands in Steps 4/5.
+
+**Shape choice:** `list[str]` (player/person names), not a structured `DetectedSubject` model. The only consumer (Step 5) needs name matching against `KeyFigure.name`. Bounding boxes, confidence scores, and jersey numbers are YAGNI surface — add them only when a consumer needs them.
+
+**Hallucination guard:** lives in the Vision prompt ("only name when face or unambiguous jersey identifier is visible AND name matches key_figures; bias toward empty over speculative") and the trace-eval assertion ("every entry in `detected_subjects` is a substring of some `key_figure.name`"). The Pydantic schema constrains shape, not factuality.
+
+**Refines:** D-017 (Step 4 dual-job), D-021 (Step 5 strategic decision composition).
+
+---
+
+### D-027 — `Asset.scores` Typed as `AssetScores`
+
+**Date:** 2026-05-28
+**Decision:** `Asset.scores` retyped from `dict[str, Any] | None` to `AssetScores | None` (new Pydantic model with five `Field(..., ge=0.0, le=1.0)` dimensions: `quality_score`, `merch_score`, `emotional_score`, `social_score`, `identity_score`).
+
+**Rationale:** the typed boundary surfaces malformed score blocks at the persistence-write boundary rather than at a far-downstream consumer (Step 5 ranking). The Vision LLM returns `VisionScoringOutput(scores: AssetScores, detected_subjects: list[str])` via `response_schema`; the typed `Asset.scores` field reuses the same model so the contract is single-sourced.
+
+**Trade-off acknowledged:** future score-dimension additions become a model change (new `Field` on `AssetScores`) rather than a dict-key addition. Acceptable — the five dimensions are locked in by D-013 + D-017; adding a sixth is a real architectural decision that warrants a model change anyway.
+
+**Why safe to land in Step 4:** no merged capability writes `Asset.scores` today (the Step 4 stub never wrote it). The retype has no existing readers to break.
+
+**Refines:** D-013 (scoring dimension redesign — locks the typed contract), D-017 (dual-job framing — the type carries the same five dimensions split across two roles).
+
+---
+
+### D-028 — `GEMINI_VISION_MODEL` Defaults to `gemini-2.5-flash`
+
+**Date:** 2026-05-28
+**Decision:** New env var `GEMINI_VISION_MODEL` for the Step 4 Vision call defaults to `gemini-2.5-flash`, **not** `gemini-2.5-flash-lite`.
+
+**Rationale:** D-024 set the general workflow-node default to `gemini-2.5-flash-lite` (`GEMINI_MODEL`) for cost on bounded-reasoning tasks. Vision is the first workflow capability that warrants the upgrade because:
+
+1. **`detected_subjects` is a hallucination surface.** Naming a player who isn't in the frame causes mis-routing in Step 5. The stronger model is more reliable at "leave empty when uncertain."
+2. **Commercial-signal dimensions are judgment-dense.** `emotional_score`, `social_score`, `identity_score` are interpretive assessments per D-017 — flash-lite's failure modes on judgment-shaped tasks make it the wrong default here.
+
+**Cost trade-off:** Vision is per-asset (≤20 calls per event in MVP), so the model upgrade is bounded. If demo-budget constraints force a downgrade, the env var allows it without code change.
+
+**Pattern consistency:** matches the env-var-per-LLM-role pattern set by D-024 (`GEMINI_COORDINATOR_MODEL`, `GEMINI_MODEL`) and Step 2 (`GEMINI_NARRATIVE_MODEL`).
+
+**Refines:** D-024 (model env var split — adds the fourth role).
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta
