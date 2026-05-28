@@ -150,14 +150,11 @@ def _make_events_find_handler():
 
 def _make_assets_find_handler():
     """Return seeded assets (no embeddings) for the current event's find call."""
-    _call_count = {"n": 0}
-
     def handler(args: dict) -> list:
         f = args.get("filter", {})
         # find call from get_assets_for_event — return 3 assets without embeddings
         if "event_id" in f and "status" not in f:
             event_id = f["event_id"]
-            _call_count["n"] += 1
             return [
                 {
                     "asset_id": f"ast-{i}",
@@ -289,7 +286,7 @@ def _assert_single_run(
     vs_calls = [
         (tn, a) for tn, a in mock_client.calls
         if tn == "aggregate" and a.get("collection") == "assets"
-        and a.get("pipeline", [{}])[0].get("$vectorSearch") is not None
+        and (a.get("pipeline") or [{}])[0].get("$vectorSearch") is not None
     ]
     if len(vs_calls) != 3:
         failures.append(

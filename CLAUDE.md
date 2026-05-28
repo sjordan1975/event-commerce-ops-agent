@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Step 3 plan + task list drafted and approved (plan-gate cleared 2026-05-28). On branch `step/3-similarity` (rebased onto post-D-024 `main`). Implementation not yet started — three branch-housekeeping commits and the tasks-file human gate stand between here and T-3.1.**
+**Step 3 implementation complete (T-3.1–T-3.17 done 2026-05-28). On branch `step/3-similarity`. Ready to merge to `main`.**
 
-Next action: (1) Land branch-housekeeping commits on `step/3-similarity` (doc-only, no code): update `docs/specs/02-architecture.md` (assets schema gains `similar_assets`, new "Atlas Vector Search indexes" subsection defining `assets_embedding_index`, MCP call list shows explicit `$vectorSearch` pipeline); update `docs/plans/db-wrapper-inventory.md` (`vector_search_assets` signature: drop `channel`, add `exclude_event_id`, lower default `top_k` to 5); add new D-entry in `tracking.md` capturing Step 3 architectural choices (cosine, top_k=5, setup-time index provisioning, `google.genai`+`GOOGLE_API_KEY` reconciling D-006, current-event assets get embedded). (2) Human-gate the task list at `docs/tasks/step-3-tasks.md`. (3) Begin implementation from T-3.1 (Pydantic models: `SimilarAsset`, `SimilarityResult`, `Asset.similar_assets` field).
+Next action: (1) Merge `step/3-similarity` to `main`. (2) Cut branch `step/4-vision` for `score_assets_with_vision` (Vision scoring + dual-job per D-017). (3) The branch-housekeeping commits for spec/tracking doc updates (docs/specs/02-architecture.md, docs/plans/db-wrapper-inventory.md, tracking.md D-025 update) are still outstanding on this branch — land those before or alongside the merge commit.
+
+Key Step 3 implementation notes for Step 4: `_compute_image_embedding` uses `google.genai` SDK with `Part.from_bytes` (not `from_uri`) and drops `task_type` (unsupported by `gemini-embedding-2`). The `find_similar_assets` node is the third node in the workflow graph (START → ingest → context → similarity). `similarity_results` is now written to session state for `propose_review_queue` (Step 5) to consume.
 
 Reference: `docs/plans/step-3-similarity.md` (the plan), `docs/tasks/step-3-tasks.md` (17 atomic tasks T-3.1–T-3.17), `tracking.md` D-024 for the orchestration architecture Step 3 lands against, `docs/plans/strategic-agent-reframe.md` for the capability-surface rationale. Identity-routing concern (Messi-shots problem) is captured in the Step 3 plan's risks table for Step 5 planning to inherit — Vision extracts `detected_subjects` in Step 4; Step 5 composes identity with similarity + narrative.
 
