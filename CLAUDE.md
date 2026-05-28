@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Step 4 implementation complete on `step/4-vision` (2026-05-28). T-4.1 → T-4.14 all done; T-4.13 single-run trace eval passed; T-4.14 pass-rate gate passed at N=5.**
+**Step 4 merged to `main` (2026-05-28). `score_assets_with_vision` live — AssetScores, detected_subjects, scoring node wired into pipeline. Next step is Step 5 (`propose_review_queue`).**
 
-Next action: Run `EVAL_REPEAT=20 .venv/bin/python -m pytest tests/evals/test_step_4_trace.py -v` to satisfy the D-020 ship gate (≥19/20), then merge `step/4-vision` → `main` with an updated "Next action" line pointing at Step 5 (`propose_review_queue`).
+Next action: Cut `step/5-queue` from `main`. Implement `propose_review_queue` — the strategic LlmAgent node that composes scores + detected_subjects + narrative key_figures into two-queue assignments (exploitation / exploration) per D-015/D-021. See `docs/specs/01-requirements.md` § `propose_review_queue` and `docs/strategic-agent-reframe.md` for the capability surface.
 
 Key Step 4 decisions baked in (D-026 / D-027 / D-028): Vision capability emits typed `AssetScores` + `detected_subjects: list[str]` per asset; `Asset.scores` retyped from `dict[str, Any]` to `AssetScores | None`; new env var `GEMINI_VISION_MODEL` defaults to `gemini-2.5-flash` (not flash-lite — judgment density + hallucination surface). Per-asset Vision call, idempotent skip on `asset.scores is None`. Step 4 does **not** write `product_route` or `queue_type` (Step 5's boundary). Workflow chain extends to `START → ingest → context → similarity → scoring`; `scored_assets` lands in session state for `propose_review_queue`.
 
