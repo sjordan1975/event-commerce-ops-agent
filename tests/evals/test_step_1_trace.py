@@ -36,9 +36,54 @@ APP_NAME = "event_commerce_ops_agent"
 OPERATOR_PROMPT = (
     "Argentina pulled off the upset, beating heavy favorites France 3-2. "
     "Photos: /tmp/wc-final/img01.jpg, /tmp/wc-final/img02.jpg, /tmp/wc-final/img03.jpg. "
-    "Match started 2026-05-27T19:00:00Z, finished ~20 min ago. "
-    "Ingest this batch and confirm when done. Stop after ingestion."
+    "Match started 2026-05-27T19:00:00Z. Match name: 'Argentina vs France'. "
+    "Process this batch."
 )
+
+
+def _seed_mock_for_full_pipeline(mock_client) -> None:
+    """Seed reads needed for both ingest + context to succeed under the workflow.
+
+    Under D-024 the coordinator dispatches `run_event_pipeline` which runs the
+    full pipeline (currently ingest + context). The event_id is dynamic (a fresh
+    uuid per run), so the find-by-id handler synthesizes a matching event doc
+    from whichever event_id the workflow asks for.
+    """
+    base_event = {
+        "name": "Argentina vs France",
+        "home_team": "Argentina",
+        "away_team": "France",
+        "location": None,
+        "start_date": "2026-05-27T19:00:00Z",
+        "final_score": "3-2",
+        "outcome_type": "upset_victory",
+        "timeliness": 0.87,
+        "ingested_at": "2026-05-27T19:30:00Z",
+    }
+
+    def find_events(args: dict) -> list:
+        f = args.get("filter", {})
+        event_id_filter = f.get("event_id")
+        if isinstance(event_id_filter, str):
+            return [{**base_event, "event_id": event_id_filter}]
+        return []
+
+    players = [
+        {
+            "player_id": "p1",
+            "name": "Lionel Messi",
+            "nationality": "Argentina",
+            "team": "Argentina",
+            "position": "Forward",
+            "notable_facts": ["5th World Cup appearance", "2022 World Cup winner"],
+            "career_milestones": "8x Ballon d'Or",
+            "commercial_signal": "high",
+        }
+    ]
+
+    mock_client.register("find", "events", find_events)
+    mock_client.register("find", "player_context", players)
+    mock_client.register("aggregate", "performance", [])
 
 
 async def _run_agent(runner) -> list:
@@ -73,22 +118,22 @@ def _assert_single_run(events: list, mock_client, trace_label: str) -> list[str]
     trace_path = dump_trace(events, trace_label)
 
     tool_calls = extract_tool_calls(events)
-    ingest_calls = [c for c in tool_calls if c["name"] == "ingest_event_batch"]
+    pipeline_calls = [c for c in tool_calls if c["name"] == "run_event_pipeline"]
 
     # Collect all classified parts once for text-order analysis
     from tests.evals.conftest import _collect_parts
     all_parts = _collect_parts(events)
 
-    # (a) capability selection — ingest_event_batch called exactly once
-    if len(ingest_calls) != 1:
+    # (a) capability selection — coordinator dispatched the pipeline exactly once
+    if len(pipeline_calls) != 1:
         failures.append(
-            f"(a) Expected ingest_event_batch called 1 time, got {len(ingest_calls)}. "
+            f"(a) Expected run_event_pipeline called 1 time, got {len(pipeline_calls)}. "
             f"Trace: {trace_path}"
         )
 
-    # (b) natural-language field extraction
-    if ingest_calls:
-        meta = ingest_calls[0]["args"].get("event_metadata", {})
+    # (b) natural-language field extraction — event_metadata passed to the pipeline
+    if pipeline_calls:
+        meta = pipeline_calls[0]["args"].get("event_metadata", {})
         if not isinstance(meta, dict):
             failures.append(f"(b) event_metadata is not a dict: {meta!r}. Trace: {trace_path}")
         else:
@@ -187,6 +232,7 @@ def _assert_single_run(events: list, mock_client, trace_label: str) -> list[str]
 async def test_step_1_single_run():
     """Single-run outcome-shaped trace eval for ingest_event_batch."""
     with build_runner_with_mock_db() as (runner, mock_client):
+        _seed_mock_for_full_pipeline(mock_client)
         events = await _run_agent(runner)
 
     failures = _assert_single_run(events, mock_client, "step_1_single_run")
@@ -202,6 +248,7 @@ async def test_step_1_pass_rate():
 
     for i in range(n):
         with build_runner_with_mock_db() as (runner, mock_client):
+            _seed_mock_for_full_pipeline(mock_client)
             events = await _run_agent(runner)
         failures = _assert_single_run(events, mock_client, f"step_1_pass_rate_run_{i}")
         if not failures:

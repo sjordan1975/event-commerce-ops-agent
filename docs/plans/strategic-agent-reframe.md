@@ -163,19 +163,19 @@ The edit-requested loop is the agent's reasoning, **not a separate capability**.
 
 ---
 
-## Enforced vs. emergent
+## Enforced vs. emergent (revised by D-024)
 
 (Resolution to open question #3.)
 
-The capability surface defines *what* the agent can do; this section resolves *what each capability enforces* and what stays in the agent's discretion. The principle is sharp: **enforce data dependencies; leave order among independent operations to the agent.**
+The capability surface defines *what* the agent can do; this section resolves *what each capability enforces* and what stays in the agent's discretion. The pre-D-024 principle was: **enforce data dependencies via wrapper-level `PreconditionError`; leave order among independent operations to the agent.** D-024 tightened the enforcement surface: order is now enforced **structurally by workflow graph edges**, not by `PreconditionError` checks at runtime. `PreconditionError` remains as a defense-in-depth signal — direct capability calls (e.g., from unit tests in `tests/test_step_*.py`) still get the self-correcting error if state is missing — but the graph removes the surface for the agent to violate the dependency in the first place.
 
 ### Why this split
 
-Data dependencies are physical invariants — you cannot propose a queue with no assets, draft for a non-existent queue, or execute approvals that do not exist. These are wrapper-level contracts, not reasoning challenges. Agent autonomy gains nothing from being free to try them and fail; refusing them with a clear error is strictly better than letting them silently produce garbage.
+Data dependencies are physical invariants — you cannot propose a queue with no assets, draft for a non-existent queue, or execute approvals that do not exist. Pre-D-024 these were enforced at the wrapper layer; post-D-024 they are enforced at the workflow-graph layer, with the wrapper-layer check kept as a safety net. Either way, agent autonomy gains nothing from being free to try them and fail.
 
-Order among independent operations is judgment-shaped: among `build_event_context`, `find_similar_assets`, and `score_assets_with_vision`, all three are independent of each other (each only requires ingestion) and all three feed `propose_review_queue`. The agent can pick the order, parallelize them conceptually, or interleave them with other reasoning. That is where "emergent" lives.
+Order among independent operations was originally framed as judgment-shaped: among `build_event_context`, `find_similar_assets`, and `score_assets_with_vision`, all three only require ingestion and all three feed `propose_review_queue`. **D-024 reframes this**: since the agent's value at Layer 2 (capability composition) is recognition rather than judgment (see `agentic-model.md`), the marginal value of letting the agent pick an order among independent operations is small, while the cost of letting it skip a step or hallucinate an order is real. The workflow graph wires them as a fixed chain. The agent's strategic surface stays exactly where it was — on `propose_review_queue` (Layer 3).
 
-This split matches D-019's spirit: wrappers enforce contracts; the agent's strategic surface lives above those contracts. It is also consistent with the capability-surface resolution in § The capability surface — explicit `find_similar_assets` and `score_assets_with_vision` make their outputs first-class artifacts that downstream capabilities can require as preconditions. The implicit-similarity alternative (bundled into queue assembly) would have made precondition enforcement messier — no clear wrapper boundary to enforce on. Explicit surface + enforced preconditions are consistent design choices that reinforce each other.
+This still matches D-019's spirit: wrappers enforce data contracts; the agent's strategic surface lives above those contracts. The change is that the agent no longer drives composition at all (the graph drives it); the strategic surface — Layer 3 — is unchanged.
 
 ### Preconditions per capability
 

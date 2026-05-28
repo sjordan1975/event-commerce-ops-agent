@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Union
 from unittest.mock import patch
 
-from src.agent import APP_NAME, build_agent, build_runner
+from src.agent import APP_NAME, build_coordinator, build_runner
 
 
 def _make_mcp_envelope(docs: list[dict]) -> dict:
@@ -88,7 +88,7 @@ def build_runner_with_mock_db():
         patch("src.db.performance.get_client", return_value=mock_client),
         patch("src.db.player_context.get_client", return_value=mock_client),
     ):
-        agent = build_agent()
+        agent = build_coordinator()
         runner = build_runner(agent)
         yield runner, mock_client
 

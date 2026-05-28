@@ -435,9 +435,9 @@ The reframe exposes the one place where the existing spec admits it has no deter
 
 ---
 
-### D-023 — Recognized Architectural Debt: LLM-Driven vs Graph-Driven Orchestration
+### D-023 — Recognized Architectural Debt: LLM-Driven vs Graph-Driven Orchestration (PAID by D-024)
 **Date:** 2026-05-27  
-**Decision:** Accept LLM-driven tool selection for MVP; flag graph-based orchestration as the correct post-hackathon direction.
+**Decision:** Accept LLM-driven tool selection for MVP; flag graph-based orchestration as the correct post-hackathon direction. **Superseded by D-024 (2026-05-27) — the debt was paid before any further capability work, not deferred to post-hackathon. The original deferral rationale ("scope risk against tight deadline") was an unverified cost estimate; the spike replaced the guess with a fact (`docs/plans/spike-d023-findings.md`) and the refactor took ~1 day.**
 
 **Context:** Evals on Step 1 and Step 2 surfaced a reliability failure mode: after ingesting a batch, the agent sometimes chains to `build_event_context` even when the operator explicitly says "stop after ingestion." Root cause is that a single `LlmAgent` with all tools registered treats tool selection as a judgment call every turn — including decisions that are structurally determined.
 
@@ -450,6 +450,42 @@ The reframe exposes the one place where the existing spec admits it has no deter
 **Mitigation for MVP:** System prompt now makes workflow steps explicitly numbered and adds "the operator drives the workflow — only proceed when instructed." Combined with PreconditionError enforcement, this reduces (but does not eliminate) unwanted chaining. Prompt-based control with N=5 pass-rate gates is the acceptance criterion.
 
 **Post-hackathon direction:** Refactor to a coordinator `LlmAgent` that routes to specialized sub-agents or a `SequentialAgent` pipeline for the deterministic steps, with `LlmAgent` reserved for `propose_review_queue`. This eliminates the entire class of "agent chains to next step when it shouldn't" failures.
+
+---
+
+### D-024 — Graph-Orchestrated Agent (Pays Off D-023)
+
+**Date:** 2026-05-27
+**Decision:** Replace the single-`LlmAgent` free-loop with a coordinator-over-workflow architecture. A chat-mode `LlmAgent` coordinator owns the operator conversation, clarification, and HITL. A `google.adk.workflow.Workflow` graph below it owns deterministic execution and (from Step 5) contains a single `LlmAgent(mode='single_turn')` node for the strategic decision (`propose_review_queue`). Spike (`docs/plans/spike-d023-findings.md`) validated all three load-bearing primitives.
+
+**Why now, not post-hackathon (revises D-023's deferral):** The cost estimate in D-023 was an unverified guess. A targeted spike replaced the guess with empirical evidence in ~1 hour. With 2/9 capabilities implemented and HITL unrealized, the refactor cost was at its minimum; the cost of *not* refactoring was linear in remaining capabilities × N=20 eval gates. The curves crossed at this moment.
+
+**Components locked in:**
+
+1. **Orchestration primitive:** `google.adk.workflow.Workflow`, not `SequentialAgent`. The latter is marked `@deprecated` in ADK v2.1 source and requires every step to be a `BaseAgent` — boilerplate-heavy for a deterministic-function-dominated pipeline. `Workflow` accepts `FunctionNode(func=fn)` directly.
+2. **Coordinator integration:** Coordinator dispatches the workflow via a `FunctionTool` shim (`run_event_pipeline` in `src/agent.py`) that runs the workflow over a sub-`Runner` with pre-populated session state. `Workflow` is a `BaseNode`, not a `BaseAgent`, so `AgentTool` cannot wrap it directly.
+3. **Model pinning:** Coordinator on `gemini-2.5-flash` (`GEMINI_COORDINATOR_MODEL` env var). Workflow nodes (including the future strategic `LlmAgent` node) on `gemini-2.5-flash-lite` (`GEMINI_MODEL`). Spike found flash-lite unreliable at the coordinator's delegate-vs-dispatch branch points; flash delegates reliably.
+4. **Bidirectional clarification:** `LlmAgent(mode='task')` sub-agent on the coordinator. ADK auto-wires it as `_TaskAgentTool` via `coordinator.sub_agents`. Multi-turn exchange validated in the spike (claim 3).
+5. **HITL approval:** `LongRunningFunctionTool` on the coordinator. Same suspend/resume pattern as `spike/adk_hitl_test.py`. Lives coordinator-side because suspension semantics + chat surface align there.
+6. **Strategic decision (`propose_review_queue`):** Inside the Workflow as an `LlmAgent(mode='single_turn')` node — added in Step 5 when its data dependencies (similarity, scoring) are also in the graph. Reads upstream state, emits the queue.
+7. **`PreconditionError`:** Stays as defense in depth. Graph edges now structurally enforce order; the explicit error remains so direct capability calls (e.g., from `tests/test_step_*.py`) still get a self-correcting message.
+8. **CoT/structured-justification directive:** Retained, moved from `prompts/v2/agent_system.md` to `prompts/v2/coordinator_system.md`. Load-bearing for trace evals per D-020.
+9. **`src/db/` wrappers:** Unchanged. D-019 boundary stands.
+10. **Capability function bodies:** Unchanged. The change is at the orchestration layer (`src/capabilities/__init__.py`) which now exposes `FunctionNode` wrappers around the existing functions plus a `build_pipeline_graph()` helper.
+
+**Workflow graph at refactor checkpoint:**
+
+```text
+START → ingest_event_batch (FunctionNode) → build_event_context (FunctionNode) → END
+```
+
+Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 adds `score_assets_with_vision`, Step 5 adds the strategic `LlmAgent` node, Step 6 adds `draft_campaigns_for_queue`. HITL approval + execution + outcomes (capabilities 7–9) live coordinator-side, not in the workflow.
+
+**What the operator loses:** The old prompt-policed "stop after step X" semantics. Under D-024 each `run_event_pipeline` dispatch runs the workflow to completion. If the operator needs partial dispatches in the future, that becomes a coordinator-level concern, not a workflow-level one.
+
+**Verification:** All four phase gates cleared. Coordinator + workflow construct. 30/30 non-eval tests green. Step 1 + Step 2 trace evals re-shaped to the new architecture (coordinator dispatches workflow; assertions verify `run_event_pipeline` is called and the underlying MongoDB call shape is preserved); N=20 pass-rate gates met. Bidirectional clarification + HITL primitives validated in spike.
+
+**Supersedes:** D-023. The pre-pivot framing of `docs/plans/agentic-model.md` (the "Layer 1 — framework" section described a single-`LlmAgent` loop) is now stale and is being rewritten in this refactor commit.
 
 ---
 

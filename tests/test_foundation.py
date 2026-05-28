@@ -18,12 +18,19 @@ def _echo(message: str) -> str:
 echo_tool = FunctionTool(_echo)
 
 
-def test_agent_builds_with_echo_tool():
-    from src.agent import build_agent
+def test_coordinator_builds_with_echo_tool():
+    from src.agent import COORDINATOR_NAME, build_coordinator
 
-    agent = build_agent(extra_tools=[echo_tool])
+    agent = build_coordinator(extra_tools=[echo_tool])
     assert agent is not None
-    assert agent.name == "event_commerce_ops_agent"
+    assert agent.name == COORDINATOR_NAME
+    assert agent.mode == "chat"
+    tool_names = {t.name for t in agent.tools}
+    assert "run_event_pipeline" in tool_names
+    assert "request_human_approval" in tool_names
+    assert "_echo" in tool_names
+    sub_agent_names = {s.name for s in agent.sub_agents}
+    assert "clarify_event_metadata" in sub_agent_names
 
 
 def test_echo_tool_is_callable():
@@ -42,9 +49,9 @@ async def test_runner_processes_event_stream():
     Mock the Runner to yield a tool-call event followed by a text response.
     Asserts the event-processing loop works and trace is non-empty.
     """
-    from src.agent import build_agent
+    from src.agent import build_coordinator
 
-    agent = build_agent(extra_tools=[echo_tool])
+    agent = build_coordinator(extra_tools=[echo_tool])
 
     tool_call_event = MagicMock()
     tool_call_event.is_final_response.return_value = False
@@ -86,15 +93,15 @@ async def test_runner_processes_event_stream():
     assert len(trace_parts) > 0, "Reasoning trace is empty"
 
 
-def test_agent_does_not_expose_mcp_directly():
-    """D-019: agent.tools must contain only domain FunctionTools, never McpToolset."""
-    from src.agent import build_agent
+def test_coordinator_does_not_expose_mcp_directly():
+    """D-019: coordinator.tools must not include McpToolset directly."""
+    from src.agent import build_coordinator
     from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 
-    agent = build_agent()
+    agent = build_coordinator()
     for tool in agent.tools:
         assert not isinstance(tool, McpToolset), (
-            "McpToolset found in agent.tools — violates D-019. "
+            "McpToolset found in coordinator.tools — violates D-019. "
             "MongoDB MCP must be used programmatically via src/db/client.py, "
             "not registered as an agent tool."
         )

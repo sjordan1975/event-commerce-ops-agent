@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Step 2 (build_event_context) complete — 35/35 tests green (unit + scaffolding + evals), N=20 pass-rate gates cleared for both Step 1 and Step 2. Ready for Step 3.**
+**D-024 graph-orchestration refactor complete — coordinator-over-workflow architecture in place; 30/30 non-eval tests green; Step 1 + Step 2 trace evals re-shaped to the new architecture and N=20 gates cleared. D-023 is paid. Ready for Step 3 on the new shape.**
 
-Next action: On branch `step/2-context`. All T-2.1 through T-2.18 tasks implemented and verified. Commit Step 2 work, then merge to `main`. Cut `step/3-similarity` branch for the next capability (`find_similar_assets` — vector embedding + similarity search via MongoDB Atlas Vector Search). Key architectural note logged in D-023: LLM-driven tool selection is MVP-acceptable but graph-based orchestration (`SequentialAgent` / coordinator pattern) is the correct post-hackathon direction for the deterministic pipeline steps.
+Next action: On branch `refactor/d023-graph-orchestration`. Confirm verification gates one more time, merge to `main`. Then rebase `step/3-similarity` onto the new `main` and resume Step 3 implementation (`find_similar_assets` — vector embedding via `gemini-embedding-2` + MongoDB Atlas Vector Search). Step 3 adds a new `FunctionNode` to the workflow graph (via `build_pipeline_graph()` in `src/capabilities/__init__.py`); the agent shell does not change.
 
-Reference: `docs/plans/strategic-agent-reframe.md` § Propagation plan for the full ordered list; `tracking.md` D-021 for the design rationale.
+Reference: `tracking.md` D-024 for the refactor design + locked-in decisions; `docs/plans/spike-d023-findings.md` for the validation; `docs/plans/strategic-agent-reframe.md` § Propagation plan for the per-step roadmap; `tracking.md` D-021 for the strategic-surface rationale.
 
 Update the above before ending each session — it is the single source of truth for session orientation.  
 Deadline: June 11, 2026 @ 2:00 PM PDT.
@@ -44,7 +44,7 @@ project-root/
 │   └── 02-architecture.md      ← system design, MongoDB schemas, MCP call list, ADK architecture
 ├── docs/plans/                  ← per-step implementation plans + cross-cutting design docs (agentic-model, testing-model, evaluation-strategy, safety-measures, strategic-agent-reframe, db-wrapper-inventory, workflow)
 ├── docs/tasks/                  ← per-step atomic task lists (one file per step)
-├── spike/                       ← validated ADK spikes (adk_hitl_test.py, adk_mcp_raw_test.py, adk_event_capture.py)
+├── spike/                       ← validated ADK spikes (adk_hitl_test.py, adk_mcp_raw_test.py, adk_event_capture.py, adk_workflow_hitl_spike.py [D-024])
 ├── scripts/                     ← provisioning and seed scripts (setup_mongodb.py, seed_mongodb.py)
 ├── src/                         ← agent code (agent.py, prompt_loader.py, db/, models)
 ├── tests/                       ← test suite (test_foundation.py, expanded each capability)
@@ -83,8 +83,8 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 # Run a single test file
 .venv/bin/python -m pytest tests/test_foundation.py -v
 
-# Verify agent shell imports
-.venv/bin/python -c "from src.agent import build_agent; print('ok')"
+# Verify agent shell imports (coordinator + workflow per D-024)
+.venv/bin/python -c "from src.agent import build_coordinator, build_workflow; build_coordinator(); build_workflow(); print('ok')"
 
 # Run a spike
 .venv/bin/python spike/adk_mcp_raw_test.py
@@ -106,7 +106,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
 See `tracking.md` for all architectural decisions (D-000 through D-021) with full rationale.
 
-Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007), logistics reframe (D-014), two-queue exploration/exploitation (D-015, exploration default updated by D-021), Step 2 event narrative + `player_context` RAG (D-016), Step 4 dual-job (D-017), raw McpToolset spike (D-018), domain wrappers over MongoDB MCP supersede raw (D-019), evaluation is first-class engineering (D-020), **strategic-agent reframe: procedural → strategist with queue assembly (D-021)**.
+Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007), logistics reframe (D-014), two-queue exploration/exploitation (D-015, exploration default updated by D-021), Step 2 event narrative + `player_context` RAG (D-016), Step 4 dual-job (D-017), raw McpToolset spike (D-018), domain wrappers over MongoDB MCP supersede raw (D-019), evaluation is first-class engineering (D-020), **strategic-agent reframe: procedural → strategist with queue assembly (D-021)**, **graph-orchestrated coordinator-over-workflow architecture (D-024, paying off D-023)**.
 
 **Every commit that changes `docs/specs/` must add or update a D-entry in `tracking.md`.**
 
@@ -141,9 +141,11 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 
 ### ADK-Specific Rules
 - `LongRunningFunctionTool` is required for all HITL — do not use plain `FunctionTool` for `request_human_approval`
-- Model configured via `GEMINI_MODEL` env var (default: `gemini-2.5-flash-lite`) — never hardcode
+- **Two model env vars per D-024:** `GEMINI_COORDINATOR_MODEL` (default: `gemini-2.5-flash`) for the chat-mode coordinator and any task-mode sub-agents; `GEMINI_MODEL` (default: `gemini-2.5-flash-lite`) for workflow nodes and any internal-LLM helpers like `build_event_context`. Never hardcode model names. Flash-lite is unreliable at the coordinator's delegate-vs-dispatch decision points — keep that role on flash.
+- **Workflow primitive (D-024):** orchestration is via `google.adk.workflow.Workflow` with `FunctionNode`s, not `SequentialAgent` (deprecated in ADK v2.1). The graph is built by `src/capabilities/__init__.py:build_pipeline_graph()`. Each new step extends the graph by adding nodes and an edge — the agent shell does not change.
+- **Coordinator dispatches the workflow via a `FunctionTool` shim** (`run_event_pipeline` in `src/agent.py`). The shim spins up a sub-`Runner` with pre-populated session state. `Workflow` extends `BaseNode`, not `BaseAgent`, so `AgentTool` cannot wrap it.
 - The OTel `ValueError: Token was created in a different Context` warning on generator exit is cosmetic — do not attempt to fix it
-- **Framing:** see `docs/plans/agentic-model.md` for what kind of agent this is (single `LlmAgent` loop composing capabilities, exit conditions, HITL as suspension). Pair with `docs/plans/strategic-agent-reframe.md` for the capability surface and the one strategic decision (`propose_review_queue`).
+- **Framing:** see `docs/plans/agentic-model.md` for what kind of agent this is (coordinator chat loop + workflow graph + one strategic node + bidirectional clarification + HITL). Pair with `docs/plans/strategic-agent-reframe.md` for the capability surface and the one strategic decision (`propose_review_queue`).
 
 ### Prompts
 - All LLM prompts live in `prompts/` as versioned subdirectories (e.g. `prompts/v1/`) — do not inline prompts in agent logic

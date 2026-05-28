@@ -2,7 +2,7 @@
 
 Companion to `testing-model.md` and `evaluation-strategy.md`. Those cover *how* we test the agent; this one covers *what kind of agent it is* — and, just as importantly, **what kind of agent it is not**.
 
-> **Substantially revised for D-021** (2026-05-26). The pre-pivot framing of this doc treated the LlmAgent loop as the agent's macro planning surface and celebrated "emergent step trajectory" as a feature. After D-021 we rejected that framing: this project is a workflow with one judgment surface, not a free-roaming planner. The new version below replaces the "common misreading" section (which argued against a workflow-graph diagram that no longer exists in `02-architecture.md`), reframes exit conditions as plumbing, and concentrates "where agentic value lives" on `propose_review_queue`. Full pivot rationale: `docs/plans/strategic-agent-reframe.md`.
+> **Substantially revised for D-021** (2026-05-26) and then **paid down with implementation by D-024** (2026-05-27). The pre-pivot framing of this doc treated the LlmAgent loop as the agent's macro planning surface and celebrated "emergent step trajectory" as a feature. D-021 rejected that framing conceptually. D-024 implemented the resolution: the agent is now a coordinator `LlmAgent` over a `google.adk.workflow.Workflow` graph. The "Layer 1" section below describes that implementation. The strategic surface is unchanged from D-021 — `propose_review_queue`, added to the workflow as a graph node in Step 5. Full pivot rationale: `docs/plans/strategic-agent-reframe.md`; implementation details + spike validation: `tracking.md` D-024 and `docs/plans/spike-d023-findings.md`.
 
 ---
 
@@ -28,19 +28,23 @@ This doc exists so that testing, evaluation, and any future design choices line 
 
 ### Layer 1 — framework (the mechanism)
 
-The implementation is one `LlmAgent` with 9 capability tools registered. ADK's `Runner` drives a loop:
+Per D-024, the implementation is a **coordinator-over-workflow** composition:
 
 ```text
-loop:
-  LLM reads conversation + tool descriptions
-  LLM emits reasoning + (tool_call | final_text)
-  if tool_call:
-      run tool, append result to conversation, continue
-  if final_text:
-      EXIT
+Coordinator LlmAgent (mode='chat', gemini-2.5-flash)
+├── sub_agent: clarify_event_metadata (LlmAgent, mode='task')   ← bidirectional clarification
+├── tool: run_event_pipeline (FunctionTool)                     ← dispatches the workflow
+└── tool: request_human_approval (LongRunningFunctionTool)      ← HITL gate
+
+Workflow (graph, run via sub-Runner from the dispatch tool)
+  START → ingest_event_batch → build_event_context → [future nodes per step] → END
 ```
 
-This is the same mechanism any single-`LlmAgent` ADK system uses. It is not where the design lives, and treating it as the agent's "planning surface" misframes the project. The loop is plumbing.
+ADK's `Runner` drives the coordinator's chat loop the same way it drives any `LlmAgent`. The coordinator decides: clarify, dispatch, or hand off to approval. When it dispatches, `run_event_pipeline` constructs a sub-`Runner` over the `Workflow` (`google.adk.workflow.Workflow`) with seeded session state and runs the graph deterministically.
+
+The graph enforces execution order structurally — there is no "agent could skip a step" failure mode at the workflow layer anymore. The pre-D-024 single-`LlmAgent` free loop made tool selection a judgment call every turn (including for deterministic steps); the graph removes that surface entirely. This is the "Layer 2 is thin" disposition (described below) made structural rather than prompt-policed.
+
+Sub-Runner-from-tool is the same pattern ADK uses internally (see `AgentTool.run_async` in the ADK source). The shim creates a fresh `InMemorySessionService`, pre-populates state with `images` and `event_metadata`, and iterates the graph. Final session state is returned as the tool result.
 
 ### Layer 2 — capability composition (mostly known)
 

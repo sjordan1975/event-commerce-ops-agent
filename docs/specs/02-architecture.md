@@ -301,47 +301,70 @@ assets.aggregate          → find assets similar to best performers (informs fu
 
 ---
 
-## ADK Agent Architecture
+## ADK Agent Architecture (revised by D-024)
 
-The system is a **single ADK `LlmAgent`** with 9 capability tools registered, looping until terminal text. There is no `Workflow` graph — capability ordering is the agent's plan, not the framework's orchestration. The agent's strategic moment is one tool call (`propose_review_queue`); the rest are computational, LLM-at-the-node, HITL, or external-API capability invocations. Full loop semantics and exit conditions: `docs/plans/agentic-model.md`.
+The system is a **coordinator `LlmAgent` over a `google.adk.workflow.Workflow` graph**. The coordinator (chat mode) owns the operator conversation, clarification, and HITL. The workflow (graph) owns deterministic capability execution and (from Step 5) hosts one `LlmAgent(mode='single_turn')` node for the strategic decision (`propose_review_queue`). The pre-D-024 single-`LlmAgent` free loop is gone — execution order is now enforced by graph edges, not by prompt + `PreconditionError`. Full loop semantics: `docs/plans/agentic-model.md`. Implementation details + spike validation: `tracking.md` D-024 and `docs/plans/spike-d023-findings.md`.
 
-### Capability composition (typical trajectory)
+### Top-level composition
 
-```
-ingest_event_batch
-        │
-        ▼
-[ build_event_context  ∥  find_similar_assets  ∥  score_assets_with_vision ]
-        │              (independent — agent picks order; preconditions enforced by wrappers)
-        ▼
-propose_review_queue                    ← the one strategic decision
-        │
-        ▼
-draft_campaigns_for_queue
-        │
-        ▼
-request_human_approval  ← LongRunningFunctionTool, suspends
-        │
-        ├─ all approved   ─→ execute_approved_campaigns ─→ record_outcomes ─→ terminal text
+```text
+Coordinator LlmAgent (mode='chat', gemini-2.5-flash)
+├── sub_agent: clarify_event_metadata (LlmAgent, mode='task')   ← bidirectional clarification
+├── tool: run_event_pipeline (FunctionTool)                     ← dispatches the workflow via sub-Runner
+└── tool: request_human_approval (LongRunningFunctionTool)      ← HITL gate
+
+Workflow (graph, name='event_pipeline', runs via sub-Runner from the dispatch tool)
+  START
+    │
+    ▼
+  ingest_event_batch (FunctionNode)
+    │
+    ▼
+  build_event_context (FunctionNode)
+    │
+    ▼  [Step 3+]
+  find_similar_assets (FunctionNode)         ← added in Step 3
+    │
+    ▼  [Step 4+]
+  score_assets_with_vision (FunctionNode)    ← added in Step 4
+    │
+    ▼  [Step 5+]
+  propose_review_queue (LlmAgent, mode='single_turn', gemini-2.5-flash-lite) ← the one strategic decision
+    │
+    ▼  [Step 6+]
+  draft_campaigns_for_queue (FunctionNode)   ← added in Step 6
+    │
+    ▼
+  END
+
+[coordinator picks up after END:]
+  request_human_approval  → LongRunningFunctionTool, suspends
+        ├─ all approved   ─→ execute_approved_campaigns (Step 7) ─→ record_outcomes (Step 8) ─→ terminal text
         ├─ any rejected   ─→ those items drop; subset proceeds to execute
-        └─ edit_requested ─→ draft_campaigns_for_queue (with operator notes) ─→ request_human_approval (loop)
+        └─ edit_requested ─→ re-dispatch drafts capability with notes → request_human_approval (loop)
 ```
 
-This is the **expected trajectory** — not a state machine. The agent could deviate; wrappers refuse (with self-correcting `PreconditionError`) if data dependencies are missing, but no framework-level guard prevents reordering among independent capabilities. Per D-021, this is by design: the agent's surface is `propose_review_queue`'s strategic call plus whatever ordering it picks among the supporting capabilities.
+The workflow's order is **structurally enforced** by graph edges, not by prompts. The agent cannot skip a capability or invent one. Each step extends the workflow by adding nodes and edges via `src/capabilities/__init__.py:build_pipeline_graph()`; the agent shell (`src/agent.py`) does not change.
+
+HITL approval + execution + outcomes (capabilities 7–9) live coordinator-side, not in the workflow. HITL suspension needs to halt the operator conversation, which is the coordinator's plane; execution and outcomes branch on operator decisions, which is also a coordinator concern.
 
 ### Key ADK primitives
 
-- **Single `LlmAgent`** with 9 `FunctionTool`s registered (one is `LongRunningFunctionTool`). No `SequentialAgent`, no `Workflow` graph — the agent loop is the orchestration.
-- **`LongRunningFunctionTool`** at `request_human_approval` — returns `None` to suspend; runner emits `long_running_tool_ids`; resumes when caller sends `FunctionResponse` with matching `id`.
+- **Coordinator `LlmAgent`** (chat mode) — `event_commerce_ops_coordinator`, `gemini-2.5-flash`. Owns conversation, clarification, and HITL. Implementation: `src/agent.py:build_coordinator`.
+- **`LlmAgent(mode='task')` sub-agent** — `clarify_event_metadata`. Auto-wrapped as `_TaskAgentTool` via `coordinator.sub_agents`. Multi-turn exchange validated in `spike/adk_workflow_hitl_spike.py`.
+- **`google.adk.workflow.Workflow`** — the deterministic pipeline graph. `SequentialAgent` is deprecated in ADK v2.1; `Workflow` is the modern replacement. The graph is built by `src/capabilities/__init__.py:build_pipeline_graph()` and instantiated by `src/agent.py:build_workflow`.
+- **`FunctionNode(func=fn, parameter_binding='state')`** — wraps each deterministic capability. Reads parameters from `ctx.state`; writes results back to `ctx.state` for downstream nodes. The function bodies in `src/capabilities/{ingest,context,...}.py` are unchanged from pre-D-024 form.
+- **`run_event_pipeline` `FunctionTool` shim** — the coordinator dispatches the workflow by calling this tool. The shim creates a fresh `InMemorySessionService`, seeds session state with `{"images": ..., "event_metadata": ...}`, and runs a sub-`Runner(node=workflow)`. Returns the final state. `Workflow` extends `BaseNode`, not `BaseAgent`, so `AgentTool` cannot wrap it.
+- **`LongRunningFunctionTool` at `request_human_approval`** — coordinator-side, not workflow-side. Returns `None` to suspend; runner emits `long_running_tool_ids`; resumes when caller sends `FunctionResponse` with matching `id`.
 - **`McpToolset(StdioConnectionParams(...))`** — connects MongoDB MCP server (`npx mongodb-mcp-server`). Per D-019, owned by `src/db/client.py` as a programmatic client — not registered in `agent.tools`. Discovered tools are invoked by domain wrappers inside each capability via `MongoMCPClient.call(tool_name, args)`.
 - **`InMemorySessionService`** for local dev; swap to persistent session service for Cloud Run.
 - **State persistence** via MongoDB `assets` collection — most capabilities write `status` updates so the trajectory is resumable across ADK sessions.
-- **Retry logic** internal to `execute_approved_campaigns` for Printful async mockup polling (`POST /mockups` → poll `GET /mockups/{task_id}`).
-- **`PreconditionError`** — wrapper-level exception with self-correcting message format (*"Cannot do X for Y: missing Z (call Z-producer first)"*). Used by every capability that has data dependencies; first usage is `ingest_event_batch`'s input validation. See `docs/plans/strategic-agent-reframe.md` § Enforced vs. emergent.
+- **Retry logic** internal to `execute_approved_campaigns` for Printful async mockup polling.
+- **`PreconditionError`** — wrapper-level exception with self-correcting message format. Under D-024 the graph enforces order structurally; `PreconditionError` remains as defense-in-depth for direct capability calls (e.g., from unit tests). See `docs/plans/strategic-agent-reframe.md` § Enforced vs. emergent.
 - **Loop and spend bounds** — ADK's iteration cap and `max_output_tokens` are the operational safety bounds. Explicit values + cap on the `edit_requested` redraft loop are tracked in `docs/plans/safety-measures.md`.
-- **Model:** `gemini-2.5-flash-lite` (confirmed working; `gemini-2.0-flash` deprecated for new API users).
+- **Two model env vars (D-024):** `GEMINI_COORDINATOR_MODEL` (default `gemini-2.5-flash`) for the coordinator + task sub-agents; `GEMINI_MODEL` (default `gemini-2.5-flash-lite`) for workflow nodes (including the strategic LlmAgent node and the internal LLM call in `build_event_context`).
 
-Spike code at `spike/adk_hitl_test.py` — confirmed PASS on both HITL checks (2026-05-23). Event-capture pattern for trace evals at `spike/adk_event_capture.py`.
+Spike code: `spike/adk_hitl_test.py` (HITL primitive — pre-D-024), `spike/adk_event_capture.py` (event trace classification), `spike/adk_workflow_hitl_spike.py` (D-024 validation — all three load-bearing primitives). Findings: `docs/plans/spike-d023-findings.md`.
 
 ---
 
