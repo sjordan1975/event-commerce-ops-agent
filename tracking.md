@@ -489,6 +489,31 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 ---
 
+### D-025 — Step 3 Architectural Choices: Vector Search Configuration + Embedding Auth Path
+
+**Date:** 2026-05-28
+**Decision:** Five locked-in choices for the Step 3 `find_similar_assets` capability, captured here so they are searchable rather than buried in the step plan.
+
+1. **Similarity metric: `cosine`.** Standard for Gemini multimodal image embeddings. `gemini-embedding-2` outputs are L2-normalizable, so cosine ≈ dotProduct in practice. Atlas Vector Search also supports `euclidean`; rejected — different geometry, no benefit for normalized embeddings.
+
+2. **Default `top_k = 5`** (lowered from `db-wrapper-inventory.md`'s original `top_k = 20`). Keeps trace logs scannable and matches typical "show me the top few" UI expectations. Revisitable in Step 5 planning if the exploitation queue feels brittle. `numCandidates = 10 × top_k = 50` per Atlas guidance for high-recall vector search.
+
+3. **Vector index provisioned at setup time, not lazily.** One-time idempotent `scripts/setup_vector_index.py` creates `assets_embedding_index`. Lazy creation rejected — couples runtime to the Atlas Admin API and adds minutes of cold-start latency on first call (Atlas vector-index creation is asynchronous, ~minutes).
+
+4. **Embedding auth path: `google.genai` SDK + `GOOGLE_API_KEY`** (Google AI Studio surface), matching Step 2's existing path (`src/capabilities/context.py:22`). **Reconciles D-006's "Vertex AI" framing** — same model (`gemini-embedding-2`), different SDK surface. The `google.genai` SDK supports both AI Studio (`api_key=...`) and Vertex (`vertexai=True, project=..., location=...`); flipping to Vertex auth later is a one-line client-construction change behind the `_compute_image_embedding` helper. Chose AI Studio for Step 3 to keep the auth surface consistent with the rest of the codebase rather than introducing GCP ADC + project/location config for one helper.
+
+5. **Current event's assets get embedded and persisted** — not only historical assets. Today's ingested batch becomes tomorrow's similarity corpus (the feedback-loop seed). Skipping this would scope Step 3 to "search against pre-existing corpus only" and defer corpus growth to Step 9 (`record_outcomes`); rejected because the embedding compute is already happening for the search, so the persisted column makes the corpus grow for free.
+
+**Wrapper signature consequence:** `vector_search_assets(embedding, top_k=5, exclude_event_id=None)` deviates from the pre-D-025 inventory entry `vector_search_assets(embedding, top_k=20, channel=None)`. The `channel` parameter is dropped — per-channel routing is `propose_review_queue`'s judgment surface (Step 5), not a wrapper concern; neighbors' `product_route` is surfaced in the result for Step 5 to compose over. `exclude_event_id` is added to prevent an event's own assets from being returned as their own neighbors. `db-wrapper-inventory.md` updated to match.
+
+**Identity-routing concern (Messi-shots problem)** captured in `docs/plans/step-3-similarity.md` risks table for Step 5 planning to inherit: cosine on a multimodal embedding may not preserve subject identity as the dominant similarity signal. Mitigation lands downstream — Step 4 (Vision scoring) extracts identity as structured fields (`detected_subjects`, `recognizable_jersey`); Step 5 (`propose_review_queue`) composes identity + similarity + narrative `key_figures`. Step 3 stays purely "embed + vector search, no judgment."
+
+**Verification:** N/A at decision time — Step 3 implementation has not started. Verification is the trace-eval gate in `docs/tasks/step-3-tasks.md` § T-3.14 / T-3.15.
+
+**Refines:** D-006 (embedding provider — reconciles the SDK surface), D-021 (capability surface — locks in the explicit `find_similar_assets` wrapper signature).
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta

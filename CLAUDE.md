@@ -104,9 +104,9 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
 ## Decision Log
 
-See `tracking.md` for all architectural decisions (D-000 through D-021) with full rationale.
+See `tracking.md` for all architectural decisions (D-000 through D-025) with full rationale.
 
-Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007), logistics reframe (D-014), two-queue exploration/exploitation (D-015, exploration default updated by D-021), Step 2 event narrative + `player_context` RAG (D-016), Step 4 dual-job (D-017), raw McpToolset spike (D-018), domain wrappers over MongoDB MCP supersede raw (D-019), evaluation is first-class engineering (D-020), **strategic-agent reframe: procedural → strategist with queue assembly (D-021)**, **graph-orchestrated coordinator-over-workflow architecture (D-024, paying off D-023)**.
+Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-005, confirmed by spike D-011), `gemini-embedding-2` over Voyage AI (D-006), social simulation over live API (D-007), logistics reframe (D-014), two-queue exploration/exploitation (D-015, exploration default updated by D-021), Step 2 event narrative + `player_context` RAG (D-016), Step 4 dual-job (D-017), raw McpToolset spike (D-018), domain wrappers over MongoDB MCP supersede raw (D-019), evaluation is first-class engineering (D-020), **strategic-agent reframe: procedural → strategist with queue assembly (D-021)**, **graph-orchestrated coordinator-over-workflow architecture (D-024, paying off D-023)**, **Step 3 vector-search configuration + embedding auth path (D-025)**.
 
 **Every commit that changes `docs/specs/` must add or update a D-entry in `tracking.md`.**
 
