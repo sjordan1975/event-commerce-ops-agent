@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Step 3 implementation complete (T-3.1–T-3.17 done 2026-05-28). On branch `step/3-similarity`. Ready to merge to `main`.**
+**Step 3 merged to `main` (2026-05-28). On branch `main`. Ready to cut `step/4-vision`.**
 
-Next action: (1) Merge `step/3-similarity` to `main`. (2) Cut branch `step/4-vision` for `score_assets_with_vision` (Vision scoring + dual-job per D-017). (3) The branch-housekeeping commits for spec/tracking doc updates (docs/specs/02-architecture.md, docs/db-wrapper-inventory.md, tracking.md D-025 update) are still outstanding on this branch — land those before or alongside the merge commit.
+Next action: Cut branch `step/4-vision` for `score_assets_with_vision` (Vision scoring + dual-job per D-017).
 
-Key Step 3 implementation notes for Step 4: `_compute_image_embedding` uses `google.genai` SDK with `Part.from_bytes` (not `from_uri`) and drops `task_type` (unsupported by `gemini-embedding-2`). The `find_similar_assets` node is the third node in the workflow graph (START → ingest → context → similarity). `similarity_results` is now written to session state for `propose_review_queue` (Step 5) to consume.
+Key Step 3 notes for Step 4: `_compute_image_embedding` uses `google.genai` SDK with `Part.from_bytes` (not `from_uri`); `task_type` dropped (unsupported by `gemini-embedding-2`). Workflow is now `START → ingest → context → similarity`. `similarity_results` in session state for `propose_review_queue` (Step 5).
 
 Reference: `docs/plans/step-3-similarity.md` (the plan), `docs/tasks/step-3-tasks.md` (17 atomic tasks T-3.1–T-3.17), `tracking.md` D-024 for the orchestration architecture Step 3 lands against, `docs/strategic-agent-reframe.md` for the capability-surface rationale. Identity-routing concern (Messi-shots problem) is captured in the Step 3 plan's risks table for Step 5 planning to inherit — Vision extracts `detected_subjects` in Step 4; Step 5 composes identity with similarity + narrative.
 
