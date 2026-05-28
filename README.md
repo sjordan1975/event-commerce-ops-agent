@@ -18,19 +18,28 @@ See `docs/specs/00-overview.md` for full project context and `tracking.md` for a
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in values:
+Copy `.env.template` to `.env` and fill in values:
 
 ```
-# MongoDB
+# MongoDB MCP server
 MONGODB_URI=mongodb+srv://...
+MDB_MCP_API_CLIENT_ID=
+MDB_MCP_API_CLIENT_SECRET=
 
-# GCP / Vertex AI
-GCP_PROJECT=
-GCP_REGION=us-central1
+# Google AI (google.genai SDK — used for coordinator, narrative LLM, and embeddings)
+GOOGLE_API_KEY=
 
-# Agent
-GEMINI_MODEL=gemini-2.5-flash-lite
-PROMPT_VERSION=v1
+# Model selection
+GEMINI_MODEL=gemini-2.5-flash-lite          # workflow nodes and internal helpers
+GEMINI_COORDINATOR_MODEL=gemini-2.5-flash   # coordinator chat LlmAgent
+GEMINI_NARRATIVE_MODEL=gemini-2.5-flash-lite  # build_event_context narrative LLM
+GEMINI_EMBEDDING_MODEL=gemini-embedding-2   # image embeddings in find_similar_assets
+
+# Atlas Vector Search (Step 3)
+VECTOR_INDEX_NAME=assets_embedding_index    # Atlas vector search index name on assets.embedding
+
+# Prompt version
+PROMPT_VERSION=v3
 
 # Shopify
 SHOPIFY_STORE_URL=

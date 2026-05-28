@@ -14,6 +14,7 @@ from typing import Any, Callable, Union
 from unittest.mock import patch
 
 from src.agent import APP_NAME, build_coordinator, build_runner
+from tests.conftest import build_embedding_fixture
 
 
 def _make_mcp_envelope(docs: list[dict]) -> dict:
@@ -43,6 +44,10 @@ class _MockMCPClient:
     list/dict or a callable(args) -> list/dict for cases that need to inspect
     the filter (e.g., two different find calls on the same collection).
 
+    For aggregate calls whose pipeline starts with $vectorSearch, dispatch is
+    keyed by (tool_name, collection, "$vectorSearch") — checked before the
+    plain collection-keyed fallback. Register via register_vector_search().
+
     Write operations (insert-many, update-many) that have no handler registered
     return {"content": [{"type": "text", "text": "ok"}]} (response not parsed
     by any wrapper).
@@ -50,7 +55,7 @@ class _MockMCPClient:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict]] = []
-        self._handlers: dict[tuple[str, str], Union[list, dict, Callable]] = {}
+        self._handlers: dict[tuple, Union[list, dict, Callable]] = {}
 
     def register(
         self,
@@ -61,9 +66,28 @@ class _MockMCPClient:
         """Register a static result or callable handler for (tool_name, collection)."""
         self._handlers[(tool_name, collection)] = handler
 
+    def register_vector_search(
+        self,
+        collection: str,
+        results: list[dict],
+    ) -> None:
+        """Register a fixture for $vectorSearch aggregates on the given collection."""
+        self._handlers[("aggregate", collection, "$vectorSearch")] = results
+
     async def call(self, tool_name: str, args: dict) -> dict:
         self.calls.append((tool_name, args))
         collection = args.get("collection", "")
+
+        # $vectorSearch dispatch: check pipeline[0] before falling back to collection key
+        if tool_name == "aggregate":
+            pipeline = args.get("pipeline", [])
+            if pipeline and "$vectorSearch" in pipeline[0]:
+                vs_key = ("aggregate", collection, "$vectorSearch")
+                if vs_key in self._handlers:
+                    handler = self._handlers[vs_key]
+                    result = handler(args) if callable(handler) else handler
+                    return _make_mcp_envelope(result)
+
         key = (tool_name, collection)
         if key in self._handlers:
             handler = self._handlers[key]
@@ -76,10 +100,9 @@ class _MockMCPClient:
 def build_runner_with_mock_db():
     """Context manager that yields (runner, mock_client) with MongoDB patched out.
 
-    Patches all four db module get_client bindings so no real MongoDB connection
-    is attempted. The mock_client.calls list records every (tool_name, args) pair
-    that would have gone to MongoDB. Callers can call mock_client.register(...)
-    before running the agent to seed read responses.
+    Patches all four db module get_client bindings and patches
+    src.capabilities.similarity._compute_image_embedding to return a
+    deterministic 3072-dim fixture — no live Gemini calls during trace evals.
     """
     mock_client = _MockMCPClient()
     with (
@@ -87,6 +110,10 @@ def build_runner_with_mock_db():
         patch("src.db.assets.get_client", return_value=mock_client),
         patch("src.db.performance.get_client", return_value=mock_client),
         patch("src.db.player_context.get_client", return_value=mock_client),
+        patch(
+            "src.capabilities.similarity._compute_image_embedding",
+            return_value=build_embedding_fixture(),
+        ),
     ):
         agent = build_coordinator()
         runner = build_runner(agent)

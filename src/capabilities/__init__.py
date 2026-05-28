@@ -1,19 +1,19 @@
 """Agent-facing capabilities for the event commerce ops agent.
 
 Graph orchestration (D-024) — capabilities are wired as `FunctionNode`s inside a
-`google.adk.workflow.Workflow`. The workflow graph at the refactor checkpoint
-contains only the implemented capabilities (ingest, context). Subsequent steps
-extend the graph as capabilities come online:
+`google.adk.workflow.Workflow`. Chain tuples of any length are supported by the
+ADK graph builder (_process_chain iterates pairwise), so a single n-element tuple
+expands to n-1 edges.
 
-  Step 3 → adds `find_similar_assets` node
+Current pipeline: START → ingest_event_batch → build_event_context → find_similar_assets
+
+Future steps extend the graph:
   Step 4 → adds `score_assets_with_vision` node
   Step 5 → adds `propose_review_queue` (LlmAgent node, mode='single_turn')
   Step 6 → adds `draft_campaigns_for_queue` node
 
 Adapter functions (prefix `_node_*`) wrap each capability so the workflow node
-writes its outputs back to `ctx.state` for downstream nodes to read. The
-underlying capability function bodies (`src/capabilities/ingest.py`,
-`src/capabilities/context.py`) are unchanged.
+writes its outputs back to `ctx.state` for downstream nodes to read.
 """
 
 from typing import Any
@@ -22,6 +22,7 @@ from google.adk.workflow import FunctionNode, START
 
 from src.capabilities.context import build_event_context as _build_event_context
 from src.capabilities.ingest import ingest_event_batch as _ingest_event_batch
+from src.capabilities.similarity import find_similar_assets as _find_similar_assets
 
 WORKFLOW_NAME = "event_pipeline"
 
@@ -51,10 +52,20 @@ async def _node_build_event_context(ctx: Any, event_id: str) -> dict:
     return result
 
 
-# Module-level FunctionNode instances so the same nodes can be referenced
-# from src/agent.py.build_workflow(). Both use parameter_binding='state' —
-# the coordinator's run_event_pipeline shim pre-populates session state with
-# `images` and `event_metadata`, and downstream nodes propagate via state too.
+async def _node_find_similar_assets(ctx: Any, event_id: str) -> dict:
+    """Workflow adapter: calls find_similar_assets and writes similarity_results to state.
+
+    Reads `event_id` from state (written by the upstream ingest node).
+    """
+    result = await _find_similar_assets(event_id)
+    ctx.state["similarity_results"] = result["similar"]
+    return result
+
+
+# Module-level FunctionNode instances — referenced by src/agent.py.build_workflow().
+# All use parameter_binding='state': the coordinator's run_event_pipeline shim
+# pre-populates session state with `images` and `event_metadata`; downstream nodes
+# read and write via state.
 
 ingest_event_batch_node = FunctionNode(
     func=_node_ingest_event_batch,
@@ -68,13 +79,19 @@ build_event_context_node = FunctionNode(
     parameter_binding="state",
 )
 
+find_similar_assets_node = FunctionNode(
+    func=_node_find_similar_assets,
+    name="find_similar_assets",
+    parameter_binding="state",
+)
+
 
 def build_pipeline_graph() -> list:
     """Returns the edge list for the event pipeline workflow.
 
-    Currently: START -> ingest_event_batch -> build_event_context.
-    Extended progressively as capabilities are implemented.
+    A single chain-tuple expands to pairwise edges (ADK _process_chain semantics).
+    Pipeline: START → ingest_event_batch → build_event_context → find_similar_assets.
     """
     return [
-        (START, ingest_event_batch_node, build_event_context_node),
+        (START, ingest_event_batch_node, build_event_context_node, find_similar_assets_node),
     ]

@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from src.models import Asset, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player
+from src.models import Asset, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, SimilarAsset
 
 
 def build_valid_event(**overrides) -> Event:
@@ -54,6 +54,24 @@ def build_valid_player(**overrides) -> Player:
     }
     base.update(overrides)
     return Player(**base)
+
+
+def build_valid_similar_asset(**overrides) -> SimilarAsset:
+    """Return a valid SimilarAsset instance with sensible defaults."""
+    base = {
+        "asset_id": "past-asset-1",
+        "event_id": "evt-past-1",
+        "similarity": 0.85,
+        "product_route": "poster",
+        "scores": {"quality_score": 0.9},
+    }
+    base.update(overrides)
+    return SimilarAsset(**base)
+
+
+def build_embedding_fixture() -> list[float]:
+    """Return a deterministic 3072-element float list for tests (no live API)."""
+    return [0.1] * 3072
 
 
 def build_valid_event_narrative(**overrides) -> EventNarrative:

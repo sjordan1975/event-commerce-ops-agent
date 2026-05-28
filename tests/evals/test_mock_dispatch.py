@@ -1,4 +1,4 @@
-"""Smoke test: verify _MockMCPClient dispatch correctly seeds all Step 2 wrapper calls.
+"""Smoke tests: verify _MockMCPClient dispatch correctly seeds all Step 2 and Step 3 wrapper calls.
 
 Does NOT run the agent — exercises wrappers directly against the mock client to
 confirm the envelope encoding matches what each wrapper's parse logic expects.
@@ -6,8 +6,14 @@ confirm the envelope encoding matches what each wrapper's parse logic expects.
 
 import pytest
 
-from tests.conftest import build_valid_event, build_valid_event_narrative, build_valid_player
-from tests.evals.conftest import _MockMCPClient
+from tests.conftest import (
+    build_valid_event,
+    build_valid_event_narrative,
+    build_valid_player,
+    build_embedding_fixture,
+    build_valid_similar_asset,
+)
+from tests.evals.conftest import _MockMCPClient, build_runner_with_mock_db
 
 
 def _make_event_find_handler(seeded_event, past_events):
@@ -95,3 +101,55 @@ async def test_mock_dispatch_all_wrappers():
     assert update_args["filter"] == {"event_id": "evt-smoke-1"}
     assert "event_narrative" in update_args["update"]["$set"]
     assert update_args["update"]["$set"]["event_narrative"] == narrative.model_dump(mode="json")
+
+
+@pytest.mark.anyio
+async def test_mock_dispatch_vector_search():
+    """register_vector_search dispatches $vectorSearch aggregates correctly."""
+    sa = build_valid_similar_asset()
+    sa_doc = sa.model_dump(mode="json")
+
+    mock_client = _MockMCPClient()
+    mock_client.register_vector_search(collection="assets", results=[sa_doc])
+
+    import unittest.mock as mock
+    with mock.patch("src.db.assets.get_client", return_value=mock_client):
+        from src.db.assets import vector_search_assets
+
+        result = await vector_search_assets(build_embedding_fixture())
+
+    assert len(result) == 1
+    assert result[0].asset_id == sa.asset_id
+    assert result[0].similarity == sa.similarity
+
+
+@pytest.mark.anyio
+async def test_mock_dispatch_falls_back_to_collection_key():
+    """aggregate on performance still dispatches via collection key when no $vectorSearch registered."""
+    agg_docs = [{"_id": "poster", "total_orders": 50, "total_impressions": 2000, "count": 1}]
+
+    mock_client = _MockMCPClient()
+    mock_client.register("aggregate", "performance", agg_docs)
+
+    import unittest.mock as mock
+    with mock.patch("src.db.performance.get_client", return_value=mock_client):
+        from src.db.performance import aggregate_performance_for_events
+
+        result = await aggregate_performance_for_events(["evt-past-1"])
+
+    assert result["top_product_route"] == "poster"
+    assert result["total_orders"] == 50
+
+
+def test_embedding_helper_is_patched_in_runner():
+    """build_runner_with_mock_db patches _compute_image_embedding to return the fixture."""
+    import unittest.mock as mock
+    import src.capabilities.similarity as sim_module
+
+    with build_runner_with_mock_db():
+        patched_fn = sim_module._compute_image_embedding
+        # The patch replaces the function — calling it should return build_embedding_fixture()
+        result = patched_fn("anything")
+
+    assert isinstance(result, list)
+    assert len(result) == 3072
