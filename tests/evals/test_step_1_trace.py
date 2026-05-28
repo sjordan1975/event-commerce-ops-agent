@@ -14,7 +14,7 @@ The agent must:
   (b) extract correct fields from natural language (hardest: outcome_type)
   (c) drive two MongoDB insert-many calls (events + assets)
   (d) produce a non-null timeliness float in [0, 1] on the event document
-  (e) emit reasoning text before the tool call (CoT directive from v2 prompt)
+  (e) emit reasoning text before the tool call (CoT directive from coordinator_system prompt)
   (f) emit non-empty terminal text after the tool returns
   (g) include the failure trace path in any assertion message
 """

@@ -48,7 +48,7 @@ project-root/
 ├── scripts/                     ← provisioning and seed scripts (setup_mongodb.py, seed_mongodb.py)
 ├── src/                         ← agent code (agent.py, prompt_loader.py, db/, models)
 ├── tests/                       ← test suite (test_foundation.py, expanded each capability)
-└── prompts/                     ← versioned system prompts (v1 archived; v2 active per D-021)
+└── prompts/                     ← versioned system prompts (v1 + v2 archived as pre-D-024 snapshots; v3 active per D-024)
 ```
 
 Planning documents (historical, superseded by docs/specs/):
@@ -148,9 +148,10 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 - **Framing:** see `docs/plans/agentic-model.md` for what kind of agent this is (coordinator chat loop + workflow graph + one strategic node + bidirectional clarification + HITL). Pair with `docs/plans/strategic-agent-reframe.md` for the capability surface and the one strategic decision (`propose_review_queue`).
 
 ### Prompts
-- All LLM prompts live in `prompts/` as versioned subdirectories (e.g. `prompts/v1/`) — do not inline prompts in agent logic
+- All LLM prompts live in `prompts/` as versioned subdirectories (e.g. `prompts/v3/`) — do not inline prompts in agent logic
 - A prompt loader utility (`src/prompt_loader.py`) handles file I/O and version selection — agent logic calls the loader, never reads prompt files directly
-- Active prompt version set via `PROMPT_VERSION` env var (e.g. `PROMPT_VERSION=v1`)
+- Active prompt version set via `PROMPT_VERSION` env var; default is `v3` (D-024). Prior versions (`v1`, `v2`) are archived snapshots — see `prompts/v2/ARCHIVED.md`
+- v3 active prompts: `coordinator_system.md` (coordinator LlmAgent), `clarification_system.md` (task-mode sub-agent), `build_event_context.md` (capability-internal narrative prompt). No `agent_system.md` in v3 — that orphaned file lives only in the v2 archive.
 
 ### Code Style
 - Docstrings on public interfaces only — one line max; no multi-paragraph docstrings
