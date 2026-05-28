@@ -30,8 +30,8 @@ Design decisions baked in (see `docs/plans/step-3-similarity.md` § Decisions ta
 Files: `src/models.py` (extend), `tests/test_models.py` (extend)
 Acceptance:
 - `SimilarAsset(BaseModel)` with `model_config = ConfigDict(extra="forbid")`. Fields: `asset_id: str`, `event_id: str`, `similarity: float = Field(..., ge=0.0, le=1.0)`, `product_route: str | None`, `scores: dict[str, Any] | None`.
-- `SimilarityResult(BaseModel)`. Fields: `asset_id: str` (the current-event asset), `neighbors: list[SimilarAsset]`. No `extra="forbid"` constraint needed.
-- Tests: happy-path construction, `similarity` field rejects values outside [0, 1], `neighbors=[]` accepted (empty-neighbors tolerance), `product_route=None` and `scores=None` accepted.
+- `SimilarityResult(BaseModel)`. Fields: `asset_id: str` (the current-event asset), `neighbors: list[SimilarAsset]`, `inferred_route: str | None` (mechanical inference from neighbors' `product_route`; see T-3.9 helper). No `extra="forbid"` constraint needed.
+- Tests: happy-path construction, `similarity` field rejects values outside [0, 1], `neighbors=[]` accepted (empty-neighbors tolerance), `product_route=None` and `scores=None` accepted, `inferred_route=None` accepted, `inferred_route="poster"` accepted.
 
 Verify: `.venv/bin/python -m pytest tests/test_models.py -v -k "similar_asset or similarity_result"`
 
@@ -173,6 +173,26 @@ Acceptance: `find_similar_assets(event_id: str) -> dict` is async. Behavior per 
 ```python
 DEFAULT_TOP_K = 5  # module-level constant
 
+
+def _infer_route_from_neighbors(neighbors: list[SimilarAsset]) -> str | None:
+    """Mechanical routing inference: plurality vote over neighbors' product_route,
+    similarity-weighted tie-break. Returns None when neighbors is empty (the
+    asset is a discovery-queue candidate, route assignment deferred to Step 5).
+    Not judgment — see D-025."""
+    if not neighbors:
+        return None
+    # Sum similarity per product_route; skip neighbors with route=None.
+    weights: dict[str, float] = {}
+    for n in neighbors:
+        if n.product_route is None:
+            continue
+        weights[n.product_route] = weights.get(n.product_route, 0.0) + n.similarity
+    if not weights:
+        return None
+    # max by (weight, route) — deterministic on weight tie via lexicographic route order
+    return max(weights.items(), key=lambda kv: (kv[1], kv[0]))[0]
+
+
 async def find_similar_assets(event_id: str) -> dict:
     assets = await get_assets_for_event(event_id)
     if not assets:
@@ -189,7 +209,7 @@ async def find_similar_assets(event_id: str) -> dict:
             await save_asset_embedding(asset.asset_id, embedding)
             asset.embedding = embedding
 
-    # Search-and-persist loop
+    # Search + infer-route + persist loop
     similarity_results = []
     for asset in assets:
         neighbors = await vector_search_assets(
@@ -200,20 +220,28 @@ async def find_similar_assets(event_id: str) -> dict:
         similarity_results.append({
             "asset_id": asset.asset_id,
             "neighbors": [n.model_dump(mode="json") for n in neighbors],
+            "inferred_route": _infer_route_from_neighbors(neighbors),
         })
         await save_similar_assets(asset.asset_id, [n.asset_id for n in neighbors])
 
     return {"event_id": event_id, "similar": similarity_results}
 ```
 
+**Routing inference is mechanical, not judgment (D-025).** The helper computes a plurality vote weighted by similarity score — no LLM, no agent reasoning. Returns `None` only when `neighbors` is empty *or* every neighbor has `product_route=None` (corrupt or pre-routing legacy data). Persistence of the final route to `asset.product_route` is Step 5's responsibility via `assign_asset_to_queue`; Step 3 only emits the inference in `similarity_results` session state.
+
 Capability docstring per `docs/plans/step-3-similarity.md` § "Tool docstring" — must name `gemini-embedding-2`, 3072-dim, cosine, the idempotent re-embed skip, the empty-neighbors-is-valid contract, and the downstream consumers (`propose_review_queue`, `draft_campaigns_for_queue`).
 
 Unit tests cover:
 - `test_find_similar_assets_raises_when_no_assets` — `get_assets_for_event` returns `[]` → `PreconditionError` with matching `capability`, `context`, `missing`.
-- `test_find_similar_assets_full_orchestration` — three assets, none with embeddings; mocks all wrappers + `_compute_image_embedding`. Asserts: `_compute_image_embedding` invoked 3× (once per asset); `save_asset_embedding` invoked 3×; `vector_search_assets` invoked 3× (once per asset, with the asset's embedding); `save_similar_assets` invoked 3×; return dict has 3 entries in `similar` with correct shape.
+- `test_find_similar_assets_full_orchestration` — three assets, none with embeddings; mocks all wrappers + `_compute_image_embedding`. Asserts: `_compute_image_embedding` invoked 3× (once per asset); `save_asset_embedding` invoked 3×; `vector_search_assets` invoked 3× (once per asset, with the asset's embedding); `save_similar_assets` invoked 3×; return dict has 3 entries in `similar` with correct shape including `inferred_route`.
 - `test_find_similar_assets_idempotent_reembed_skip` — three assets, one with `embedding` already populated; asserts `_compute_image_embedding` invoked only 2×; `save_asset_embedding` invoked only 2×; vector search still invoked 3× (search runs for every asset regardless of embedding source).
-- `test_find_similar_assets_empty_neighbors_tolerance` — `vector_search_assets` returns `[]` for one of the assets; capability completes without exception; `save_similar_assets` invoked with `similar_asset_ids=[]` for that asset; the corresponding `SimilarityResult` has `neighbors=[]`.
+- `test_find_similar_assets_empty_neighbors_tolerance` — `vector_search_assets` returns `[]` for one of the assets; capability completes without exception; `save_similar_assets` invoked with `similar_asset_ids=[]` for that asset; the corresponding `SimilarityResult` has `neighbors=[]` and `inferred_route is None`.
 - `test_find_similar_assets_call_order` — uses ordered MagicMock assertions to verify the embed-loop completes for all assets before the search-loop begins (per the plan's "embed batch → search batch" sequencing).
+- `test_infer_route_from_neighbors_plurality` — given 5 neighbors (3 poster, 1 tshirt, 1 social_only) with equal similarity 0.8, helper returns `"poster"`.
+- `test_infer_route_from_neighbors_similarity_tiebreak` — given 4 neighbors (2 poster sim 0.5+0.5=1.0, 2 tshirt sim 0.9+0.7=1.6), helper returns `"tshirt"` (similarity-weighted, not count-weighted).
+- `test_infer_route_from_neighbors_empty_returns_none` — empty list returns `None`.
+- `test_infer_route_from_neighbors_all_routes_none_returns_none` — neighbors exist but every `product_route` is `None` (corrupt data); helper returns `None`.
+- `test_infer_route_from_neighbors_deterministic_route_tiebreak` — when two routes have exactly equal summed similarity, helper picks the lexicographically larger route (deterministic, not random).
 
 Each unit test monkeypatches per-module bindings (`src.db.assets.get_client`) and `src.capabilities.similarity._compute_image_embedding`.
 

@@ -87,9 +87,11 @@ find_similar_assets(event_id: str) → dict
                top_k=K,
                exclude_event_id=event_id,
            )
+           inferred_route = _infer_route_from_neighbors(neighbors)  # None if neighbors empty
            similarity_results.append({
                "asset_id": asset.asset_id,
                "neighbors": [n.model_dump() for n in neighbors],
+               "inferred_route": inferred_route,
            })
            await save_similar_assets(asset.asset_id, [n.asset_id for n in neighbors])
     4. return {"event_id": event_id, "similar": similarity_results}
@@ -120,9 +122,14 @@ Returned by `vector_search_assets`. The `similarity` score is the value MongoDB 
 class SimilarityResult(BaseModel):
     asset_id: str                       # current event's asset
     neighbors: list[SimilarAsset]       # ranked top-K from history
+    inferred_route: str | None          # mechanical inference from neighbors' product_route
+                                        # plurality vote; similarity-weighted tie-break;
+                                        # None when neighbors is empty (discovery candidate)
 ```
 
 Returned per current-event asset from the capability. Capability result is `{event_id, similar: list[SimilarityResult].model_dump()}`.
+
+**Routing inference (mechanical, not judgment):** per the spec and D-025, channel routing for the exploitation queue is implied by majority-channel of nearest neighbors — *not* a Step 5 judgment surface. Step 3 computes this as `inferred_route` on each `SimilarityResult` via a private helper `_infer_route_from_neighbors(neighbors) -> str | None`. Algorithm: plurality vote over `neighbors[].product_route`; ties broken by sum-of-similarity; returns `None` when `neighbors` is empty (the discovery-queue candidate path). Step 3 does **not** persist `inferred_route` to the asset — that write boundary belongs to Step 5's `assign_asset_to_queue(asset_id, queue_type, product_route, reasoning)` wrapper, so Step 5 can override the inference for exploration items or when Vision (Step 4) flags an asset as unprintable.
 
 Model addition to existing `Asset`: append `similar_assets: list[str] | None = None`. (Currently the field is implied by the architecture spec but not on the Pydantic model.) Default `None` — populated by `save_similar_assets`.
 
