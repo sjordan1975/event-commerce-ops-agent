@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**D-024 graph-orchestration refactor complete — coordinator-over-workflow architecture in place; 30/30 non-eval tests green; Step 1 + Step 2 trace evals re-shaped to the new architecture and N=20 gates cleared. D-023 is paid. Ready for Step 3 on the new shape.**
+**Step 3 plan + task list drafted and approved (plan-gate cleared 2026-05-28). On branch `step/3-similarity` (rebased onto post-D-024 `main`). Implementation not yet started — three branch-housekeeping commits and the tasks-file human gate stand between here and T-3.1.**
 
-Next action: On branch `refactor/d023-graph-orchestration`. Confirm verification gates one more time, merge to `main`. Then rebase `step/3-similarity` onto the new `main` and resume Step 3 implementation (`find_similar_assets` — vector embedding via `gemini-embedding-2` + MongoDB Atlas Vector Search). Step 3 adds a new `FunctionNode` to the workflow graph (via `build_pipeline_graph()` in `src/capabilities/__init__.py`); the agent shell does not change.
+Next action: (1) Land branch-housekeeping commits on `step/3-similarity` (doc-only, no code): update `docs/specs/02-architecture.md` (assets schema gains `similar_assets`, new "Atlas Vector Search indexes" subsection defining `assets_embedding_index`, MCP call list shows explicit `$vectorSearch` pipeline); update `docs/plans/db-wrapper-inventory.md` (`vector_search_assets` signature: drop `channel`, add `exclude_event_id`, lower default `top_k` to 5); add new D-entry in `tracking.md` capturing Step 3 architectural choices (cosine, top_k=5, setup-time index provisioning, `google.genai`+`GOOGLE_API_KEY` reconciling D-006, current-event assets get embedded). (2) Human-gate the task list at `docs/tasks/step-3-tasks.md`. (3) Begin implementation from T-3.1 (Pydantic models: `SimilarAsset`, `SimilarityResult`, `Asset.similar_assets` field).
 
-Reference: `tracking.md` D-024 for the refactor design + locked-in decisions; `docs/plans/spike-d023-findings.md` for the validation; `docs/plans/strategic-agent-reframe.md` § Propagation plan for the per-step roadmap; `tracking.md` D-021 for the strategic-surface rationale.
+Reference: `docs/plans/step-3-similarity.md` (the plan), `docs/tasks/step-3-tasks.md` (17 atomic tasks T-3.1–T-3.17), `tracking.md` D-024 for the orchestration architecture Step 3 lands against, `docs/plans/strategic-agent-reframe.md` for the capability-surface rationale. Identity-routing concern (Messi-shots problem) is captured in the Step 3 plan's risks table for Step 5 planning to inherit — Vision extracts `detected_subjects` in Step 4; Step 5 composes identity with similarity + narrative.
 
 Update the above before ending each session — it is the single source of truth for session orientation.  
 Deadline: June 11, 2026 @ 2:00 PM PDT.
