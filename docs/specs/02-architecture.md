@@ -1,6 +1,6 @@
 # 02 — Architecture: System Design
 
-> **Updated for D-021** (2026-05-26) — the agent is reframed as **strategist composing 9 capabilities** with queue assembly as the one strategic decision. The pre-pivot "8-step workflow" framing is superseded. Sections updated: tech stack notes, MongoDB collection intros (capability references replace step references), MongoDB MCP call list (reorganized by capability), ADK Agent Architecture (workflow diagram replaced with capability composition framing), Hard Constraint #1. Sections unchanged: collection JSON schemas, external integrations, all other hard constraints. Full design rationale: `docs/plans/strategic-agent-reframe.md`; D-021 in `tracking.md`.
+> **Updated for D-021** (2026-05-26) — the agent is reframed as **strategist composing 9 capabilities** with queue assembly as the one strategic decision. The pre-pivot "8-step workflow" framing is superseded. Sections updated: tech stack notes, MongoDB collection intros (capability references replace step references), MongoDB MCP call list (reorganized by capability), ADK Agent Architecture (workflow diagram replaced with capability composition framing), Hard Constraint #1. Sections unchanged: collection JSON schemas, external integrations, all other hard constraints. Full design rationale: `docs/strategic-agent-reframe.md`; D-021 in `tracking.md`.
 >
 > **Updated for D-022** (2026-05-27) — `build_event_context` persists the LLM-composed `EventNarrative` onto the producing `events` document (new `event_narrative` field). The `events` JSON example and the `build_event_context` MCP call list reflect the new write. Full rationale: `tracking.md` D-022; design context: `docs/plans/step-2-context.md` § "Persistence: `event_narrative` field on `events`".
 
@@ -10,7 +10,7 @@
 |-------|-----------|-------|
 | LLM | Gemini (Vertex AI) | Required by hackathon — reasoning and vision |
 | Embeddings | `gemini-embedding-2` (Vertex AI) | 3072 dimensions, multimodal (image + text) |
-| Orchestration | Google ADK v2.1 | Single `LlmAgent` composing 9 capability tools; `LongRunningFunctionTool` at the HITL gate. No `Workflow` graph — the agent loops calling tools until terminal text (see `docs/plans/agentic-model.md`) |
+| Orchestration | Google ADK v2.1 | Single `LlmAgent` composing 9 capability tools; `LongRunningFunctionTool` at the HITL gate. No `Workflow` graph — the agent loops calling tools until terminal text (see `docs/agentic-model.md`) |
 | MCP integration | `McpToolset` (built into ADK) | Native ADK adapter; used by domain wrappers as a programmatic client (D-019) — not registered in `agent.tools` |
 | Database / state | MongoDB Atlas | Partner MCP track; all state, queues, vector search, memory |
 | Ecommerce | Shopify GraphQL Admin API | Partners dev store (free); products + draft orders |
@@ -326,7 +326,7 @@ assets.aggregate          → find assets similar to best performers (informs fu
 
 ## ADK Agent Architecture (revised by D-024)
 
-The system is a **coordinator `LlmAgent` over a `google.adk.workflow.Workflow` graph**. The coordinator (chat mode) owns the operator conversation, clarification, and HITL. The workflow (graph) owns deterministic capability execution and (from Step 5) hosts one `LlmAgent(mode='single_turn')` node for the strategic decision (`propose_review_queue`). The pre-D-024 single-`LlmAgent` free loop is gone — execution order is now enforced by graph edges, not by prompt + `PreconditionError`. Full loop semantics: `docs/plans/agentic-model.md`. Implementation details + spike validation: `tracking.md` D-024 and `docs/plans/spike-d023-findings.md`.
+The system is a **coordinator `LlmAgent` over a `google.adk.workflow.Workflow` graph**. The coordinator (chat mode) owns the operator conversation, clarification, and HITL. The workflow (graph) owns deterministic capability execution and (from Step 5) hosts one `LlmAgent(mode='single_turn')` node for the strategic decision (`propose_review_queue`). The pre-D-024 single-`LlmAgent` free loop is gone — execution order is now enforced by graph edges, not by prompt + `PreconditionError`. Full loop semantics: `docs/agentic-model.md`. Implementation details + spike validation: `tracking.md` D-024 and `docs/spike-d023-findings.md`.
 
 ### Top-level composition
 
@@ -383,11 +383,11 @@ HITL approval + execution + outcomes (capabilities 7–9) live coordinator-side,
 - **`InMemorySessionService`** for local dev; swap to persistent session service for Cloud Run.
 - **State persistence** via MongoDB `assets` collection — most capabilities write `status` updates so the trajectory is resumable across ADK sessions.
 - **Retry logic** internal to `execute_approved_campaigns` for Printful async mockup polling.
-- **`PreconditionError`** — wrapper-level exception with self-correcting message format. Under D-024 the graph enforces order structurally; `PreconditionError` remains as defense-in-depth for direct capability calls (e.g., from unit tests). See `docs/plans/strategic-agent-reframe.md` § Enforced vs. emergent.
-- **Loop and spend bounds** — ADK's iteration cap and `max_output_tokens` are the operational safety bounds. Explicit values + cap on the `edit_requested` redraft loop are tracked in `docs/plans/safety-measures.md`.
+- **`PreconditionError`** — wrapper-level exception with self-correcting message format. Under D-024 the graph enforces order structurally; `PreconditionError` remains as defense-in-depth for direct capability calls (e.g., from unit tests). See `docs/strategic-agent-reframe.md` § Enforced vs. emergent.
+- **Loop and spend bounds** — ADK's iteration cap and `max_output_tokens` are the operational safety bounds. Explicit values + cap on the `edit_requested` redraft loop are tracked in `docs/safety-measures.md`.
 - **Two model env vars (D-024):** `GEMINI_COORDINATOR_MODEL` (default `gemini-2.5-flash`) for the coordinator + task sub-agents; `GEMINI_MODEL` (default `gemini-2.5-flash-lite`) for workflow nodes (including the strategic LlmAgent node and the internal LLM call in `build_event_context`).
 
-Spike code: `spike/adk_hitl_test.py` (HITL primitive — pre-D-024), `spike/adk_event_capture.py` (event trace classification), `spike/adk_workflow_hitl_spike.py` (D-024 validation — all three load-bearing primitives). Findings: `docs/plans/spike-d023-findings.md`.
+Spike code: `spike/adk_hitl_test.py` (HITL primitive — pre-D-024), `spike/adk_event_capture.py` (event trace classification), `spike/adk_workflow_hitl_spike.py` (D-024 validation — all three load-bearing primitives). Findings: `docs/spike-d023-findings.md`.
 
 ---
 

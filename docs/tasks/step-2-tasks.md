@@ -219,7 +219,7 @@ Verify: `.venv/bin/python -m pytest tests/evals/test_step_2_trace.py::test_step_
 Files: `tests/evals/test_step_2_trace.py` (extend)
 Acceptance: A second test function runs the single-run eval N=20 times (configurable via `EVAL_REPEAT` env var, default 5 in CI). Asserts ≥ 19/20 runs pass all eight assertions (95% threshold per D-020). On failure, prints which assertion failed in which run and the per-assertion pass-rate.
 
-The hardest assertion empirically is expected to be (g) the hallucination guard — the LLM's narrative composition is the only assertion target with non-deterministic creative latitude. If pass rate dips below threshold, follow the remediation playbook per `docs/plans/evaluation-strategy.md`: tighten prompt language → tighten capability docstring → tighten schema constraint (e.g., add post-validation in `build_event_context` that filters `grounded_facts` to the verbatim-substring subset) → swap `GEMINI_NARRATIVE_MODEL` to `gemini-2.5-flash` as the last rung.
+The hardest assertion empirically is expected to be (g) the hallucination guard — the LLM's narrative composition is the only assertion target with non-deterministic creative latitude. If pass rate dips below threshold, follow the remediation playbook per `docs/evaluation-strategy.md`: tighten prompt language → tighten capability docstring → tighten schema constraint (e.g., add post-validation in `build_event_context` that filters `grounded_facts` to the verbatim-substring subset) → swap `GEMINI_NARRATIVE_MODEL` to `gemini-2.5-flash` as the last rung.
 
 The MVP-acceptability escape hatch is explicitly forbidden by CLAUDE.md (and the user's standing feedback memory) — climb the ladder fully before declaring done.
 
@@ -254,8 +254,8 @@ Verify:
 
 ## Tracking note
 
-If trace eval pass-rate dips below the 95% threshold, follow the remediation ladder in `docs/plans/evaluation-strategy.md` § Remediation. The cheap rungs (prompt tightening → docstring tightening → schema constraint → hybrid post-validation in the wrapper) must be tried before the model swap (`GEMINI_NARRATIVE_MODEL` → `gemini-2.5-flash`). Per CLAUDE.md and the standing feedback rule, "acceptable for MVP" is not a valid stopping point with cheaper rungs untried.
+If trace eval pass-rate dips below the 95% threshold, follow the remediation ladder in `docs/evaluation-strategy.md` § Remediation. The cheap rungs (prompt tightening → docstring tightening → schema constraint → hybrid post-validation in the wrapper) must be tried before the model swap (`GEMINI_NARRATIVE_MODEL` → `gemini-2.5-flash`). Per CLAUDE.md and the standing feedback rule, "acceptable for MVP" is not a valid stopping point with cheaper rungs untried.
 
-Step 2's trace eval exercises failure categories **1, 3, 4, 5** per `docs/plans/evaluation-strategy.md`: tool selection (a, b), tool arguments (c), tool-output handling (g — the hallucination case is category 4), end-state (d, e, f). Strategy coherence (category 6) does not apply here — it lands when `propose_review_queue` ships in Step 5.
+Step 2's trace eval exercises failure categories **1, 3, 4, 5** per `docs/evaluation-strategy.md`: tool selection (a, b), tool arguments (c), tool-output handling (g — the hallucination case is category 4), end-state (d, e, f). Strategy coherence (category 6) does not apply here — it lands when `propose_review_queue` ships in Step 5.
 
-Per `docs/plans/workflow.md` Phase 6, advisor consultation is required before declaring Step 2 done — independent read on whether the implementation matches the plan, whether the eval exercises what it claims to, and whether anything was quietly cut to make tests pass. Commit before the advisor call so the deliverable is durable if the session ends mid-call.
+Per `docs/workflow.md` Phase 6, advisor consultation is required before declaring Step 2 done — independent read on whether the implementation matches the plan, whether the eval exercises what it claims to, and whether anything was quietly cut to make tests pass. Commit before the advisor call so the deliverable is durable if the session ends mid-call.

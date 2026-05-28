@@ -1,6 +1,6 @@
 # 01 — Requirements: Functional Specification
 
-> **Updated for D-021** (2026-05-26) — the agent's job is reframed as **strategic queue assembly** composed of 9 capabilities. The pre-pivot "8-step workflow" framing is superseded. Sections updated: routing strategy, agent capabilities (was: 8-step workflow), demo flow, judging alignment, success metrics. Sections unchanged: hackathon non-negotiables, MVP scope, asset routing, channel responsibility, performance metrics, non-goals. Full design rationale: `docs/plans/strategic-agent-reframe.md`; D-021 in `tracking.md`.
+> **Updated for D-021** (2026-05-26) — the agent's job is reframed as **strategic queue assembly** composed of 9 capabilities. The pre-pivot "8-step workflow" framing is superseded. Sections updated: routing strategy, agent capabilities (was: 8-step workflow), demo flow, judging alignment, success metrics. Sections unchanged: hackathon non-negotiables, MVP scope, asset routing, channel responsibility, performance metrics, non-goals. Full design rationale: `docs/strategic-agent-reframe.md`; D-021 in `tracking.md`.
 
 ## Hackathon Non-Negotiables
 
@@ -105,7 +105,7 @@ The MVP uses similarity-based prioritization for the main exploitation queue, wi
 
 The human operator reviews both queues and decides. The algorithm surfaces exploitation candidates; **the agent surfaces exploration candidates with reasoning**; editorial judgment advances them.
 
-**Why agent-driven exploration for the demo:** the exploration queue is the canonical judgment-under-bounded-ambiguity case. Random selection (D-015's default) is honest but produces no visible reasoning. Agent-driven selection surfaces the agent's judgment — *"this is worth your time despite the miss because X"* — which is the load-bearing demonstration of strategic AI value (per `docs/plans/strategic-agent-reframe.md`).
+**Why agent-driven exploration for the demo:** the exploration queue is the canonical judgment-under-bounded-ambiguity case. Random selection (D-015's default) is honest but produces no visible reasoning. Agent-driven selection surfaces the agent's judgment — *"this is worth your time despite the miss because X"* — which is the load-bearing demonstration of strategic AI value (per `docs/strategic-agent-reframe.md`).
 
 **Tuning space (customer/implementation decision):**
 
@@ -160,7 +160,7 @@ The agent composes **nine mid-granularity capabilities** to take a batch of even
 
 Capability ordering is dependency-aware (you cannot draft for a non-existent queue), but the middle three computational capabilities (`build_event_context`, `find_similar_assets`, `score_assets_with_vision`) have no order constraint among themselves — the agent picks. Preconditions are enforced by wrapper-level validation (`PreconditionError`); the agent receives a self-correcting error if it calls a capability before its data dependencies are met. Order among independent operations stays emergent.
 
-Full design rationale: `docs/plans/strategic-agent-reframe.md`. Loop shape and exit conditions: `docs/plans/agentic-model.md`.
+Full design rationale: `docs/strategic-agent-reframe.md`. Loop shape and exit conditions: `docs/agentic-model.md`.
 
 ### The strategic decision: queue assembly
 
@@ -243,7 +243,7 @@ When the tool resumes with decisions:
 - Any rejected → those items drop; executable subset proceeds
 - Any edit-requested → agent calls `draft_campaigns_for_queue` with the edit notes, then loops back to `request_human_approval`
 
-The edit-requested loop is the agent's reasoning, not a separate capability. A revision cap (per `docs/plans/safety-measures.md`) lives in the system prompt or the tool's contract to prevent infinite revision cycles.
+The edit-requested loop is the agent's reasoning, not a separate capability. A revision cap (per `docs/safety-measures.md`) lives in the system prompt or the tool's contract to prevent infinite revision cycles.
 
 **8. `execute_approved_campaigns`** — For approved items:
 - **Shopify:** create product draft via GraphQL Admin API
@@ -256,7 +256,7 @@ The edit-requested loop is the agent's reasoning, not a separate capability. A r
 
 ## Demo Flow (Judge-Facing Narrative)
 
-Two contrasting events demonstrate that the agent reasons strategically rather than running a fixed pipeline. Event 1 carries the full flow; Event 2 focuses on how the strategy differs. **Pacing target: ~3 minutes total.** Full pacing breakdown and reproducibility plan: `docs/plans/strategic-agent-reframe.md` § Demo coherence.
+Two contrasting events demonstrate that the agent reasons strategically rather than running a fixed pipeline. Event 1 carries the full flow; Event 2 focuses on how the strategy differs. **Pacing target: ~3 minutes total.** Full pacing breakdown and reproducibility plan: `docs/strategic-agent-reframe.md` § Demo coherence.
 
 ### Event 1 — Upset victory at peak timeliness (~90 seconds)
 
@@ -308,7 +308,7 @@ The story is operational velocity *and* visible strategic judgment — not just 
 ## Success Metrics
 
 - Time from event upload → approval queue populated (target: under 60 seconds for 50-image batch)
-- **Queue-assembly coherence:** for a given event type, does the agent produce a queue whose composition matches expected strategy (per-event-type assertion class in trace evals, per `docs/plans/evaluation-strategy.md`)
+- **Queue-assembly coherence:** for a given event type, does the agent produce a queue whose composition matches expected strategy (per-event-type assertion class in trace evals, per `docs/evaluation-strategy.md`)
 - Human approval rate on agent-surfaced candidates (both exploitation and exploration)
 - Shopify draft creation success rate
 - Printful mockup generation completion rate

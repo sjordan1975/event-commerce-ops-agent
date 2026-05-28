@@ -45,7 +45,7 @@ This framing is load-bearing. It determines every capability the agent invokes a
 
 > "A chaotic post-match media workflow became operationally organized by an AI agent — and the agent reasoned differently for two different events."
 
-The demo runs **two contrasting events** to show that the agent's strategy varies with the situation. Full pacing and design in `01-requirements.md` § Demo Flow and `docs/plans/strategic-agent-reframe.md` § Demo coherence:
+The demo runs **two contrasting events** to show that the agent's strategy varies with the situation. Full pacing and design in `01-requirements.md` § Demo Flow and `docs/strategic-agent-reframe.md` § Demo coherence:
 
 1. **Event 1 — Upset victory at peak timeliness** (~90s, full flow on screen). Rich exploitation queue (many similarity matches), narrow-but-pointed exploration picks with per-item reasoning. HITL approval, execution, MongoDB collections populated.
 2. **Event 2 — Group-stage draw at moderate timeliness** (~45s, strategic differences only). Thin exploitation queue, exploration emphasis, agent has to actively justify why anything is worth surfacing.

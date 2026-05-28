@@ -2,7 +2,7 @@
 
 Companion to `testing-model.md` and `evaluation-strategy.md`. Those cover *how* we test the agent; this one covers *what kind of agent it is* — and, just as importantly, **what kind of agent it is not**.
 
-> **Substantially revised for D-021** (2026-05-26) and then **paid down with implementation by D-024** (2026-05-27). The pre-pivot framing of this doc treated the LlmAgent loop as the agent's macro planning surface and celebrated "emergent step trajectory" as a feature. D-021 rejected that framing conceptually. D-024 implemented the resolution: the agent is now a coordinator `LlmAgent` over a `google.adk.workflow.Workflow` graph. The "Layer 1" section below describes that implementation. The strategic surface is unchanged from D-021 — `propose_review_queue`, added to the workflow as a graph node in Step 5. Full pivot rationale: `docs/plans/strategic-agent-reframe.md`; implementation details + spike validation: `tracking.md` D-024 and `docs/plans/spike-d023-findings.md`.
+> **Substantially revised for D-021** (2026-05-26) and then **paid down with implementation by D-024** (2026-05-27). The pre-pivot framing of this doc treated the LlmAgent loop as the agent's macro planning surface and celebrated "emergent step trajectory" as a feature. D-021 rejected that framing conceptually. D-024 implemented the resolution: the agent is now a coordinator `LlmAgent` over a `google.adk.workflow.Workflow` graph. The "Layer 1" section below describes that implementation. The strategic surface is unchanged from D-021 — `propose_review_queue`, added to the workflow as a graph node in Step 5. Full pivot rationale: `docs/strategic-agent-reframe.md`; implementation details + spike validation: `tracking.md` D-024 and `docs/spike-d023-findings.md`.
 
 ---
 
@@ -134,12 +134,12 @@ Different layers, different problems, different evidence. Conflating them is how
 
 ## Cross-references
 
-- `docs/plans/strategic-agent-reframe.md` — D-021 design doc; the capability surface and the one strategic decision this doc presupposes
+- `docs/strategic-agent-reframe.md` — D-021 design doc; the capability surface and the one strategic decision this doc presupposes
 - `docs/specs/02-architecture.md` § ADK Agent Architecture — the capability composition diagram (typical trajectory) this doc explains
 - `prompts/v2/agent_system.md` *(pending Phase A item 6)* — strategist framing for the system prompt; tool docstrings carry the per-capability contracts
-- `docs/plans/testing-model.md` — three-category test model (unit / scaffolding / eval); conceptual sibling
-- `docs/plans/evaluation-strategy.md` — failure categories (including *strategy coherence* per D-021) and remediation playbook
-- `docs/plans/safety-measures.md` — operational bounds (loop cap, spend bound) on the layer-1 mechanism
+- `docs/testing-model.md` — three-category test model (unit / scaffolding / eval); conceptual sibling
+- `docs/evaluation-strategy.md` — failure categories (including *strategy coherence* per D-021) and remediation playbook
+- `docs/safety-measures.md` — operational bounds (loop cap, spend bound) on the layer-1 mechanism
 - `tracking.md` D-019 — wrapper boundary; the agent never calls MongoDB directly
 - `tracking.md` D-021 — strategic-agent reframe; the one strategic decision
 - `src/agent.py` — confirms single `LlmAgent` implementation

@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Step 3 implementation complete (T-3.1–T-3.17 done 2026-05-28). On branch `step/3-similarity`. Ready to merge to `main`.**
 
-Next action: (1) Merge `step/3-similarity` to `main`. (2) Cut branch `step/4-vision` for `score_assets_with_vision` (Vision scoring + dual-job per D-017). (3) The branch-housekeeping commits for spec/tracking doc updates (docs/specs/02-architecture.md, docs/plans/db-wrapper-inventory.md, tracking.md D-025 update) are still outstanding on this branch — land those before or alongside the merge commit.
+Next action: (1) Merge `step/3-similarity` to `main`. (2) Cut branch `step/4-vision` for `score_assets_with_vision` (Vision scoring + dual-job per D-017). (3) The branch-housekeeping commits for spec/tracking doc updates (docs/specs/02-architecture.md, docs/db-wrapper-inventory.md, tracking.md D-025 update) are still outstanding on this branch — land those before or alongside the merge commit.
 
 Key Step 3 implementation notes for Step 4: `_compute_image_embedding` uses `google.genai` SDK with `Part.from_bytes` (not `from_uri`) and drops `task_type` (unsupported by `gemini-embedding-2`). The `find_similar_assets` node is the third node in the workflow graph (START → ingest → context → similarity). `similarity_results` is now written to session state for `propose_review_queue` (Step 5) to consume.
 
-Reference: `docs/plans/step-3-similarity.md` (the plan), `docs/tasks/step-3-tasks.md` (17 atomic tasks T-3.1–T-3.17), `tracking.md` D-024 for the orchestration architecture Step 3 lands against, `docs/plans/strategic-agent-reframe.md` for the capability-surface rationale. Identity-routing concern (Messi-shots problem) is captured in the Step 3 plan's risks table for Step 5 planning to inherit — Vision extracts `detected_subjects` in Step 4; Step 5 composes identity with similarity + narrative.
+Reference: `docs/plans/step-3-similarity.md` (the plan), `docs/tasks/step-3-tasks.md` (17 atomic tasks T-3.1–T-3.17), `tracking.md` D-024 for the orchestration architecture Step 3 lands against, `docs/strategic-agent-reframe.md` for the capability-surface rationale. Identity-routing concern (Messi-shots problem) is captured in the Step 3 plan's risks table for Step 5 planning to inherit — Vision extracts `detected_subjects` in Step 4; Step 5 composes identity with similarity + narrative.
 
 Update the above before ending each session — it is the single source of truth for session orientation.  
 Deadline: June 11, 2026 @ 2:00 PM PDT.
@@ -44,7 +44,15 @@ project-root/
 │   ├── 00-overview.md          ← vision, origin, positioning, demo narrative
 │   ├── 01-requirements.md      ← functional spec, 9 capabilities + queue assembly (D-021), MVP scope
 │   └── 02-architecture.md      ← system design, MongoDB schemas, MCP call list, ADK architecture
-├── docs/plans/                  ← per-step implementation plans + cross-cutting design docs (agentic-model, testing-model, evaluation-strategy, safety-measures, strategic-agent-reframe, db-wrapper-inventory, workflow)
+├── docs/agentic-model.md        ← agent loop shape, exit conditions, HITL framing, three-layer model
+├── docs/db-wrapper-inventory.md ← MongoDB wrapper signatures, per-step ownership
+├── docs/evaluation-strategy.md  ← six failure categories, trace-eval model, remediation ladder
+├── docs/safety-measures.md      ← loop bound + spend bound
+├── docs/spike-d023-findings.md  ← D-023 spike results (superseded by D-024)
+├── docs/strategic-agent-reframe.md ← D-021 capability surface, queue assembly, propagation plan
+├── docs/testing-model.md        ← three-category test model (unit / scaffolding / eval)
+├── docs/workflow.md             ← per-step workflow and phase gates
+├── docs/plans/                  ← per-step implementation plans (step-*.md only)
 ├── docs/tasks/                  ← per-step atomic task lists (one file per step)
 ├── spike/                       ← validated ADK spikes (adk_hitl_test.py, adk_mcp_raw_test.py, adk_event_capture.py, adk_workflow_hitl_spike.py [D-024])
 ├── scripts/                     ← provisioning and seed scripts (setup_mongodb.py, seed_mongodb.py)
@@ -54,7 +62,7 @@ project-root/
 ```
 
 Planning documents (historical, superseded by docs/specs/):
-- `rapid_agent_hackathon_spec.md` — hackathon rules reference; do not modify
+- `docs/rapid_agent_hackathon_spec.md` — hackathon rules reference; do not modify
 
 ---
 
@@ -127,12 +135,12 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 - **Conftest helpers:** `build_valid_asset()`, `build_valid_campaign()`, etc. — return valid model instances for reuse across test files
 - **LLM scaffolding tests:** validate prompt structure and output parsing without live API calls; mock at the `Runner` boundary, not inside agent logic
 - Test runner: `pytest` — run with `.venv/bin/python -m pytest`
-- **Framing:** see `docs/plans/testing-model.md` for the three-category model (unit / scaffolding / eval) — defines the boundary between this section and § Evaluation
+- **Framing:** see `docs/testing-model.md` for the three-category model (unit / scaffolding / eval) — defines the boundary between this section and § Evaluation
 
 ### Evaluation (agentic behavior — distinct from unit tests)
 - **Trace-based evals are required for every capability** — not optional, not "if we have time" (D-020). Live under `tests/evals/`.
 - **A passing smoke test is not evidence the system works.** Repetition matters: pass rate ≥ 95% across 20 runs per capability is the ship gate. A test that passes 5/5 in CI but 18/20 manually is a flake we should be nervous about.
-- **When an eval surfaces a partial result or failure, run the remediation playbook top-to-bottom before declaring "acceptable":** prompt language → tool docstring → tool surface → hybrid wrapper → model swap. Never settle on "acceptable for MVP" with a cheap rung untried. See `docs/plans/evaluation-strategy.md`.
+- **When an eval surfaces a partial result or failure, run the remediation playbook top-to-bottom before declaring "acceptable":** prompt language → tool docstring → tool surface → hybrid wrapper → model swap. Never settle on "acceptable for MVP" with a cheap rung untried. See `docs/evaluation-strategy.md`.
 - **Failure traces must include LLM reasoning text.** The "Before each tool call, briefly state why" directive in the system prompt is load-bearing for this — confirmed by `spike/adk_event_capture.py`. Do not remove it without re-verifying reasoning text still surfaces under the full production prompt.
 - **Six failure categories to assert on:** tool selection, tool sequencing (weaker now that most capabilities are independent — see D-021), tool arguments, tool-output handling (the hallucination case), end-state, and **strategy coherence** (queue assembly: does the composition match the event class? per D-021 — load-bearing for `propose_review_queue` evals).
 
@@ -147,7 +155,7 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 - **Workflow primitive (D-024):** orchestration is via `google.adk.workflow.Workflow` with `FunctionNode`s, not `SequentialAgent` (deprecated in ADK v2.1). The graph is built by `src/capabilities/__init__.py:build_pipeline_graph()`. Each new step extends the graph by adding nodes and an edge — the agent shell does not change.
 - **Coordinator dispatches the workflow via a `FunctionTool` shim** (`run_event_pipeline` in `src/agent.py`). The shim spins up a sub-`Runner` with pre-populated session state. `Workflow` extends `BaseNode`, not `BaseAgent`, so `AgentTool` cannot wrap it.
 - The OTel `ValueError: Token was created in a different Context` warning on generator exit is cosmetic — do not attempt to fix it
-- **Framing:** see `docs/plans/agentic-model.md` for what kind of agent this is (coordinator chat loop + workflow graph + one strategic node + bidirectional clarification + HITL). Pair with `docs/plans/strategic-agent-reframe.md` for the capability surface and the one strategic decision (`propose_review_queue`).
+- **Framing:** see `docs/agentic-model.md` for what kind of agent this is (coordinator chat loop + workflow graph + one strategic node + bidirectional clarification + HITL). Pair with `docs/strategic-agent-reframe.md` for the capability surface and the one strategic decision (`propose_review_queue`).
 
 ### Prompts
 - All LLM prompts live in `prompts/` as versioned subdirectories (e.g. `prompts/v3/`) — do not inline prompts in agent logic

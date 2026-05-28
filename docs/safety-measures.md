@@ -88,6 +88,6 @@ These are real concerns for a production version, not load-bearing for the hacka
 
 ## Cross-references
 
-- `docs/plans/agentic-model.md` — establishes the loop shape these measures bound
-- `docs/plans/evaluation-strategy.md` — behavioral measurement (orthogonal to the operational bounds above)
+- `docs/agentic-model.md` — establishes the loop shape these measures bound
+- `docs/evaluation-strategy.md` — behavioral measurement (orthogonal to the operational bounds above)
 - `CLAUDE.md` § ADK-Specific Rules — where the iteration cap value should be recorded once chosen

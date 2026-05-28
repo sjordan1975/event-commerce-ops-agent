@@ -125,7 +125,7 @@ The phrase that captures it: **in agentic systems, you unit-test the parts and y
 
 ## Cross-references
 
-- `docs/plans/evaluation-strategy.md` — how trace evals actually work (failure categories, eval surfaces, remediation playbook, per-step eval contract)
+- `docs/evaluation-strategy.md` — how trace evals actually work (failure categories, eval surfaces, remediation playbook, per-step eval contract)
 - `CLAUDE.md` § Evaluation — operational rules (95% pass rate, CoT directive load-bearing, five failure categories)
 - `tracking.md` D-020 — the decision to treat evals as first-class
 - `spike/adk_event_capture.py` — verified pattern for capturing tool calls / responses / reasoning text from the ADK event stream

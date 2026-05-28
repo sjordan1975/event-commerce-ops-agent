@@ -350,7 +350,7 @@ Wrappers around the load-bearing MongoDB features should be named such that a re
 - Less of the agent's MongoDB knowledge visible in the trace. Replaced by architecture diagram + index definitions + named wrappers in the codebase. Net: demo narrative is at least as strong, more robust.
 - Up-front engineering cost to build the wrapper layer before Step 1. Recovered by shorter prompts, fewer hallucination paths, simpler tests.
 
-**Full wrapper inventory:** see `docs/plans/db-wrapper-inventory.md`.
+**Full wrapper inventory:** see `docs/db-wrapper-inventory.md`.
 
 ---
 
@@ -370,7 +370,7 @@ Agentic systems fail statistically, not deterministically. A smoke test that pas
 **Specific connection to D-019 Q#6 (timeliness chain):**
 The agent calls `compute_timeliness` explicitly and chains the result into `record_event` because that chain demonstrates the agentic premise. The risk of that decision (the agent could hallucinate the value or skip the call) is mitigated by the trace eval, not by hiding the computation in the wrapper. If the eval shows < 90% pass rate, the hybrid fallback wrapper kicks in. This is the pattern for every decision where we trade agentic legibility against statistical reliability — evals are the instrument that tells us which side wins.
 
-**Full framework:** see `docs/plans/evaluation-strategy.md`.
+**Full framework:** see `docs/evaluation-strategy.md`.
 
 **What we are explicitly not doing for MVP:** LLM-as-judge for quality, cross-model behavioral diffs, statistical significance testing, adversarial probes, cost budgets. Listed in the strategy doc so we don't accidentally pretend to have them.
 
@@ -398,7 +398,7 @@ The reframe exposes the one place where the existing spec admits it has no deter
 - **D-015 update:** structure unchanged (two-queue split persists). Default for exploration changes from random sampling to agent-driven novelty selection for the demo. Random retained as documented fallback configuration. D-015's own framing (*"expected to be tuned by customer and implementation"*) anticipated this — the change is a configuration choice, not a structural reversal.
 - **Hard Constraint #1 in `CLAUDE.md` revises:** *"Do not simplify or merge the 8-step workflow"* → *"Do not remove capabilities or collapse the queue-assembly decision into a heuristic."*
 
-**Full design rationale, capability table, precondition table, demo pacing, Step 1 reconciliation plan, and three-phase propagation plan:** see `docs/plans/strategic-agent-reframe.md`. Companion docs: `docs/plans/agentic-model.md` (agent loop shape) and `docs/plans/safety-measures.md` (loop and spend bounds).
+**Full design rationale, capability table, precondition table, demo pacing, Step 1 reconciliation plan, and three-phase propagation plan:** see `docs/strategic-agent-reframe.md`. Companion docs: `docs/agentic-model.md` (agent loop shape) and `docs/safety-measures.md` (loop and spend bounds).
 
 **What this is not:**
 - Not a pivot of the problem domain. Real-time event commerce, sports merchandise monetization windows, MongoDB-grounded similarity all unchanged.
@@ -437,7 +437,7 @@ The reframe exposes the one place where the existing spec admits it has no deter
 
 ### D-023 — Recognized Architectural Debt: LLM-Driven vs Graph-Driven Orchestration (PAID by D-024)
 **Date:** 2026-05-27  
-**Decision:** Accept LLM-driven tool selection for MVP; flag graph-based orchestration as the correct post-hackathon direction. **Superseded by D-024 (2026-05-27) — the debt was paid before any further capability work, not deferred to post-hackathon. The original deferral rationale ("scope risk against tight deadline") was an unverified cost estimate; the spike replaced the guess with a fact (`docs/plans/spike-d023-findings.md`) and the refactor took ~1 day.**
+**Decision:** Accept LLM-driven tool selection for MVP; flag graph-based orchestration as the correct post-hackathon direction. **Superseded by D-024 (2026-05-27) — the debt was paid before any further capability work, not deferred to post-hackathon. The original deferral rationale ("scope risk against tight deadline") was an unverified cost estimate; the spike replaced the guess with a fact (`docs/spike-d023-findings.md`) and the refactor took ~1 day.**
 
 **Context:** Evals on Step 1 and Step 2 surfaced a reliability failure mode: after ingesting a batch, the agent sometimes chains to `build_event_context` even when the operator explicitly says "stop after ingestion." Root cause is that a single `LlmAgent` with all tools registered treats tool selection as a judgment call every turn — including decisions that are structurally determined.
 
@@ -456,7 +456,7 @@ The reframe exposes the one place where the existing spec admits it has no deter
 ### D-024 — Graph-Orchestrated Agent (Pays Off D-023)
 
 **Date:** 2026-05-27
-**Decision:** Replace the single-`LlmAgent` free-loop with a coordinator-over-workflow architecture. A chat-mode `LlmAgent` coordinator owns the operator conversation, clarification, and HITL. A `google.adk.workflow.Workflow` graph below it owns deterministic execution and (from Step 5) contains a single `LlmAgent(mode='single_turn')` node for the strategic decision (`propose_review_queue`). Spike (`docs/plans/spike-d023-findings.md`) validated all three load-bearing primitives.
+**Decision:** Replace the single-`LlmAgent` free-loop with a coordinator-over-workflow architecture. A chat-mode `LlmAgent` coordinator owns the operator conversation, clarification, and HITL. A `google.adk.workflow.Workflow` graph below it owns deterministic execution and (from Step 5) contains a single `LlmAgent(mode='single_turn')` node for the strategic decision (`propose_review_queue`). Spike (`docs/spike-d023-findings.md`) validated all three load-bearing primitives.
 
 **Why now, not post-hackathon (revises D-023's deferral):** The cost estimate in D-023 was an unverified guess. A targeted spike replaced the guess with empirical evidence in ~1 hour. With 2/9 capabilities implemented and HITL unrealized, the refactor cost was at its minimum; the cost of *not* refactoring was linear in remaining capabilities × N=20 eval gates. The curves crossed at this moment.
 
@@ -485,7 +485,7 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 **Verification:** All four phase gates cleared. Coordinator + workflow construct. 30/30 non-eval tests green. Step 1 + Step 2 trace evals re-shaped to the new architecture (coordinator dispatches workflow; assertions verify `run_event_pipeline` is called and the underlying MongoDB call shape is preserved); N=20 pass-rate gates met. Bidirectional clarification + HITL primitives validated in spike.
 
-**Supersedes:** D-023. The pre-pivot framing of `docs/plans/agentic-model.md` (the "Layer 1 — framework" section described a single-`LlmAgent` loop) is now stale and is being rewritten in this refactor commit.
+**Supersedes:** D-023. The pre-pivot framing of `docs/agentic-model.md` (the "Layer 1 — framework" section described a single-`LlmAgent` loop) is now stale and is being rewritten in this refactor commit.
 
 ---
 
@@ -506,7 +506,7 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 **Wrapper signature consequence:** `vector_search_assets(embedding, top_k=5, exclude_event_id=None)` deviates from the pre-D-025 inventory entry `vector_search_assets(embedding, top_k=20, channel=None)`. The `channel` parameter is dropped — it was a candidate-pool **pre-filter** ("only search past posters"), useful only when we already know the asset's product type before searching, which we don't at MVP. `exclude_event_id` is added to prevent an event's own assets from being returned as their own neighbors. `db-wrapper-inventory.md` updated to match.
 
-**Routing inference belongs to Step 3, not Step 5.** Per `docs/specs/01-requirements.md` line 202 and `docs/plans/strategic-agent-reframe.md`, **routing for the exploitation queue is mechanical, not judgment**: aggregate the neighbors' `product_route`, dominant route wins (plurality, similarity-weighted tie-break). Step 3 produces this as a derived field `inferred_route: str | None` on each `SimilarityResult` (`None` when `neighbors` is empty — the discovery-queue candidate path). The capability `find_similar_assets` gains a tiny private helper `_infer_route_from_neighbors`; no wrapper signature changes.
+**Routing inference belongs to Step 3, not Step 5.** Per `docs/specs/01-requirements.md` line 202 and `docs/strategic-agent-reframe.md`, **routing for the exploitation queue is mechanical, not judgment**: aggregate the neighbors' `product_route`, dominant route wins (plurality, similarity-weighted tie-break). Step 3 produces this as a derived field `inferred_route: str | None` on each `SimilarityResult` (`None` when `neighbors` is empty — the discovery-queue candidate path). The capability `find_similar_assets` gains a tiny private helper `_infer_route_from_neighbors`; no wrapper signature changes.
 
 **What Step 5 actually decides** (correcting the prior misframing): for exploitation items, Step 5 *uses* `inferred_route` without re-deriving — its judgment is the quality gate (Vision scores from Step 4 catching compositionally-similar-but-technically-unfit), commercial-signal ranking, event-narrative fit ordering, and per-item reasoning. For exploration items (no similarity match), Step 5 assigns `product_route` itself based on Vision + narrative + image content. The persistence boundary stays Step 5's `assign_asset_to_queue(asset_id, queue_type, product_route, reasoning)` per the wrapper inventory — so Step 5 can override Step 3's inference if Vision flags the asset as unprintable, or pick a route for items Step 3 left as `None`.
 
@@ -526,7 +526,7 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 | File | Role | Status |
 | --- | --- | --- |
-| `rapid_agent_hackathon_spec.md` | Hackathon rules, partner details, judging criteria | Reference — do not modify |
+| `docs/rapid_agent_hackathon_spec.md` | Hackathon rules, partner details, judging criteria | Reference — do not modify |
 | `CLAUDE.md` | Project index; orientation; build practices | Current |
 | `tracking.md` | This file — decision log | Current |
 | `docs/specs/00-overview.md` | Vision, origin, positioning, demo narrative | Current |
@@ -538,7 +538,7 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 | File | Role | Status |
 | --- | --- | --- |
 | `strategic-agent-reframe.md` | D-021 design doc — strategic-agent pivot, queue assembly, capability surface, preconditions, demo coherence, propagation plan | Current |
-| `agentic-model.md` | What kind of agent this is — loop shape, exit conditions, HITL framing | **Pending revision per D-021** (pre-pivot framing) |
+| `docs/agentic-model.md` | What kind of agent this is — loop shape, exit conditions, HITL framing | **Pending revision per D-021** (pre-pivot framing) |
 | `safety-measures.md` | Loop bound + spend bound — operational safety follow-ups | Current |
 | `testing-model.md` | Three-category test model (unit / scaffolding / eval) | Current |
 | `evaluation-strategy.md` | Trace-eval framework, failure categories, remediation playbook | **Pending revision per D-021** (gains *strategy coherence* failure category) |

@@ -455,9 +455,9 @@ Once this resolution is reviewed and stable, propagate in three phases. Phase or
 2. **`docs/specs/01-requirements.md`** — restructure from "8-step workflow" to "8 capabilities + queue-assembly strategy." Keep the demo flow (refresh with the two-event contrast in § Demo coherence), success metrics, MVP non-goals. The exploration-queue section specifically needs editing to reflect agent-driven selection.
 3. **`docs/specs/02-architecture.md`** — replace the workflow diagram with a capability surface diagram. Keep the MongoDB schemas, MCP call list, external integrations sections (data layer unchanged). The ADK Agent Architecture section needs revision — the implicit workflow framing goes away.
 4. **`CLAUDE.md`** — revise Hard Constraint #1; update the Spec Documents table descriptions if they describe the workflow; update the "Current Phase" line if appropriate; ensure the `agentic-model.md` cross-reference still reads correctly after that doc's revision.
-5. **`docs/plans/agentic-model.md`** — rewrite the "what kind of agent this is" framing. The exit-conditions analysis mostly still applies (same single `LlmAgent`, same loop shape). The "8 steps as emergent property" framing should be replaced with "queue assembly as the strategic surface; other capabilities as bounded LLM-at-the-node tasks."
+5. **`docs/agentic-model.md`** — rewrite the "what kind of agent this is" framing. The exit-conditions analysis mostly still applies (same single `LlmAgent`, same loop shape). The "8 steps as emergent property" framing should be replaced with "queue assembly as the strategic surface; other capabilities as bounded LLM-at-the-node tasks."
 6. **`prompts/v2/agent_system.md`** — new prompt with strategist framing focused on queue assembly. No capability inventory in the prompt — the agent reads available tools from registered docstrings. v1 stays on disk for traceability; v2 is what gets registered going forward.
-7. **`docs/plans/evaluation-strategy.md`** — add the *strategy coherence* failure category; refresh examples to reflect queue-coherence assertions rather than tool-sequencing assertions for non-ingestion steps.
+7. **`docs/evaluation-strategy.md`** — add the *strategy coherence* failure category; refresh examples to reflect queue-coherence assertions rather than tool-sequencing assertions for non-ingestion steps.
 
 ### Phase B — Step 1 doc rewrites (against the new design)
 
@@ -486,10 +486,10 @@ Create `docs/plans/demo-corpus.md` — new doc capturing the asset-curation stra
 
 ## Cross-references
 
-- `docs/plans/agentic-model.md` — describes the pre-pivot agent shape; will be revised
-- `docs/plans/safety-measures.md` — loop bound + spend bound concerns; carry over unchanged
-- `docs/plans/testing-model.md` — three-category test model; categories unchanged, but eval surface within Category 3 gains the strategy-coherence assertion class
-- `docs/plans/evaluation-strategy.md` — remediation playbook stays; failure-category set gains *strategy coherence*
+- `docs/agentic-model.md` — describes the pre-pivot agent shape; will be revised
+- `docs/safety-measures.md` — loop bound + spend bound concerns; carry over unchanged
+- `docs/testing-model.md` — three-category test model; categories unchanged, but eval surface within Category 3 gains the strategy-coherence assertion class
+- `docs/evaluation-strategy.md` — remediation playbook stays; failure-category set gains *strategy coherence*
 - `CLAUDE.md` § Hard Constraints — Constraint #1 needs revision after this pivot lands
 - `tracking.md` — new D-entry to be added capturing the pivot rationale and D-015 reconciliation
 - `tracking.md` D-015 — two-queue exploration/exploitation split, whose exploration default is updated by this pivot (not reversed)

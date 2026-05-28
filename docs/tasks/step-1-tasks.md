@@ -48,7 +48,7 @@ Cannot do <capability> for <context>:
   - <missing_key_2> (<remediation_2>)
 ```
 
-Subclasses `Exception`. Cross-cutting — used by every capability wrapper that has data dependencies (per `docs/plans/strategic-agent-reframe.md` § Enforced vs. emergent). First usage in Step 1 is `ingest_event_batch` input validation for missing/invalid `event_metadata` fields.
+Subclasses `Exception`. Cross-cutting — used by every capability wrapper that has data dependencies (per `docs/strategic-agent-reframe.md` § Enforced vs. emergent). First usage in Step 1 is `ingest_event_batch` input validation for missing/invalid `event_metadata` fields.
 
 Tests: (a) constructs with valid args; (b) `__str__` matches the expected format including all missing entries; (c) raisable and catchable as a normal Python exception; (d) `capability`, `context`, `missing` accessible as attributes after raise/catch.
 Verify: `.venv/bin/python -m pytest tests/test_errors.py -v`
@@ -161,7 +161,7 @@ Acceptance: `tests/evals/conftest.py` exposes helpers reused across all capabili
 - `extract_tool_calls(events)` / `extract_tool_responses(events)` — convenience extractors.
 - `dump_trace(events, label)` — writes structured trace to `tests/evals/_failures/{label}.json`; returns the path (for use in assertion messages).
 
-Per `docs/plans/evaluation-strategy.md` Open Q #4 — `MongoMCPClient` mocking via `src.db.get_client` monkeypatch is the canonical seam.
+Per `docs/evaluation-strategy.md` Open Q #4 — `MongoMCPClient` mocking via `src.db.get_client` monkeypatch is the canonical seam.
 Verify: `.venv/bin/python -c "from tests.evals.conftest import build_runner_with_mock_db, classify_part, extract_tool_calls, dump_trace; print('ok')"`
 
 ---
@@ -169,7 +169,7 @@ Verify: `.venv/bin/python -c "from tests.evals.conftest import build_runner_with
 ## T-1.13: Write trace eval — outcome-shaped (REWRITTEN per D-021)
 
 Files: `tests/evals/test_step_1_trace.py`
-Acceptance: Given the operator prompt *"We just finished Argentina vs France 3-2. Photos are in /tmp/wc-final/. Match started 19:00 UTC, finished ~20 min ago. Ingest this batch."*, the test asserts seven outcomes (exercising failure categories 1, 3, 5 from `docs/plans/evaluation-strategy.md`):
+Acceptance: Given the operator prompt *"We just finished Argentina vs France 3-2. Photos are in /tmp/wc-final/. Match started 19:00 UTC, finished ~20 min ago. Ingest this batch."*, the test asserts seven outcomes (exercising failure categories 1, 3, 5 from `docs/evaluation-strategy.md`):
 
 **(a) Capability selection** — agent called `ingest_event_batch` exactly once. Failure category 1.
 
@@ -201,7 +201,7 @@ Verify: `.venv/bin/python -m pytest tests/evals/test_step_1_trace.py -v`
 Files: `tests/evals/test_step_1_trace.py` (extend)
 Acceptance: A second test function runs the single-run eval **N=20 times** (configurable via `EVAL_REPEAT` env var, default 5 in CI). Asserts ≥ 19/20 runs pass all seven assertions (95% threshold per D-020). On failure, prints which assertion failed in which run and the pass-rate percentage.
 
-The hardest assertions empirically are likely to be (b) `outcome_type == "upset_victory"` (categorical judgment) and (b) `start_date` correct format with inferred date. If these dip below threshold, the remediation playbook per `docs/plans/evaluation-strategy.md` applies: tighten system prompt → tighten capability docstring → consider adding examples → consider escalating model.
+The hardest assertions empirically are likely to be (b) `outcome_type == "upset_victory"` (categorical judgment) and (b) `start_date` correct format with inferred date. If these dip below threshold, the remediation playbook per `docs/evaluation-strategy.md` applies: tighten system prompt → tighten capability docstring → consider adding examples → consider escalating model.
 
 Verify: `EVAL_REPEAT=20 .venv/bin/python -m pytest tests/evals/test_step_1_trace.py::test_step_1_pass_rate -v`
 
@@ -217,7 +217,7 @@ Verify: `.venv/bin/python -m pytest tests/ -v`
 
 ## Tracking note
 
-If any trace eval fails after the cheap remediation rungs (system-prompt tightening → docstring tightening → tool-surface change) have been tried, follow the playbook in `docs/plans/evaluation-strategy.md` § Remediation.
+If any trace eval fails after the cheap remediation rungs (system-prompt tightening → docstring tightening → tool-surface change) have been tried, follow the playbook in `docs/evaluation-strategy.md` § Remediation.
 
 The pre-D-021 hybrid-wrapper escape hatch for hallucinated `timeliness` (D-019 Open Q #6) is no longer relevant — `compute_timeliness` is now internal to `ingest_event_batch` and the agent cannot hallucinate the value. Remediation now focuses on **natural-language field extraction quality** (specifically `outcome_type` categorization and `start_date` inference) — the hardest extraction judgments Step 1 makes.
 

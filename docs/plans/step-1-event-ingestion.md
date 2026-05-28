@@ -1,6 +1,6 @@
 # Step 1 — Event Ingestion: Implementation Plan
 
-> **Reframed for D-021** (2026-05-26). Step 1 delivers the `ingest_event_batch` capability — one agent-facing tool that wraps three internal Python functions (`compute_timeliness`, `record_event`, `record_assets`). Agent-facing surface collapses from the pre-reframe 3 atomic `FunctionTool`s to 1 capability per `docs/plans/strategic-agent-reframe.md` § The capability surface. Trace eval premise shifts from sequencing-shaped to outcome-shaped. The three internal wrappers themselves are unchanged. `PreconditionError` foundation class also lands in this step (used cross-capability from Step 2 onward).
+> **Reframed for D-021** (2026-05-26). Step 1 delivers the `ingest_event_batch` capability — one agent-facing tool that wraps three internal Python functions (`compute_timeliness`, `record_event`, `record_assets`). Agent-facing surface collapses from the pre-reframe 3 atomic `FunctionTool`s to 1 capability per `docs/strategic-agent-reframe.md` § The capability surface. Trace eval premise shifts from sequencing-shaped to outcome-shaped. The three internal wrappers themselves are unchanged. `PreconditionError` foundation class also lands in this step (used cross-capability from Step 2 onward).
 
 ## What this capability delivers
 
@@ -209,7 +209,7 @@ Same as Step 0 — no new vars.
 | **Trace eval — outcome-shaped (single run)** | `.venv/bin/python -m pytest tests/evals/test_step_1_trace.py -v` | Given a realistic ingestion prompt (e.g. *"We just finished Argentina vs France 3-2. Photos are in /tmp/wc-final/. Match started 19:00 UTC, finished ~20 min ago. Ingest this batch."*): (a) agent calls `ingest_event_batch` exactly once; (b) `event_metadata` has correctly-extracted fields (`home_team="Argentina"`, `away_team="France"`, `outcome_type="upset_victory"`, `start_date` is ISO 8601 UTC for today at 19:00); (c) mocked client recorded one `insert-many` on `events` and one on `assets` with all images; (d) the `events` document has `timeliness` set (computed internally — non-null); (e) reasoning text is present before the tool call (CoT directive working); (f) agent emits terminal text after success; (g) on assertion failure, the full trace (tool calls + reasoning text + LLM responses) is dumped via `dump_trace()`. |
 | **Trace eval — pass rate** | `EVAL_REPEAT=20 .venv/bin/python -m pytest tests/evals/test_step_1_trace.py -v` | ≥ 19/20 runs pass all seven assertions (95% threshold per D-020). |
 
-The trace evals are automated, not manual. They are the regression net for the capability's agent-facing behavior. Per `docs/plans/evaluation-strategy.md`, Step 1's surface exercises **failure categories 1, 3, 5** (tool selection, tool arguments — the natural-language extraction quality, end-state). Strategy coherence (category 6) does not apply to `ingest_event_batch`; it lands when `propose_review_queue` ships in a later step.
+The trace evals are automated, not manual. They are the regression net for the capability's agent-facing behavior. Per `docs/evaluation-strategy.md`, Step 1's surface exercises **failure categories 1, 3, 5** (tool selection, tool arguments — the natural-language extraction quality, end-state). Strategy coherence (category 6) does not apply to `ingest_event_batch`; it lands when `propose_review_queue` ships in a later step.
 
 ---
 

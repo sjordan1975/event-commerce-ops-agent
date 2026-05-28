@@ -1,6 +1,6 @@
 # Evaluation Strategy
 
-> **Updated for D-021** (2026-05-26) — adds a sixth failure category (*strategy coherence*) for queue-assembly assertions; refreshes examples to reflect the 9-capability surface; resolves the timeliness-fallback concern (now moot — `compute_timeliness` is internal to `ingest_event_batch`, no hallucination surface for the agent); resolves the McpToolset mocking open question (Step 0.5 introduced `MongoMCPClient`; mock via `src.db.get_client`). Pair with `docs/plans/agentic-model.md` for the three-layer framing (framework / composition / strategy) that this doc's failure categories map onto.
+> **Updated for D-021** (2026-05-26) — adds a sixth failure category (*strategy coherence*) for queue-assembly assertions; refreshes examples to reflect the 9-capability surface; resolves the timeliness-fallback concern (now moot — `compute_timeliness` is internal to `ingest_event_batch`, no hallucination surface for the agent); resolves the McpToolset mocking open question (Step 0.5 introduced `MongoMCPClient`; mock via `src.db.get_client`). Pair with `docs/agentic-model.md` for the three-layer framing (framework / composition / strategy) that this doc's failure categories map onto.
 
 Draft. Evals are a first-class engineering concern, not a hackathon afterthought. This document defines what we evaluate, how we detect failure, how we diagnose it, and how we remediate.
 
