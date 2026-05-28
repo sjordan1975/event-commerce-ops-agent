@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from src.models import Asset, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, SimilarAsset
+from src.models import Asset, AssetScores, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, SimilarAsset, VisionScoringOutput
 
 
 def build_valid_event(**overrides) -> Event:
@@ -72,6 +72,29 @@ def build_valid_similar_asset(**overrides) -> SimilarAsset:
 def build_embedding_fixture() -> list[float]:
     """Return a deterministic 3072-element float list for tests (no live API)."""
     return [0.1] * 3072
+
+
+def build_valid_asset_scores(**overrides) -> AssetScores:
+    """Return a valid AssetScores instance with sensible defaults (all dims 0.7)."""
+    base = {
+        "quality_score": 0.7,
+        "merch_score": 0.7,
+        "emotional_score": 0.7,
+        "social_score": 0.7,
+        "identity_score": 0.7,
+    }
+    base.update(overrides)
+    return AssetScores(**base)
+
+
+def build_valid_vision_scoring_output(**overrides) -> VisionScoringOutput:
+    """Return a valid VisionScoringOutput with default scores and detected_subjects."""
+    base = {
+        "scores": build_valid_asset_scores(),
+        "detected_subjects": ["Lionel Messi"],
+    }
+    base.update(overrides)
+    return VisionScoringOutput(**base)
 
 
 def build_valid_event_narrative(**overrides) -> EventNarrative:

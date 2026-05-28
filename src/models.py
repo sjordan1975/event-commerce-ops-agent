@@ -5,6 +5,23 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class AssetScores(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    quality_score: float = Field(..., ge=0.0, le=1.0)
+    merch_score: float = Field(..., ge=0.0, le=1.0)
+    emotional_score: float = Field(..., ge=0.0, le=1.0)
+    social_score: float = Field(..., ge=0.0, le=1.0)
+    identity_score: float = Field(..., ge=0.0, le=1.0)
+
+
+# No extra="forbid": Gemini response_schema rejects additionalProperties:false
+# (verified empirically in Step 2 — same constraint applies to VisionScoringOutput).
+class VisionScoringOutput(BaseModel):
+    scores: AssetScores
+    detected_subjects: list[str]
+
+
 class Player(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -72,7 +89,8 @@ class Asset(BaseModel):
     product_route: str | None = None
     queue_type: str | None = None
     embedding: list[float] | None = None
-    scores: dict[str, Any] | None = None
+    scores: "AssetScores | None" = None
+    detected_subjects: list[str] | None = None
     campaign_id: str | None = None
     similar_assets: list[str] | None = None
 

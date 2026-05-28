@@ -178,7 +178,7 @@ Vision scoring and queue assignment remain temporally distinct: scores are produ
 | Wrapper | Internal MCP calls | Used by capability | Notes |
 |---|---|---|---|
 | `get_assets_for_event(event_id: str, status: str \| None = None) -> list[Asset]` | `assets find` | Multiple | Cross-cutting utility. `score_assets_with_vision` uses it to iterate the batch; `draft_campaigns_for_queue` reuses it with a status filter. Lives in `assets.py`. |
-| `save_asset_scores(asset_id: str, scores: AssetScores) -> None` | `assets update-many` | `score_assets_with_vision` | Writes the 5-dimension score block (D-013, D-017). |
+| `save_asset_scores(asset_id: str, scores: AssetScores, detected_subjects: list[str]) -> None` | `assets update-many` | `score_assets_with_vision` | Bundled write: sets `scores` (typed AssetScores per D-027), `detected_subjects` (list[str] per D-026 — names of recognizable players in the frame), and transitions `status → "scored"`. One update-many, three fields — the writes are inseparable (status without scores is incoherent; detected_subjects is co-derived in the same Vision call). *(Signature gains `detected_subjects` per D-026; signature deviation from the original `save_asset_scores(asset_id, scores)` inventory entry.)* |
 | `assign_asset_to_queue(asset_id: str, queue_type: str, product_route: str \| None, reasoning: str) -> None` | `assets update-many` | `propose_review_queue` | Sets `queue_type` ∈ {exploitation, discovery, null}, `product_route`, and per-item `reasoning`. Also transitions status to `"scored"`. *(Signature gains `reasoning` field per D-021's per-item-reasoning requirement.)* |
 
 Plus non-MongoDB:

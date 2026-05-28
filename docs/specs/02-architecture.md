@@ -68,13 +68,8 @@ One document per image. Central state document — touched by nearly every capab
   "product_route": "poster | tshirt | social_only | null",
   "queue_type": "exploitation | discovery | null",
   "embedding": [/* 3072-dim vector */],
-  "scores": {
-    "quality_score": 0.88,
-    "emotional_score": 0.87,
-    "social_score": 0.91,
-    "merch_score": 0.72,
-    "identity_score": 0.68
-  },
+  "scores": { /* AssetScores: quality_score, merch_score, emotional_score, social_score, identity_score — all [0,1]; D-013, D-017, D-027 */ },
+  "detected_subjects": ["Lionel Messi"],
   "similar_assets": ["asset_id_1", "asset_id_2"],
   "campaign_id": "uuid | null",
   "published_urls": {
@@ -252,9 +247,12 @@ Top-K defaults to 5 (D-025). Removing the `$vectorSearch` call removes the per-c
 
 ### `score_assets_with_vision`
 ```
-assets.updateMany         → write Gemini Vision score fields to each asset document
-                            (5 dimensions per D-017: quality, merch, emotional, social, identity)
+(per asset in the event, if asset.scores is None:)
+[external] Gemini Vision (gemini-2.5-flash via google.genai, structured output) → AssetScores + detected_subjects
+assets.update-many        → set scores (typed AssetScores per D-027), detected_subjects (list[str] per D-026),
+                            and status: "scored" — bundled write
 ```
+Per D-017: scores split into technical fitness (`quality_score`, `merch_score`) + commercial signal (`emotional_score`, `social_score`, `identity_score`). Per D-026: `detected_subjects` carries the identity signal forward for Step 5 to compose against narrative `key_figures`. Per D-028: Vision model defaults to `gemini-2.5-flash` (not flash-lite — judgment density + hallucination surface).
 
 ### `propose_review_queue` ← the one strategic decision
 ```

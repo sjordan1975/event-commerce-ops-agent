@@ -5,10 +5,9 @@ Graph orchestration (D-024) — capabilities are wired as `FunctionNode`s inside
 ADK graph builder (_process_chain iterates pairwise), so a single n-element tuple
 expands to n-1 edges.
 
-Current pipeline: START → ingest_event_batch → build_event_context → find_similar_assets
+Current pipeline: START → ingest_event_batch → build_event_context → find_similar_assets → score_assets_with_vision
 
 Future steps extend the graph:
-  Step 4 → adds `score_assets_with_vision` node
   Step 5 → adds `propose_review_queue` (LlmAgent node, mode='single_turn')
   Step 6 → adds `draft_campaigns_for_queue` node
 
@@ -23,6 +22,7 @@ from google.adk.workflow import FunctionNode, START
 from src.capabilities.context import build_event_context as _build_event_context
 from src.capabilities.ingest import ingest_event_batch as _ingest_event_batch
 from src.capabilities.similarity import find_similar_assets as _find_similar_assets
+from src.capabilities.scoring import score_assets_with_vision as _score_assets_with_vision
 
 WORKFLOW_NAME = "event_pipeline"
 
@@ -62,6 +62,16 @@ async def _node_find_similar_assets(ctx: Any, event_id: str) -> dict:
     return result
 
 
+async def _node_score_assets_with_vision(ctx: Any, event_id: str) -> dict:
+    """Workflow adapter: calls score_assets_with_vision and writes scored_assets to state.
+
+    Reads `event_id` from state (written by the upstream ingest node).
+    """
+    result = await _score_assets_with_vision(event_id)
+    ctx.state["scored_assets"] = result["scored"]
+    return result
+
+
 # Module-level FunctionNode instances — referenced by src/agent.py.build_workflow().
 # All use parameter_binding='state': the coordinator's run_event_pipeline shim
 # pre-populates session state with `images` and `event_metadata`; downstream nodes
@@ -85,13 +95,19 @@ find_similar_assets_node = FunctionNode(
     parameter_binding="state",
 )
 
+score_assets_with_vision_node = FunctionNode(
+    func=_node_score_assets_with_vision,
+    name="score_assets_with_vision",
+    parameter_binding="state",
+)
+
 
 def build_pipeline_graph() -> list:
     """Returns the edge list for the event pipeline workflow.
 
     A single chain-tuple expands to pairwise edges (ADK _process_chain semantics).
-    Pipeline: START → ingest_event_batch → build_event_context → find_similar_assets.
+    Pipeline: START → ingest_event_batch → build_event_context → find_similar_assets → score_assets_with_vision.
     """
     return [
-        (START, ingest_event_batch_node, build_event_context_node, find_similar_assets_node),
+        (START, ingest_event_batch_node, build_event_context_node, find_similar_assets_node, score_assets_with_vision_node),
     ]

@@ -34,6 +34,7 @@ GEMINI_MODEL=gemini-2.5-flash-lite          # workflow nodes and internal helper
 GEMINI_COORDINATOR_MODEL=gemini-2.5-flash   # coordinator chat LlmAgent
 GEMINI_NARRATIVE_MODEL=gemini-2.5-flash-lite  # build_event_context narrative LLM
 GEMINI_EMBEDDING_MODEL=gemini-embedding-2   # image embeddings in find_similar_assets
+GEMINI_VISION_MODEL=gemini-2.5-flash        # score_assets_with_vision (judgment-laden — not flash-lite)
 
 # Atlas Vector Search (Step 3)
 VECTOR_INDEX_NAME=assets_embedding_index    # Atlas vector search index name on assets.embedding
@@ -105,4 +106,4 @@ _Not yet implemented — placeholder._
 
 ## Architecture
 
-See `docs/specs/02-architecture.md` for the full system design, 8-step workflow, MCP call list, and ADK agent architecture.
+See `docs/specs/02-architecture.md` for the full system design, 9-capability pipeline, MCP call list, and ADK agent architecture.

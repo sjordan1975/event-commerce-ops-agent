@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.models import Asset, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, SimilarAsset, SimilarityResult
+from src.models import Asset, AssetScores, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, SimilarAsset, SimilarityResult, VisionScoringOutput
 
 
 def test_event():
@@ -435,3 +435,124 @@ def test_similarity_result():
         inferred_route="poster",
     )
     assert sr_routed.inferred_route == "poster"
+
+
+def test_asset_scores():
+    # Happy-path construction
+    scores = AssetScores(
+        quality_score=0.9,
+        merch_score=0.8,
+        emotional_score=0.7,
+        social_score=0.6,
+        identity_score=0.5,
+    )
+    assert scores.quality_score == 0.9
+    assert scores.identity_score == 0.5
+
+    # Boundary values accepted
+    AssetScores(quality_score=0.0, merch_score=0.0, emotional_score=0.0, social_score=0.0, identity_score=0.0)
+    AssetScores(quality_score=1.0, merch_score=1.0, emotional_score=1.0, social_score=1.0, identity_score=1.0)
+
+    # quality_score below 0.0 rejected
+    with pytest.raises(ValidationError):
+        AssetScores(quality_score=-0.1, merch_score=0.5, emotional_score=0.5, social_score=0.5, identity_score=0.5)
+
+    # quality_score above 1.0 rejected
+    with pytest.raises(ValidationError):
+        AssetScores(quality_score=1.1, merch_score=0.5, emotional_score=0.5, social_score=0.5, identity_score=0.5)
+
+    # identity_score out of range rejected
+    with pytest.raises(ValidationError):
+        AssetScores(quality_score=0.5, merch_score=0.5, emotional_score=0.5, social_score=0.5, identity_score=-0.5)
+
+    # Missing dimension raises
+    with pytest.raises(ValidationError):
+        AssetScores(quality_score=0.5, merch_score=0.5, emotional_score=0.5, social_score=0.5)
+
+    # Extra dimension raises (extra="forbid")
+    with pytest.raises(ValidationError):
+        AssetScores(
+            quality_score=0.5,
+            merch_score=0.5,
+            emotional_score=0.5,
+            social_score=0.5,
+            identity_score=0.5,
+            timeliness_score=0.5,
+        )
+
+
+def test_vision_scoring_output():
+    scores = AssetScores(
+        quality_score=0.7, merch_score=0.6, emotional_score=0.8,
+        social_score=0.9, identity_score=0.7,
+    )
+
+    # Happy-path construction
+    vso = VisionScoringOutput(scores=scores, detected_subjects=["Lionel Messi"])
+    assert vso.scores.quality_score == 0.7
+    assert vso.detected_subjects == ["Lionel Messi"]
+
+    # Empty detected_subjects accepted
+    vso_empty = VisionScoringOutput(scores=scores, detected_subjects=[])
+    assert vso_empty.detected_subjects == []
+
+    # Nested AssetScores validation propagates (out-of-range score raises)
+    with pytest.raises(ValidationError):
+        VisionScoringOutput(
+            scores={
+                "quality_score": 1.5,
+                "merch_score": 0.5,
+                "emotional_score": 0.5,
+                "social_score": 0.5,
+                "identity_score": 0.5,
+            },
+            detected_subjects=[],
+        )
+
+
+def test_asset_scores_retype_and_detected_subjects():
+    # Construct with scores=None, detected_subjects=None (both default)
+    a = Asset(
+        asset_id="ast-001",
+        event_id="evt-001",
+        content_url="/tmp/photo.jpg",
+        upload_date="2026-07-14T21:00:00Z",
+    )
+    assert a.scores is None
+    assert a.detected_subjects is None
+
+    # Construct with scores=AssetScores(...) and detected_subjects=list
+    typed_scores = AssetScores(
+        quality_score=0.9, merch_score=0.8, emotional_score=0.7,
+        social_score=0.6, identity_score=0.9,
+    )
+    a2 = Asset(
+        asset_id="ast-002",
+        event_id="evt-001",
+        content_url="/tmp/photo2.jpg",
+        upload_date="2026-07-14T21:00:00Z",
+        scores=typed_scores,
+        detected_subjects=["Lionel Messi"],
+    )
+    assert a2.scores.quality_score == 0.9
+    assert a2.detected_subjects == ["Lionel Messi"]
+
+    # Dict scores no longer accepted (typed boundary rejects raw dict)
+    with pytest.raises(ValidationError):
+        Asset(
+            asset_id="ast-003",
+            event_id="evt-001",
+            content_url="/tmp/photo3.jpg",
+            upload_date="2026-07-14T21:00:00Z",
+            scores={"quality_score": 0.9},
+        )
+
+    # detected_subjects=[123] rejected (list[str] enforced)
+    with pytest.raises(ValidationError):
+        Asset(
+            asset_id="ast-004",
+            event_id="evt-001",
+            content_url="/tmp/photo4.jpg",
+            upload_date="2026-07-14T21:00:00Z",
+            detected_subjects=[123],
+        )

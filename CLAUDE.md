@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Step 3 merged to `main` (2026-05-28). On branch `main`. Ready to cut `step/4-vision`.**
+**Step 4 merged to `main` (2026-05-28). `score_assets_with_vision` live — AssetScores, detected_subjects, scoring node wired into pipeline. Next step is Step 5 (`propose_review_queue`).**
 
-Next action: Cut branch `step/4-vision` for `score_assets_with_vision` (Vision scoring + dual-job per D-017).
+Next action: Cut `step/5-queue` from `main`. Implement `propose_review_queue` — the strategic LlmAgent node that composes scores + detected_subjects + narrative key_figures into two-queue assignments (exploitation / exploration) per D-015/D-021. See `docs/specs/01-requirements.md` § `propose_review_queue` and `docs/strategic-agent-reframe.md` for the capability surface.
 
-Key Step 3 notes for Step 4: `_compute_image_embedding` uses `google.genai` SDK with `Part.from_bytes` (not `from_uri`); `task_type` dropped (unsupported by `gemini-embedding-2`). Workflow is now `START → ingest → context → similarity`. `similarity_results` in session state for `propose_review_queue` (Step 5).
+Key Step 4 decisions baked in (D-026 / D-027 / D-028): Vision capability emits typed `AssetScores` + `detected_subjects: list[str]` per asset; `Asset.scores` retyped from `dict[str, Any]` to `AssetScores | None`; new env var `GEMINI_VISION_MODEL` defaults to `gemini-2.5-flash` (not flash-lite — judgment density + hallucination surface). Per-asset Vision call, idempotent skip on `asset.scores is None`. Step 4 does **not** write `product_route` or `queue_type` (Step 5's boundary). Workflow chain extends to `START → ingest → context → similarity → scoring`; `scored_assets` lands in session state for `propose_review_queue`.
 
-Reference: `docs/plans/step-3-similarity.md` (the plan), `docs/tasks/step-3-tasks.md` (17 atomic tasks T-3.1–T-3.17), `tracking.md` D-024 for the orchestration architecture Step 3 lands against, `docs/strategic-agent-reframe.md` for the capability-surface rationale. Identity-routing concern (Messi-shots problem) is captured in the Step 3 plan's risks table for Step 5 planning to inherit — Vision extracts `detected_subjects` in Step 4; Step 5 composes identity with similarity + narrative.
+Reference: `docs/plans/step-4-vision.md` (the plan), `docs/tasks/step-4-tasks.md` (14 atomic tasks T-4.1–T-4.14 plus T-4.0 housekeeping commit), `tracking.md` D-026/D-027/D-028 for the architectural decisions Step 4 lands against, `docs/plans/step-3-similarity.md` § Risks for the Messi-shots problem origin (now resolved by D-026's `detected_subjects` contract).
 
 Update the above before ending each session — it is the single source of truth for session orientation.  
 Deadline: June 11, 2026 @ 2:00 PM PDT.
