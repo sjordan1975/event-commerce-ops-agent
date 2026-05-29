@@ -277,10 +277,12 @@ Per D-021/D-029, the discovery-half selection is agent-driven (not random per D-
 ### `draft_campaigns_for_queue`
 ```
 campaigns.insertOne       → per queued asset: campaign draft with copy, specs, platform target
-assets.updateOne          → set status: "campaign_draft_created"
+assets.updateOne          → set status: "campaign_draft_created" + link campaign_id
 approvals.insertMany      → push all drafts to queue, status: "pending"
 ```
-On a redraft cycle (operator `edit_requested`), called with the original queue + operator notes — overwrites the corresponding `campaigns` documents and recreates `approvals` entries.
+Realized as a `FunctionNode` (D-030), per-item internal `genai` copy generation on `GEMINI_MODEL`. The three writes are bundled as one logical domain operation (`submit_campaign_for_review`) — three sequential MCP calls, **not a transaction** (single-operator MVP). **Route → campaign fields** (D-030): `poster→(product_type=poster, platform_target=shopify)`, `tshirt→(tshirt, shopify)`, `social_only→(product_type=null, platform_target=social)`. `platform_target` is a display label — execution selects channels off `product_route` directly; `printful` is reserved for the enterprise multi-route path.
+
+On a redraft cycle (operator `edit_requested`), called with the original queue + operator notes — overwrites the corresponding `campaigns` documents and recreates `approvals` entries. **Redraft is implemented in Step 7** (with the HITL loop that defines the `operator_notes` payload); Step 6 implements first-pass drafting and reserves the `operator_notes` parameter.
 
 ### `request_human_approval`
 ```
@@ -400,7 +402,7 @@ HITL approval + execution + outcomes (capabilities 7–9) live coordinator-side,
 - **Retry logic** internal to `execute_approved_campaigns` for Printful async mockup polling.
 - **`PreconditionError`** — wrapper-level exception with self-correcting message format. Under D-024 the graph enforces order structurally; `PreconditionError` remains as defense-in-depth for direct capability calls (e.g., from unit tests). See `docs/strategic-agent-reframe.md` § Enforced vs. emergent.
 - **Loop and spend bounds** — ADK's iteration cap and `max_output_tokens` are the operational safety bounds. Explicit values + cap on the `edit_requested` redraft loop are tracked in `docs/safety-measures.md`.
-- **Model env vars (D-024 + D-028 + D-029):** `GEMINI_COORDINATOR_MODEL` (default `gemini-2.5-flash`) for the coordinator + task sub-agents; `GEMINI_MODEL` (default `gemini-2.5-flash-lite`) for general workflow nodes (e.g. the internal LLM call in `build_event_context`); `GEMINI_VISION_MODEL` (default `gemini-2.5-flash`, D-028) for `score_assets_with_vision`; `GEMINI_QUEUE_MODEL` (default `gemini-2.5-flash`, D-029) for the strategic `propose_review_queue` node — the judgment-dense nodes default to flash, not flash-lite.
+- **Model env vars (D-024 + D-028 + D-029):** `GEMINI_COORDINATOR_MODEL` (default `gemini-2.5-flash`) for the coordinator + task sub-agents; `GEMINI_MODEL` (default `gemini-2.5-flash-lite`) for general workflow nodes (the internal LLM call in `build_event_context`, and `draft_campaigns_for_queue`'s copy generation per D-030 — both grounded text-gen, no dedicated var); `GEMINI_VISION_MODEL` (default `gemini-2.5-flash`, D-028) for `score_assets_with_vision`; `GEMINI_QUEUE_MODEL` (default `gemini-2.5-flash`, D-029) for the strategic `propose_review_queue` node — the judgment-dense nodes default to flash, not flash-lite.
 
 Spike code: `spike/adk_hitl_test.py` (HITL primitive — pre-D-024), `spike/adk_event_capture.py` (event trace classification), `spike/adk_workflow_hitl_spike.py` (D-024 validation — all three load-bearing primitives). Findings: `docs/spike-d023-findings.md`.
 

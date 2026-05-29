@@ -240,7 +240,7 @@ This is where AI judgment beats heuristics.
 
 The narrative is what differentiates *"Argentina beats France — World Cup 2026 poster"* from *"Messi ends France's reign in extra-time thriller — limited edition print."*
 
-Handles the redraft case: when called with operator edit notes from a prior `request_human_approval` cycle, generates revised drafts informed by those notes.
+Handles the redraft case: when called with operator edit notes from a prior `request_human_approval` cycle, generates revised drafts informed by those notes. *(The redraft branch is **implemented in Step 7**, with the HITL loop that defines the `operator_notes` payload; Step 6 implements first-pass drafting and reserves the parameter — D-030.)*
 
 **7. `request_human_approval`** — HITL via `LongRunningFunctionTool`. Suspends. Operator reviews the approval queue; for each item, decision is `approved`, `rejected`, or `edit_requested`. No execution occurs until this gate is passed.
 

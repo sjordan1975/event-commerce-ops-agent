@@ -192,7 +192,7 @@ This is the case where bundling is correct. Inserting a campaign draft, linking 
 
 | Wrapper | Internal MCP calls | Notes |
 |---|---|---|
-| `submit_campaign_for_review(campaign: CampaignDraft) -> SubmissionResult` | `campaigns insert-many`, `assets update-many`, `approvals insert-many` | Three writes, one atomic domain operation. Returns `{campaign_id, approval_id}`. Called once per queued item. |
+| `submit_campaign_for_review(campaign: Campaign) -> dict` | `campaigns insert-many`, `assets update-many` (status `campaign_draft_created` + link `campaign_id`), `approvals insert-many` | Three writes, one logical domain operation (sequential MCP calls — not a transaction; single-operator MVP per D-030). Returns `{campaign_id, approval_id}`. Called once per queued item. **No `reviewer_notes` input** — the approval is created `status="pending"` with empty `reviewer_notes` (the human's field, written later by `request_human_approval`). Takes a fully-built `Campaign`; lives in `src/db/campaigns.py`. |
 
 Reads reuse cross-cutting utilities:
 - `get_event(event_id)` — fetches the event including the narrative written by `build_event_context`.
