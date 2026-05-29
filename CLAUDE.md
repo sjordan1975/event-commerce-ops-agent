@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**On branch `step/6-drafts`. Step 5 merged. Plan + tasks written and gate-passed; T-6.0 housekeeping committed. Next action: implement T-6.1 (the `GeneratedCopy` / `Campaign` / `Approval` models) and proceed through the task list.**
+**On branch `step/6-drafts`. Step 5 merged. T-6.0 through T-6.13 complete. All verification checkpoints pass (118 unit tests + Tier 1 gate + grounding probe). Next action: merge to `main` once all tasks confirmed green.**
 
-Step 6 = `draft_campaigns_for_queue` (capability 6). Done this session: plan (`746bdf9`) + branch housekeeping (`cf8accc`: D-030 + spec amendments). **Nothing in `src/`/`tests/` yet** — implementation starts at T-6.1.
+Step 6 = `draft_campaigns_for_queue` (capability 6). Done this session: T-6.1–T-6.13 — all three models, db wrapper, helpers, prompt, capability, node/graph wire, agent return, eval scaffolding, Tier 1 trace eval, grounding probe. Prompt strengthened after live grounding probe caught hallucination guard violation (first-rung fix: moved GROUNDING GUARD to top + explicit "(none)" rendering for empty detected_subjects).
 
 Key Step 6 decisions baked in (D-030): **a `FunctionNode`, NOT a second `LlmAgent` node** (`02-architecture.md`:373 — Step 5 stays the one strategic node). Returns to the Steps 2/4 internal-`genai` pattern: per-item `_draft_copy_for_asset` (mirror Step 4's `_score_asset_with_vision`, `response_schema=GeneratedCopy`), bundled `submit_campaign_for_review` (new `src/db/campaigns.py`: campaigns insert + assets status→`campaign_draft_created`+link + approvals pending insert; **not** a transaction; no `reviewer_notes` input). **Reuse `GEMINI_MODEL`** (flash-lite — `build_event_context` precedent; **no new env var**). `event_id`-based signature reading the persisted queue from Mongo (D-022). Route→fields: poster/tshirt→shopify, social_only→(null,social), None→social defensively. **Redraft deferred to Step 7** (`operator_notes` reserved/unused). **Zero surfaced assets = valid empty result**, not a precondition error. Copy grounds at event-narrative + identity (`detected_subjects` = identity/commercial signal); **no raw image to the copy LLM**; GROUNDING GUARD in the prompt (name only `detected_subjects`, no invented actions).
 

@@ -15,8 +15,8 @@ from typing import Any, Callable, Union
 from unittest.mock import patch
 
 from src.agent import APP_NAME, build_coordinator, build_runner
-from src.models import AssetScores
-from tests.conftest import build_embedding_fixture, build_valid_vision_scoring_output
+from src.models import AssetScores, GeneratedCopy
+from tests.conftest import build_embedding_fixture, build_valid_generated_copy, build_valid_vision_scoring_output
 
 
 def _make_mcp_envelope(docs: list[dict]) -> dict:
@@ -239,11 +239,25 @@ STEP5_DISCOVERY_IDS = {"ast-2", "ast-3"}
 
 
 def _make_step5_assets_find_handler() -> Callable:
-    """Return a handler that produces 4 assets for the Step-5 seeded event."""
+    """Return a handler that produces 4 assets for the Step-5 seeded event.
+
+    Handles two filter shapes:
+    - no status → 4 ingested assets (used by Steps 3/4/5)
+    - status='scored' → same 4 assets with scored status + no queue assignments
+      (valid-degenerate: Step 6 sees no surfaced assets and returns empty lists)
+    """
+    _base_scores = {
+        "quality_score": 0.7, "merch_score": 0.7, "emotional_score": 0.7,
+        "social_score": 0.7, "identity_score": 0.7,
+    }
+
     def handler(args: dict) -> list:
         f = args.get("filter", {})
-        if "event_id" in f and "status" not in f:
-            event_id = f["event_id"]
+        event_id = f.get("event_id")
+        if not event_id:
+            return []
+        status = f.get("status")
+        if status is None:
             return [
                 {
                     "asset_id": f"ast-{i}",
@@ -258,6 +272,28 @@ def _make_step5_assets_find_handler() -> Callable:
                     "embedding": None,
                     "scores": None,
                     "detected_subjects": None,
+                    "campaign_id": None,
+                    "similar_assets": None,
+                }
+                for i in range(4)
+            ]
+        if status == "scored":
+            # Step 6 reads scored assets — return 4 scored assets with no queue assignments
+            # so draft_campaigns_for_queue takes the valid-degenerate empty path.
+            return [
+                {
+                    "asset_id": f"ast-{i}",
+                    "event_id": event_id,
+                    "content_url": f"/tmp/wc-final/img0{i+1}.jpg",
+                    "status": "scored",
+                    "upload_date": datetime.now(timezone.utc).isoformat(),
+                    "product_route": None,
+                    "queue_type": None,
+                    "queue_rank": None,
+                    "queue_rationale": None,
+                    "embedding": None,
+                    "scores": _base_scores,
+                    "detected_subjects": [],
                     "campaign_id": None,
                     "similar_assets": None,
                 }
@@ -402,3 +438,148 @@ async def run_with_transient_retry(coro_factory, max_retries: int = 1):
             raise
     # All attempts were transient failures — exclude this run
     return [], True
+
+
+# ---------------------------------------------------------------------------
+# Step 6 eval scaffolding (T-6.11)
+# ---------------------------------------------------------------------------
+
+# Asset IDs used in Step 6 pre-seeded scored corpus.
+# ast-0: poster/exploitation — Messi in frame (identity match)
+# ast-1: tshirt/exploitation — high merch, no identity
+# ast-2: social_only/discovery — emotional moment with Messi
+# ast-3: un-surfaced (queue_type=None) — should NOT get a campaign
+# ast-4: social_only/discovery — crowd shot, empty detected_subjects (hallucination guard)
+STEP6_ASSET_IDS = ["ast-0", "ast-1", "ast-2", "ast-3", "ast-4"]
+STEP6_QUEUED_IDS = {"ast-0", "ast-1", "ast-2", "ast-4"}
+STEP6_UNSURFACED_ID = "ast-3"
+STEP6_CROWD_ASSET_ID = "ast-4"
+
+# Canned GeneratedCopy returned by the Tier-1 mock for _draft_copy_for_asset.
+_CANNED_COPY = build_valid_generated_copy()
+
+
+def _make_step6_scored_assets(event_id: str) -> list[dict]:
+    """Return the pre-seeded route-spanning scored assets for the Step 6 eval."""
+    base_scores_hi = {"quality_score": 0.9, "merch_score": 0.8, "emotional_score": 0.7, "social_score": 0.8, "identity_score": 0.95}
+    base_scores_merch = {"quality_score": 0.8, "merch_score": 0.85, "emotional_score": 0.6, "social_score": 0.7, "identity_score": 0.3}
+    base_scores_emo = {"quality_score": 0.85, "merch_score": 0.4, "emotional_score": 0.92, "social_score": 0.75, "identity_score": 0.8}
+    base_scores_lo = {"quality_score": 0.35, "merch_score": 0.3, "emotional_score": 0.4, "social_score": 0.3, "identity_score": 0.2}
+    base_scores_crowd = {"quality_score": 0.75, "merch_score": 0.3, "emotional_score": 0.85, "social_score": 0.9, "identity_score": 0.1}
+    return [
+        {
+            "asset_id": "ast-0", "event_id": event_id,
+            "content_url": "/tmp/wc-final/img01.jpg",
+            "status": "scored", "upload_date": "2026-06-01T21:00:00Z",
+            "product_route": "poster",
+            "queue_type": "exploitation", "queue_rank": 1,
+            "queue_rationale": "Identity match: Messi in frame leads exploitation queue",
+            "embedding": None, "scores": base_scores_hi,
+            "detected_subjects": ["Lionel Messi"], "campaign_id": None, "similar_assets": None,
+        },
+        {
+            "asset_id": "ast-1", "event_id": event_id,
+            "content_url": "/tmp/wc-final/img02.jpg",
+            "status": "scored", "upload_date": "2026-06-01T21:00:00Z",
+            "product_route": "tshirt",
+            "queue_type": "exploitation", "queue_rank": 2,
+            "queue_rationale": "High merch score drives t-shirt route",
+            "embedding": None, "scores": base_scores_merch,
+            "detected_subjects": [], "campaign_id": None, "similar_assets": None,
+        },
+        {
+            "asset_id": "ast-2", "event_id": event_id,
+            "content_url": "/tmp/wc-final/img03.jpg",
+            "status": "scored", "upload_date": "2026-06-01T21:00:00Z",
+            "product_route": "social_only",
+            "queue_type": "discovery", "queue_rank": 1,
+            "queue_rationale": "Emotional moment captures fan energy",
+            "embedding": None, "scores": base_scores_emo,
+            "detected_subjects": ["Lionel Messi"], "campaign_id": None, "similar_assets": None,
+        },
+        {
+            "asset_id": "ast-3", "event_id": event_id,
+            "content_url": "/tmp/wc-final/img04.jpg",
+            "status": "scored", "upload_date": "2026-06-01T21:00:00Z",
+            "product_route": None,
+            "queue_type": None, "queue_rank": None, "queue_rationale": None,
+            "embedding": None, "scores": base_scores_lo,
+            "detected_subjects": [], "campaign_id": None, "similar_assets": None,
+        },
+        {
+            "asset_id": "ast-4", "event_id": event_id,
+            "content_url": "/tmp/wc-final/img05.jpg",
+            "status": "scored", "upload_date": "2026-06-01T21:00:00Z",
+            "product_route": "social_only",
+            "queue_type": "discovery", "queue_rank": 2,
+            "queue_rationale": "Crowd shot captures collective emotion",
+            "embedding": None, "scores": base_scores_crowd,
+            "detected_subjects": [],  # crowd shot — hallucination guard probe
+            "campaign_id": None, "similar_assets": None,
+        },
+    ]
+
+
+def _make_step6_assets_find_handler() -> Callable:
+    """Combined assets find handler for Step 6 evals.
+
+    Branches by filter:
+    - no status → Step 5 base corpus (4 ingested assets, for upstream scoring/similarity)
+    - status='scored' → pre-seeded route-spanning queue-bearing assets (Step 6 reads this)
+    """
+    _step5_base = _make_step5_assets_find_handler()
+
+    def handler(args: dict) -> list:
+        f = args.get("filter", {})
+        status = f.get("status")
+        event_id = f.get("event_id", "evt-demo-1")
+
+        if not status:
+            return _step5_base(args)
+        if status == "scored":
+            return _make_step6_scored_assets(event_id)
+        return []
+
+    return handler
+
+
+@contextmanager
+def patch_draft_copy_for_asset(canned: GeneratedCopy | None = None):
+    """Context manager: patch _draft_copy_for_asset to return canned copy (Tier 1).
+
+    Pass canned=None (default) to leave _draft_copy_for_asset live (grounding probe).
+    """
+    if canned is None:
+        yield
+        return
+    with patch("src.capabilities.drafts._draft_copy_for_asset", return_value=canned):
+        yield
+
+
+@contextmanager
+def build_runner_with_step6_mock():
+    """Context manager for Step 6 evals: Step 5 scaffolding + campaigns DB patch.
+
+    Does NOT patch _draft_copy_for_asset — use patch_draft_copy_for_asset() for Tier 1.
+    Yields (runner, mock_client). Caller seeds mock_client with event/player/
+    performance/vector-search data; use _make_step6_assets_find_handler() for assets.
+    """
+    mock_client = _MockMCPClient()
+    with (
+        patch("src.db.events.get_client", return_value=mock_client),
+        patch("src.db.assets.get_client", return_value=mock_client),
+        patch("src.db.performance.get_client", return_value=mock_client),
+        patch("src.db.player_context.get_client", return_value=mock_client),
+        patch("src.db.campaigns.get_client", return_value=mock_client),
+        patch(
+            "src.capabilities.similarity._compute_image_embedding",
+            return_value=build_embedding_fixture(),
+        ),
+        patch(
+            "src.capabilities.scoring._score_asset_with_vision",
+            side_effect=_step5_vision_provider,
+        ),
+    ):
+        agent = build_coordinator()
+        runner = build_runner(agent)
+        yield runner, mock_client

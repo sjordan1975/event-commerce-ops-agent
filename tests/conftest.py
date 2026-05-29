@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from src.models import Asset, AssetScores, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, VisionScoringOutput
+from src.models import Approval, Asset, AssetScores, Campaign, Event, EventNarrative, GeneratedCopy, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, VisionScoringOutput
 
 
 def build_valid_event(**overrides) -> Event:
@@ -125,6 +125,50 @@ def build_valid_review_queue(**overrides) -> ReviewQueue:
     }
     base.update(overrides)
     return ReviewQueue(**base)
+
+
+def build_valid_generated_copy(**overrides) -> GeneratedCopy:
+    """Return a valid GeneratedCopy instance with sensible defaults."""
+    base = {
+        "headline": "Messi caps Argentina's extra-time upset",
+        "caption": "The night Argentina ended France's reign — limited edition print.",
+        "hashtags": ["#WorldCup2026", "#ArgentinaVsFrance"],
+    }
+    base.update(overrides)
+    return GeneratedCopy(**base)
+
+
+def build_valid_campaign(**overrides) -> Campaign:
+    """Return a valid Campaign instance with sensible defaults."""
+    base = {
+        "campaign_id": "cmp-1",
+        "asset_id": "a1",
+        "event_id": "evt-demo-1",
+        "product_type": "poster",
+        "generated_copy": build_valid_generated_copy(),
+        "platform_target": "shopify",
+        "timing_recommendation": "2026-07-14T22:00:00Z",
+        "status": "draft",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "execution": None,
+    }
+    base.update(overrides)
+    return Campaign(**base)
+
+
+def build_valid_approval(**overrides) -> Approval:
+    """Return a valid Approval instance with sensible defaults."""
+    base = {
+        "approval_id": "apr-1",
+        "campaign_id": "cmp-1",
+        "asset_id": "a1",
+        "status": "pending",
+        "reviewer_notes": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "decided_at": None,
+    }
+    base.update(overrides)
+    return Approval(**base)
 
 
 def build_valid_event_narrative(**overrides) -> EventNarrative:

@@ -128,3 +128,38 @@ class SimilarityResult(BaseModel):
     asset_id: str
     neighbors: list[SimilarAsset]
     inferred_route: str | None
+
+
+# No extra="forbid": Gemini response_schema rejects additionalProperties:false
+# (same constraint as VisionScoringOutput / QueueItem — established in Steps 2/4/5).
+class GeneratedCopy(BaseModel):
+    headline: str
+    caption: str
+    hashtags: list[str]
+
+
+class Campaign(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    campaign_id: str
+    asset_id: str
+    event_id: str
+    product_type: Literal["poster", "tshirt"] | None
+    generated_copy: GeneratedCopy
+    platform_target: Literal["shopify", "printful", "social"]
+    timing_recommendation: str
+    status: str = "draft"
+    created_at: str
+    execution: dict | None = None
+
+
+class Approval(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    approval_id: str
+    campaign_id: str
+    asset_id: str
+    status: str = "pending"
+    reviewer_notes: str | None = None
+    created_at: str
+    decided_at: str | None = None

@@ -127,6 +127,9 @@ async def run_event_pipeline(
         "queue_candidates": state.get("queue_candidates"),
         "review_queue": state.get("review_queue"),
         "membership_violations": state.get("membership_violations"),
+        "campaign_ids": state.get("campaign_ids"),
+        "approval_ids": state.get("approval_ids"),
+        "drafts": state.get("drafts"),
     }
 
 
