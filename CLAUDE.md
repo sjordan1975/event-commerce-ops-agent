@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**On branch `step/5-queue`. T-5.1–T-5.14 IMPLEMENTED AND COMMITTED. Next action: run Tier-2 coherence eval (`EVAL_REPEAT=20 .venv/bin/python -m pytest tests/evals/test_step_5_coherence.py -v`) with GOOGLE_API_KEY before merge — this is the D-020 ship gate.**
+**On branch `step/5-queue`. T-5.1–T-5.14 COMPLETE. All verification checkpoints pass. Next action: merge to `main` (fast-forward only).**
 
-Step 5 = `propose_review_queue`, the one strategic decision (D-021). Implementation commits: `ec478a1` (T-5.1–T-5.14), `f994e67` (Tier-1 direct dispatch rewrite), `b45133c` (exception tightening). All unit tests green (98 pass); Tier-1 eval passes offline (no API key, 0.03s).
+Step 5 = `propose_review_queue`, the one strategic decision (D-021). Implementation commits: `ec478a1` (T-5.1–T-5.14), `f994e67` (Tier-1 direct dispatch rewrite), `b45133c` (exception tightening), max_output_tokens fix. All unit tests green (98 pass); Tier-1 passes offline (0.02s, no API key); Tier-2 20/20 (440s, GOOGLE_API_KEY).
 
 Key Step 5 decisions baked in (D-029): `propose_review_queue` is the project's **first in-graph `LlmAgent(mode='single_turn')` node** (Path A — validated by `spike/adk_llm_node_queue_spike.py`). Three nodes: `prepare_queue_candidates` (FunctionNode) → `propose_review_queue` (LlmAgent) → `persist_review_queue` (FunctionNode). New env vars: `GEMINI_QUEUE_MODEL` (default `gemini-2.5-flash`), `QUEUE_EXPLOITATION_SIMILARITY_CUTOFF` (default `0.75`). Exploitation routing stays mechanical (`inferred_route`, D-015); discovery routing is the LLM's choice. Persists `queue_type`, `product_route`, `queue_rank`, `queue_rationale` onto assets; no status change.
 
