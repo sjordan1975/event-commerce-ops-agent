@@ -1,57 +1,46 @@
 """Tier-1 plumbing eval for propose_review_queue (T-5.13).
 
-Deterministic — _FIXTURE_RESPONSE is set, so the strategic LlmAgent node uses a
-canned ReviewQueue and makes zero live calls to the queue model. The coordinator
-LlmAgent still runs live (consistent with Steps 2-4; requires GOOGLE_API_KEY).
+Dispatches the workflow directly (no coordinator) with _FIXTURE_RESPONSE set and all
+LLM surfaces patched — zero live calls, no GOOGLE_API_KEY needed. This is the CI
+ship gate; it must not fail on AI-infra flakiness (D-029).
 
-Assertions (T1-a through T1-e):
+Direct-dispatch pattern validated by spike/adk_llm_node_queue_spike.py (mocked path,
+Claims A–D). Assertion T1-e (coordinator dispatch + CoT text) is intentionally omitted
+— it is a coordinator assertion, not a queue assertion, and is already covered by
+Steps 2-4 trace evals (assertions a and g there). Running Tier 2 (test_step_5_coherence.py)
+with a live coordinator covers that path when deliberately executed.
+
+Assertions (T1-a through T1-d):
   (T1-a) ReviewQueue parses from state["review_queue"] via ADK output_key.
   (T1-b) prepare_queue_candidates split correct: ast-0/ast-1 in exploitation pool,
          ast-2/ast-3 in discovery pool; inferred_route carried for exploitation.
   (T1-c) persist_review_queue issued save_queue_assignment per surfaced item:
-         exploitation route = mechanical inferred_route (not LLM's); discovery route
-         = canned LLM route; ast-1 (unsurfaced exploitation) gets no write.
-         ast-3 (cross-assigned) triggers membership_violation.
+         exploitation route = mechanical inferred_route (not LLM's "tshirt" — proves D-015);
+         discovery route = canned LLM route; ast-1 (unsurfaced) gets no write;
+         no status key in any queue write.
   (T1-d) Cross-assigned item (ast-3) recorded in membership_violations, no crash.
-  (T1-e) Coordinator dispatched run_event_pipeline exactly once; reasoning text
-         present pre-dispatch.
-
-Note on "offline / no GOOGLE_API_KEY": T-5.13 in the task list claims "offline,
-no GOOGLE_API_KEY needed," but the coordinator LlmAgent runs live (consistent with
-Steps 2-4). The claim means the NEW live call (strategic node) is mocked — the
-coordinator call is unchanged from prior steps. This is the gate main stays green
-against.
 """
 
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 import pytest
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from src.models import ReviewQueue
+from src.agent import WORKFLOW_NAME, build_workflow
+from src.models import EventNarrative, ReviewQueue
+from tests.conftest import build_embedding_fixture
 from tests.evals.conftest import (
     _MockMCPClient,
-    _collect_parts,
-    build_runner_with_step5_mock,
-    dump_trace,
-    extract_tool_calls,
-    extract_tool_responses,
-    step5_fixture_response,
-    STEP5_EXPLOITATION_IDS,
     STEP5_DISCOVERY_IDS,
+    STEP5_EXPLOITATION_IDS,
     _STEP5_INFERRED_ROUTES,
     _make_step5_assets_find_handler,
     _make_step5_vector_search_handler,
-)
-
-APP_NAME = "event_commerce_ops_agent"
-
-OPERATOR_PROMPT = (
-    "Argentina pulled off the upset, beating France 3-2. "
-    "Photos: /tmp/wc-final/img01.jpg, /tmp/wc-final/img02.jpg, "
-    "/tmp/wc-final/img03.jpg, /tmp/wc-final/img04.jpg. "
-    "Match name: 'Argentina vs France'. Start: 2026-06-01T19:00:00Z. "
-    "Process this batch."
+    _step5_vision_provider,
+    step5_fixture_response,
 )
 
 # ---------------------------------------------------------------------------
@@ -86,20 +75,6 @@ _SEEDED_NARRATIVE = {
         "total_impressions": 22000,
         "notes": "3 past upsets; poster routes dominated conversion",
     },
-}
-
-_SEEDED_EVENT = {
-    "event_id": "evt-demo-1",
-    "name": "Argentina vs France",
-    "home_team": "Argentina",
-    "away_team": "France",
-    "location": "Lusail Stadium, Qatar",
-    "start_date": "2026-06-01T19:00:00Z",
-    "final_score": "3-2",
-    "outcome_type": "upset_victory",
-    "timeliness": 0.87,
-    "ingested_at": datetime.now(timezone.utc).isoformat(),
-    "event_narrative": _SEEDED_NARRATIVE,
 }
 
 _PAST_EVENTS = [
@@ -140,8 +115,10 @@ _PERF_AGG_DOCS = [
 # Canned ReviewQueue fixture (includes a cross-assigned item for T1-d)
 #   ast-0, ast-1 are in exploitation pool (strong similarity)
 #   ast-2, ast-3 are in discovery pool (weak similarity)
-# The fixture places ast-3 (a discovery-pool asset) in the exploitation list
-# to test T1-d (cross-assignment recorded as violation, no crash).
+#
+# ast-0: LLM chose product_route="tshirt" — but persist MUST use the mechanical
+#   inferred_route="poster" (D-015). This proves the D-015 invariant end-to-end.
+# ast-3: placed in exploitation by LLM but is in discovery pool → membership_violation.
 # ---------------------------------------------------------------------------
 
 _STEP5_CANNED_RESPONSE = {
@@ -151,7 +128,7 @@ _STEP5_CANNED_RESPONSE = {
             "asset_id": "ast-0",
             "queue_type": "exploitation",
             "rank": 1,
-            "product_route": "tshirt",  # LLM chose tshirt — persist must ignore and use mechanical "poster"
+            "product_route": "tshirt",  # LLM chose tshirt — persist MUST use mechanical "poster"
             "rationale": "Messi in frame — identity match leads the queue",
         },
         {
@@ -160,9 +137,6 @@ _STEP5_CANNED_RESPONSE = {
             "rank": 2,
             "product_route": "tshirt",
             "rationale": "cross-assigned violation test — should appear in membership_violations",
-            # Note: this is ALSO intentionally different from ast-0's case:
-            # ast-0 below uses product_route="tshirt" (LLM chose tshirt)
-            # but persist must use the mechanical inferred_route "poster" — proving D-015.
         },
     ],
     "discovery": [
@@ -177,6 +151,9 @@ _STEP5_CANNED_RESPONSE = {
     "strategy_summary": "Rich exploitation led by identity match; one discovery pick with emotional signal",
 }
 
+# ---------------------------------------------------------------------------
+# Mock DB handlers
+# ---------------------------------------------------------------------------
 
 def _make_events_find_handler():
     def handler(args: dict) -> list:
@@ -185,7 +162,22 @@ def _make_events_find_handler():
         outcome_filter = f.get("outcome_type")
 
         if isinstance(event_id_filter, str):
-            return [{**_SEEDED_EVENT, "event_id": event_id_filter}]
+            # Return seeded event with whatever event_id was generated by ingest
+            return [{
+                **{k: v for k, v in {
+                    "event_id": event_id_filter,
+                    "name": "Argentina vs France",
+                    "home_team": "Argentina",
+                    "away_team": "France",
+                    "location": "Lusail Stadium, Qatar",
+                    "start_date": "2026-06-01T19:00:00Z",
+                    "final_score": "3-2",
+                    "outcome_type": "upset_victory",
+                    "timeliness": 0.87,
+                    "ingested_at": datetime.now(timezone.utc).isoformat(),
+                    "event_narrative": _SEEDED_NARRATIVE,
+                }.items()},
+            }]
 
         if outcome_filter is not None and isinstance(event_id_filter, dict) and "$ne" in event_id_filter:
             exclude = event_id_filter["$ne"]
@@ -193,9 +185,7 @@ def _make_events_find_handler():
                 e for e in _PAST_EVENTS
                 if e["outcome_type"] == outcome_filter and e["event_id"] != exclude
             ]
-
         return []
-
     return handler
 
 
@@ -208,89 +198,86 @@ def _seed_mock(mock_client: _MockMCPClient) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Agent runner
-# ---------------------------------------------------------------------------
-
-async def _run_agent(runner) -> list:
-    session = await runner.session_service.create_session(
-        app_name=APP_NAME, user_id="eval_user"
-    )
-    msg = types.Content(
-        role="user",
-        parts=[types.Part(text=OPERATOR_PROMPT)],
-    )
-    events = []
-    try:
-        async for event in runner.run_async(
-            user_id="eval_user",
-            session_id=session.id,
-            new_message=msg,
-        ):
-            events.append(event)
-    except ValueError as exc:
-        # Cosmetic OTel warning on generator exit — ignore.
-        if "Token was created in a different Context" not in str(exc):
-            raise
-    except Exception:
-        pass
-    return events
-
-
-# ---------------------------------------------------------------------------
-# T-5.13: Tier-1 plumbing eval (deterministic, single run)
+# T-5.13: Tier-1 plumbing eval (direct workflow dispatch, fully offline)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.anyio
 async def test_step_5_tier1_trace():
-    """Tier-1 plumbing eval — _FIXTURE_RESPONSE set, zero live queue calls."""
-    with step5_fixture_response(_STEP5_CANNED_RESPONSE):
-        with build_runner_with_step5_mock(_SEEDED_NARRATIVE) as (runner, mock_client):
-            _seed_mock(mock_client)
-            events = await _run_agent(runner)
+    """Tier-1 plumbing eval — direct workflow dispatch, zero live calls, no API key."""
+    narrative_fixture = EventNarrative.model_validate(_SEEDED_NARRATIVE)
+    mock_client = _MockMCPClient()
+    _seed_mock(mock_client)
+
+    with (
+        step5_fixture_response(_STEP5_CANNED_RESPONSE),
+        patch("src.db.events.get_client", return_value=mock_client),
+        patch("src.db.assets.get_client", return_value=mock_client),
+        patch("src.db.performance.get_client", return_value=mock_client),
+        patch("src.db.player_context.get_client", return_value=mock_client),
+        patch("src.capabilities.context._run_narrative_llm", return_value=narrative_fixture),
+        patch(
+            "src.capabilities.similarity._compute_image_embedding",
+            return_value=build_embedding_fixture(),
+        ),
+        patch(
+            "src.capabilities.scoring._score_asset_with_vision",
+            side_effect=_step5_vision_provider,
+        ),
+    ):
+        workflow = build_workflow()
+        session_service = InMemorySessionService()
+        session = await session_service.create_session(
+            app_name=WORKFLOW_NAME,
+            user_id="eval_user",
+            state={
+                "images": [
+                    "/tmp/wc-final/img01.jpg",
+                    "/tmp/wc-final/img02.jpg",
+                    "/tmp/wc-final/img03.jpg",
+                    "/tmp/wc-final/img04.jpg",
+                ],
+                "event_metadata": {
+                    "name": "Argentina vs France",
+                    "home_team": "Argentina",
+                    "away_team": "France",
+                    "final_score": "3-2",
+                    "start_date": "2026-06-01T19:00:00Z",
+                    "outcome_type": "upset_victory",
+                },
+            },
+        )
+        runner = Runner(
+            app_name=WORKFLOW_NAME,
+            node=workflow,
+            session_service=session_service,
+        )
+        trigger = types.Content(role="user", parts=[types.Part(text="run pipeline")])
+        try:
+            async for _event in runner.run_async(
+                user_id="eval_user",
+                session_id=session.id,
+                new_message=trigger,
+            ):
+                pass
+        except ValueError as exc:
+            if "Token was created in a different Context" not in str(exc):
+                raise
+        except Exception:
+            pass
+
+        final = await session_service.get_session(
+            app_name=WORKFLOW_NAME,
+            user_id="eval_user",
+            session_id=session.id,
+        )
+        state = dict(final.state) if final else {}
 
     failures: list[str] = []
-    trace_path = dump_trace(events, "step_5_tier1_trace")
-    all_parts = _collect_parts(events)
-    tool_calls = extract_tool_calls(events)
-    tool_responses = extract_tool_responses(events)
 
-    # (T1-e) coordinator dispatched run_event_pipeline exactly once
-    pipeline_calls = [c for c in tool_calls if c["name"] == "run_event_pipeline"]
-    if len(pipeline_calls) != 1:
-        failures.append(
-            f"(T1-e) Expected run_event_pipeline called 1 time, got {len(pipeline_calls)}. "
-            f"Trace: {trace_path}"
-        )
-
-    # (T1-e) reasoning text present before first tool call
-    first_tool_idx = next(
-        (i for i, p in enumerate(all_parts) if p["kind"] == "tool_call"), None
-    )
-    text_before_tool = any(
-        p["kind"] == "text" and i < (first_tool_idx if first_tool_idx is not None else len(all_parts))
-        for i, p in enumerate(all_parts)
-    )
-    if not text_before_tool:
-        failures.append(
-            f"(T1-e) No reasoning text before tool call — CoT directive not firing. "
-            f"Trace: {trace_path}"
-        )
-
-    # (T1-a) ReviewQueue parses from state via output_key
-    pipeline_responses = [r for r in tool_responses if r.get("name") == "run_event_pipeline"]
-    review_queue_raw = None
-    queue_candidates_raw = None
-    membership_violations_raw = None
-    if pipeline_responses:
-        resp = pipeline_responses[-1].get("response", {})
-        result = resp.get("result", resp)
-        review_queue_raw = result.get("review_queue")
-        queue_candidates_raw = result.get("queue_candidates")
-        membership_violations_raw = result.get("membership_violations")
-
-    parsed_queue = None
+    # (T1-a) ReviewQueue parses from state["review_queue"] via ADK output_key
+    review_queue_raw = state.get("review_queue")
     if review_queue_raw is None:
-        failures.append(f"(T1-a) review_queue not in pipeline response. Trace: {trace_path}")
+        failures.append("(T1-a) review_queue not in pipeline state")
     else:
         try:
             parsed_queue = (
@@ -299,34 +286,33 @@ async def test_step_5_tier1_trace():
                 else ReviewQueue.model_validate(review_queue_raw)
             )
         except Exception as exc:
-            failures.append(f"(T1-a) ReviewQueue parse failed: {exc}. Trace: {trace_path}")
+            failures.append(f"(T1-a) ReviewQueue parse failed: {exc}")
+            parsed_queue = None
 
-    # (T1-b) prepare_queue_candidates split — exploitation vs. discovery membership
-    if queue_candidates_raw is not None:
-        expl_ids = {c["asset_id"] for c in queue_candidates_raw.get("exploitation", [])}
-        disc_ids = {c["asset_id"] for c in queue_candidates_raw.get("discovery", [])}
+    # (T1-b) prepare_queue_candidates split correct
+    queue_candidates = state.get("queue_candidates")
+    if queue_candidates is None:
+        failures.append("(T1-b) queue_candidates not in pipeline state")
+    else:
+        expl_ids = {c["asset_id"] for c in queue_candidates.get("exploitation", [])}
+        disc_ids = {c["asset_id"] for c in queue_candidates.get("discovery", [])}
         if expl_ids != STEP5_EXPLOITATION_IDS:
             failures.append(
-                f"(T1-b) exploitation pool: expected {STEP5_EXPLOITATION_IDS}, got {expl_ids}. "
-                f"Trace: {trace_path}"
+                f"(T1-b) exploitation pool: expected {STEP5_EXPLOITATION_IDS}, got {expl_ids}"
             )
         if disc_ids != STEP5_DISCOVERY_IDS:
             failures.append(
-                f"(T1-b) discovery pool: expected {STEP5_DISCOVERY_IDS}, got {disc_ids}. "
-                f"Trace: {trace_path}"
+                f"(T1-b) discovery pool: expected {STEP5_DISCOVERY_IDS}, got {disc_ids}"
             )
-        # inferred_route carried for exploitation candidates
-        for c in queue_candidates_raw.get("exploitation", []):
+        for c in queue_candidates.get("exploitation", []):
             expected_route = _STEP5_INFERRED_ROUTES.get(c["asset_id"])
             if c.get("inferred_route") != expected_route:
                 failures.append(
-                    f"(T1-b) inferred_route for {c['asset_id']}: expected {expected_route!r}, "
-                    f"got {c.get('inferred_route')!r}. Trace: {trace_path}"
+                    f"(T1-b) inferred_route for {c['asset_id']}: "
+                    f"expected {expected_route!r}, got {c.get('inferred_route')!r}"
                 )
-    else:
-        failures.append(f"(T1-b) queue_candidates not in pipeline response. Trace: {trace_path}")
 
-    # (T1-c) persist_review_queue wrote correct save_queue_assignment calls
+    # (T1-c) persist_review_queue called save_queue_assignment correctly
     call_log = mock_client.calls
     queue_writes = [
         (tn, args)
@@ -341,53 +327,48 @@ async def test_step_5_tier1_trace():
         if "asset_id" in args.get("filter", {})
     }
 
-    # ast-0 persisted with mechanical route (poster), not LLM route
+    # ast-0: persist must use mechanical route "poster", not LLM's "tshirt" (D-015)
     if "ast-0" not in queue_write_map:
-        failures.append(f"(T1-c) No queue write for ast-0. Trace: {trace_path}")
+        failures.append("(T1-c) No queue write for ast-0")
     else:
         actual_route = queue_write_map["ast-0"].get("product_route")
         if actual_route != "poster":
             failures.append(
-                f"(T1-c) ast-0 route: expected 'poster' (mechanical), got {actual_route!r}. "
-                f"Trace: {trace_path}"
+                f"(T1-c) ast-0 route: expected 'poster' (mechanical D-015), got {actual_route!r}"
             )
 
-    # ast-1 not surfaced by the canned fixture → no queue write
+    # ast-1 not in canned fixture → no queue write (unsurfaced exploitation asset)
     if "ast-1" in queue_write_map:
-        failures.append(
-            f"(T1-c) ast-1 not in canned fixture but got a queue write. Trace: {trace_path}"
-        )
+        failures.append("(T1-c) ast-1 not surfaced but got a queue write")
 
-    # ast-2 persisted with LLM-chosen route (social_only)
+    # ast-2: discovery item → persist with LLM-chosen route "social_only"
     if "ast-2" not in queue_write_map:
-        failures.append(f"(T1-c) No queue write for ast-2. Trace: {trace_path}")
+        failures.append("(T1-c) No queue write for ast-2")
     else:
         actual_route = queue_write_map["ast-2"].get("product_route")
         if actual_route != "social_only":
             failures.append(
-                f"(T1-c) ast-2 route: expected 'social_only' (LLM-chosen), got {actual_route!r}. "
-                f"Trace: {trace_path}"
+                f"(T1-c) ast-2 route: expected 'social_only' (LLM-chosen), got {actual_route!r}"
             )
 
     # No status in any queue write
     for asset_id, set_block in queue_write_map.items():
         if "status" in set_block:
             failures.append(
-                f"(T1-c) Queue write for {asset_id} contains 'status' — must not change status. "
-                f"Trace: {trace_path}"
+                f"(T1-c) Queue write for {asset_id} contains 'status' — "
+                "must not change status (D-029)"
             )
 
     # (T1-d) cross-assigned item (ast-3) in membership_violations, no crash
-    if membership_violations_raw is None:
-        failures.append(
-            f"(T1-d) membership_violations not in pipeline response. Trace: {trace_path}"
-        )
+    membership_violations = state.get("membership_violations")
+    if membership_violations is None:
+        failures.append("(T1-d) membership_violations not in pipeline state")
     else:
-        violations_flat = [str(v) for v in membership_violations_raw]
+        violations_flat = [str(v) for v in membership_violations]
         if not any("ast-3" in v for v in violations_flat):
             failures.append(
                 f"(T1-d) ast-3 (cross-assigned) not recorded in membership_violations: "
-                f"{membership_violations_raw}. Trace: {trace_path}"
+                f"{membership_violations}"
             )
 
     assert not failures, "\n".join(failures)
