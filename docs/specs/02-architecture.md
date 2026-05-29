@@ -67,6 +67,8 @@ One document per image. Central state document — touched by nearly every capab
   "status": "ingested | scored | campaign_draft_created | executing | published | rejected",
   "product_route": "poster | tshirt | social_only | null",
   "queue_type": "exploitation | discovery | null",
+  "queue_rank": "1-based rank within the asset's queue half | null (set by propose_review_queue, D-029)",
+  "queue_rationale": "one-sentence operator-facing reasoning | null (set by propose_review_queue, D-029)",
   "embedding": [/* 3072-dim vector */],
   "scores": { /* AssetScores: quality_score, merch_score, emotional_score, social_score, identity_score — all [0,1]; D-013, D-017, D-027 */ },
   "detected_subjects": ["Lionel Messi"],
@@ -255,13 +257,22 @@ assets.update-many        → set scores (typed AssetScores per D-027), detected
 Per D-017: scores split into technical fitness (`quality_score`, `merch_score`) + commercial signal (`emotional_score`, `social_score`, `identity_score`). Per D-026: `detected_subjects` carries the identity signal forward for Step 5 to compose against narrative `key_figures`. Per D-028: Vision model defaults to `gemini-2.5-flash` (not flash-lite — judgment density + hallucination surface).
 
 ### `propose_review_queue` ← the one strategic decision
+Three workflow nodes (D-029): a mechanical split, the strategic `LlmAgent` node, and a mechanical persist. The `LlmAgent` node does no MongoDB I/O — the flanking `FunctionNode`s do.
 ```
-(consumes similarity results + scores + narrative from agent state)
-assets.aggregate          → rank candidates; combine similarity (exploitation half) + agent judgment (exploration half)
-assets.updateMany         → set status: "scored"; assign product_route and queue_type ("exploitation" | "discovery")
-                            with per-item reasoning attached
+prepare_queue_candidates (FunctionNode)
+  (consumes similarity_results + scored_assets from state; PreconditionError if either/narrative missing)
+  → split by QUEUE_EXPLOITATION_SIMILARITY_CUTOFF into exploitation (carry inferred_route) + discovery pools
+
+propose_review_queue (LlmAgent, mode='single_turn')
+  → orders exploitation by narrative fit + identity (D-026) + quality gate (D-017); selects discovery subset;
+    emits ReviewQueue (output_schema) with per-item rationale + strategy_summary → state["review_queue"]
+
+persist_review_queue (FunctionNode)
+  assets.updateMany  → per surfaced item: set queue_type ("exploitation" | "discovery"), product_route
+                       (mechanical inferred_route for exploitation per D-015; LLM choice for discovery),
+                       queue_rank, queue_rationale. Does NOT change status (stays "scored").
 ```
-Per D-021, the exploration-half selection is agent-driven (not random per D-015's MVP default). Each surfaced item carries a one-sentence rationale the operator can read. Hard-refuses (via `PreconditionError`) if event, scores, similarity results, or narrative are missing.
+Per D-021/D-029, the discovery-half selection is agent-driven (not random per D-015's MVP default); each surfaced item carries a one-sentence rationale the operator can read. Preconditions are enforced in `prepare_queue_candidates` (hard-refuse via `PreconditionError` if event, scores, similarity results, or narrative are missing). Persist is defensive — cross-assigned/invented `asset_id`s are recorded, not crashed on.
 
 ### `draft_campaigns_for_queue`
 ```
@@ -350,7 +361,13 @@ Workflow (graph, name='event_pipeline', runs via sub-Runner from the dispatch to
   score_assets_with_vision (FunctionNode)    ← added in Step 4
     │
     ▼  [Step 5+]
-  propose_review_queue (LlmAgent, mode='single_turn', gemini-2.5-flash-lite) ← the one strategic decision
+  prepare_queue_candidates (FunctionNode)    ← mechanical: similarity-cutoff split (D-029)
+    │
+    ▼
+  propose_review_queue (LlmAgent, mode='single_turn', GEMINI_QUEUE_MODEL=gemini-2.5-flash) ← the one strategic decision
+    │
+    ▼
+  persist_review_queue (FunctionNode)        ← mechanical: write per-asset queue fields (D-029)
     │
     ▼  [Step 6+]
   draft_campaigns_for_queue (FunctionNode)   ← added in Step 6
@@ -383,7 +400,7 @@ HITL approval + execution + outcomes (capabilities 7–9) live coordinator-side,
 - **Retry logic** internal to `execute_approved_campaigns` for Printful async mockup polling.
 - **`PreconditionError`** — wrapper-level exception with self-correcting message format. Under D-024 the graph enforces order structurally; `PreconditionError` remains as defense-in-depth for direct capability calls (e.g., from unit tests). See `docs/strategic-agent-reframe.md` § Enforced vs. emergent.
 - **Loop and spend bounds** — ADK's iteration cap and `max_output_tokens` are the operational safety bounds. Explicit values + cap on the `edit_requested` redraft loop are tracked in `docs/safety-measures.md`.
-- **Two model env vars (D-024):** `GEMINI_COORDINATOR_MODEL` (default `gemini-2.5-flash`) for the coordinator + task sub-agents; `GEMINI_MODEL` (default `gemini-2.5-flash-lite`) for workflow nodes (including the strategic LlmAgent node and the internal LLM call in `build_event_context`).
+- **Model env vars (D-024 + D-028 + D-029):** `GEMINI_COORDINATOR_MODEL` (default `gemini-2.5-flash`) for the coordinator + task sub-agents; `GEMINI_MODEL` (default `gemini-2.5-flash-lite`) for general workflow nodes (e.g. the internal LLM call in `build_event_context`); `GEMINI_VISION_MODEL` (default `gemini-2.5-flash`, D-028) for `score_assets_with_vision`; `GEMINI_QUEUE_MODEL` (default `gemini-2.5-flash`, D-029) for the strategic `propose_review_queue` node — the judgment-dense nodes default to flash, not flash-lite.
 
 Spike code: `spike/adk_hitl_test.py` (HITL primitive — pre-D-024), `spike/adk_event_capture.py` (event trace classification), `spike/adk_workflow_hitl_spike.py` (D-024 validation — all three load-bearing primitives). Findings: `docs/spike-d023-findings.md`.
 

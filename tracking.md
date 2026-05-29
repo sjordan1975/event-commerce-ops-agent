@@ -568,6 +568,34 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 ---
 
+### D-029 — `propose_review_queue` as In-Graph `LlmAgent` Node + Queue-Assembly Mechanics
+
+**Date:** 2026-05-28
+**Decision:** Step 5's `propose_review_queue` — the one strategic decision (D-021) — is realized as the project's **first in-graph `LlmAgent(mode='single_turn')` node**, flanked by two `FunctionNode`s. Validated by spike before committing the plan.
+
+**Spike (`spike/adk_llm_node_queue_spike.py`):** D-024's spike proved the *basic* LlmAgent-node mechanic; this spike closed the four Step-5-specific unknowns — (a) state→prompt via a callable `instruction` provider reading `ctx.state` inside a workflow node (ADK uses the returned string verbatim — no re-templating, so embedded JSON is safe); (b) `output_schema=ReviewQueue` + `output_key` lands an already-parsed dict in state; (c) a trailing `FunctionNode` reads that dict and persists (the agent node does no I/O); (d) `before_model_callback` returning a canned `LlmResponse` is the eval mock seam. **PASS on mocked + live; a 20-run live pass-rate probe scored 20/20 against the tolerant strategy-coherence assertions.**
+
+**Why an agent node, not a `FunctionNode` + internal `genai` call (the Step 2/4 pattern):** the output is byte-identical either way, but the agent node makes the agentic boundary an *architectural fact* — the graph reads "7 deterministic nodes + 1 agent." Steps 2/4 also call the LLM via `FunctionNode`, so "uses the LLM" does not distinguish the strategic node; only the agent-node primitive does. Confirms `02-architecture.md`'s spec intent (the spec already specified an `LlmAgent` node).
+
+**Node topology:** `score_assets_with_vision → prepare_queue_candidates (FunctionNode) → propose_review_queue (LlmAgent) → persist_review_queue (FunctionNode) → END`.
+- **`prepare_queue_candidates`** — mechanical: join `similarity_results` + `scored_assets` by `asset_id`, split into exploitation (top-neighbor similarity ≥ cutoff; carry `inferred_route`) vs. discovery (weak/empty neighbors) pools. Owns all precondition checks (raising lives in a `FunctionNode`, never the instruction provider — ADK's raising-provider semantics are untested).
+- **`propose_review_queue` (LlmAgent)** — judgment: order exploitation by narrative fit + identity composition (D-026) + technical-fitness quality gate (D-017); select the discovery subset worth surfacing; per-item `rationale` + `strategy_summary`.
+- **`persist_review_queue`** — mechanical, defensive: write per-asset queue fields; record cross-assigned/invented `asset_id`s as `membership_violations` rather than crashing (so a strategy violation fails legibly in the eval).
+
+**Sub-decisions:**
+1. **`GEMINI_QUEUE_MODEL` defaults to `gemini-2.5-flash`**, overriding the spec/D-024 `flash-lite` default for this node. Same reasoning as D-028 (judgment density); this is the single most judgment-dense node in the system, and flash-lite is documented unreliable at judgment-dense decision points. Spike's live run used flash and honored the schema cleanly.
+2. **Mechanical similarity-cutoff pre-split** (`QUEUE_EXPLOITATION_SIMILARITY_CUTOFF`, default `0.75`, **corpus-tuned — not a fixed truth**) feeds the LLM two candidate pools. Computation (split) stays separate from judgment (ordering/selection).
+3. **Exploitation routing stays mechanical** (`inferred_route` from similarity, per D-015) — `persist_review_queue` uses the mechanical route for exploitation items and the LLM's chosen route only for discovery (the one place with no similarity signal).
+4. **Persist `queue_rank` + `queue_rationale` onto `assets`** — schema extension beyond the spec's `product_route + queue_type` writes. Per D-022's persistence philosophy (persist composed artifacts, don't thread through session state); Step 6 (`draft_campaigns_for_queue`) reads them as copy substrate, and the queue is re-renderable from Mongo (demo legibility). `propose_review_queue` does **not** change `status` (no "queued" status exists; assets stay `"scored"` until Step 6).
+5. **Persisted enum is `"discovery"`** (matching the existing `Asset.queue_type` field and the `assets` schema), synonym of the reframe prose's "exploration."
+6. **Two-tier eval** — Tier 1 (`test_step_5_trace.py`, deterministic via `_FIXTURE_RESPONSE`, zero live calls) is the offline CI ship gate, isolating code correctness from AI-infra flakiness (503 / rate-limit); Tier 2 (`test_step_5_coherence.py`, live strategic node) is the D-020 95%/20-run judgment gate, run deliberately. Transient API errors are retried/excluded from the Tier-2 denominator so the 95% measures judgment, not API uptime.
+
+**Reconciliation:** the "90% / 10%" split in `01-requirements.md` is the *expected emergent shape* (cutoff + agent selection), **not** an enforced budget/cap. `assign_asset_to_queue` in `db-wrapper-inventory.md` is superseded by `save_queue_assignment(asset_id, queue_type, product_route, rank, rationale)` — gains `rank`, renames `reasoning → rationale`, and does **not** transition status (the pre-existing entry's "transitions status to scored" was incorrect — scoring already sets it).
+
+**Refines:** D-021 (the one strategic decision — locks its implementation shape), D-024 (model env split + graph orchestration — adds `GEMINI_QUEUE_MODEL`, overrides the strategic-node default), D-026 (identity composition — names where it lands), D-022 (persistence philosophy — extends it to queue fields), D-015 (exploitation routing mechanical, discovery routing agent-driven). Pattern from D-028 (env-var-per-judgment-dense-LLM-role).
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta

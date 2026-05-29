@@ -226,6 +226,10 @@ The agent's reasoning shapes both halves of the queue:
 - For exploitation, order surfaced items by event-narrative fit; attach per-item rationale.
 - For exploration, select which non-similar items merit surfacing; attach per-item rationale ("this didn't match past winners but captures X — worth your time").
 
+Each surfaced item's `queue_type`, `product_route`, **`queue_rank`, and `queue_rationale` are persisted onto the asset document** (not only returned in session state) — Step 6 reads them as copy substrate and the queue is re-renderable from MongoDB (D-029, D-022 persistence philosophy).
+
+The **90% / 10%** exploitation/exploration ratio (§ Routing strategy) is the *expected emergent shape* of a typical event — it falls out of the similarity cutoff plus the agent's discovery selection. It is **not an enforced budget or cap**: the agent surfaces what merits the operator's time, which for a thin-similarity event (the demo's group-stage draw) is discovery-heavy by design (D-029).
+
 This is where AI judgment beats heuristics.
 
 **6. `draft_campaigns_for_queue`** — For each queued asset, generate a campaign draft using the event narrative from capability 2 as copy substrate:

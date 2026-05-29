@@ -67,7 +67,7 @@ These cover the *catastrophic* failure modes. The two below cover the *operation
 **Concrete failure mode:** the macro flow touches a lot of tool I/O. A full run on a 50-image batch routes through 9 capabilities of LLM reasoning + wrapper responses; conversation history grows unmanaged. `propose_review_queue` is the highest-variance capability — its output is per-item reasoning for N queued items, which scales with batch size. Plausibly blows context window or burns more tokens than expected on a larger batch.
 
 **Followup actions:**
-- Set a per-call `max_output_tokens` (cheap; one config line)
+- Set a per-call `max_output_tokens` (cheap; one config line). **Step 5 is where this lands for the strategic node** — `build_review_queue_node` sets `generate_content_config` with an explicit `max_output_tokens` bounded for the queue payload (it scales with N surfaced items). Tracked as a Step 5 task (D-029).
 - **Measure** token usage during Step 1 trace evals — not as a guardrail, as a baseline. If one capability is already 30k tokens, we want to know before `execute_approved_campaigns`, not after. Pay particular attention to `propose_review_queue` once it lands — its per-item-reasoning output is the most likely to grow unexpectedly with batch size.
 - Defer the per-run cost-ceiling plumbing unless measurement says we need it
 
