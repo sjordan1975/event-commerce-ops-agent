@@ -249,7 +249,9 @@ When the tool resumes with decisions:
 - Any rejected → those items drop; executable subset proceeds
 - Any edit-requested → agent calls `draft_campaigns_for_queue` with the edit notes, then loops back to `request_human_approval`
 
-The edit-requested loop is the agent's reasoning, not a separate capability. A revision cap (per `docs/safety-measures.md`) lives in the system prompt or the tool's contract to prevent infinite revision cycles.
+The edit-requested loop is the agent's reasoning, not a separate capability. A revision cap (per `docs/safety-measures.md`) lives in the system prompt **and** the tool's contract to prevent infinite revision cycles (Gap 1 closed in Step 7 — D-031).
+
+*(Resume mechanics — D-031.* The decisions arrive as a per-item **list keyed by `approval_id`** (`approved` / `rejected` / `edit_requested` + optional `reviewer_notes`). The `LongRunningFunctionTool` body does **not** re-run on resume — the payload goes to the coordinator LLM, which calls a separate `apply_approval_decisions` tool to persist the decisions; `execute_approved_campaigns` and the redraft path then re-read persisted state. The **redraft branch is implemented in Step 7** (closing the Step 6 / D-030 reservation): it reads persisted `edit_requested` approvals and overwrites the drafts. Capabilities 7/8 are coordinator-plane tools, not workflow nodes. Mixed batches resolve **resolve-then-execute** (redraft to resolution, then one execute over the accumulated approvals).)*
 
 **8. `execute_approved_campaigns`** — For approved items:
 - **Shopify:** create product draft via GraphQL Admin API

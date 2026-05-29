@@ -284,22 +284,29 @@ Realized as a `FunctionNode` (D-030), per-item internal `genai` copy generation 
 
 On a redraft cycle (operator `edit_requested`), called with the original queue + operator notes — overwrites the corresponding `campaigns` documents and recreates `approvals` entries. **Redraft is implemented in Step 7** (with the HITL loop that defines the `operator_notes` payload); Step 6 implements first-pass drafting and reserves the `operator_notes` parameter.
 
-### `request_human_approval`
+### `request_human_approval` (coordinator-side; D-031)
 ```
-approvals.find            → { status: "pending" } — fetch queue for display
-approvals.updateOne       → record human decision (approved / rejected / edit_requested)
-assets.updateOne          → sync status back to asset document
-```
-HITL via `LongRunningFunctionTool` — suspends after pending fetch, resumes when decisions arrive.
+request_human_approval (LongRunningFunctionTool — the GATE; no decision writes):
+  approvals.find          → { event_id, status: "pending" } — fetch queue for display
+  → returns the grouped display batch as the initial pending payload, then SUSPENDS.
 
-### `execute_approved_campaigns`
+[on the NEXT LLM turn, after the operator's FunctionResponse:]
+apply_approval_decisions (FunctionTool — persists the per-item decisions list):
+  approvals.updateOne     → record decision (approved / rejected / edit_requested) + reviewer_notes
+  campaigns.updateOne     → cascade campaign status (approved/rejected; stays draft for edit)
+  assets.updateOne        → cascade asset status (rejected on reject; else unchanged)
 ```
-approvals.find            → { status: "approved" } — fetch approved items
+**Correction (D-031):** a `LongRunningFunctionTool` body does **not** re-run on resume — the operator's `FunctionResponse` is delivered to the coordinator LLM, not back into the function. So the gate cannot record decisions; a **separate `apply_approval_decisions` tool** does, on the next turn. `request_human_approval`, `apply_approval_decisions`, and `execute_approved_campaigns` are **coordinator `FunctionTool`s** (capabilities 7/8 are coordinator-plane — not workflow graph nodes). Operator decisions arrive as a per-item **list keyed by `approval_id`**.
+
+### `execute_approved_campaigns` (coordinator-side; D-031)
+```
+approvals.find            → { event_id, status: "approved", execution: null } — fetch approved, not-yet-executed
 assets.updateOne          → set status: "executing"
-[external: Shopify GraphQL, Printful REST (with internal mockup polling)]
+[external: Shopify GraphQL, Printful REST (mockup polling = INTERNAL async loop, not a LongRunningFunctionTool)]
 assets.updateOne          → set status: "published", write platform URLs + timestamps
-campaigns.updateOne       → record execution outcome
+campaigns.updateOne       → record execution outcome (campaign status: "executed")
 ```
+Channel selection is by `product_route` (poster/tshirt → shopify+printful; social_only → social). Failure is **retriable** (leaves `execution: null`, approval stays `approved`), not terminal. **MVP build:** the four external helpers are **stubbed at the seam** (canned payloads); live Shopify/Printful wiring is a demo-prep task (D-031). The redraft loop on `edit_requested` re-reads persisted `edit_requested` approvals and overwrites the campaign drafts (Step 7 implements it; reconciles D-030's deferral).
 
 ### `record_outcomes`
 ```

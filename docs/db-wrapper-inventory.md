@@ -192,7 +192,9 @@ This is the case where bundling is correct. Inserting a campaign draft, linking 
 
 | Wrapper | Internal MCP calls | Notes |
 |---|---|---|
-| `submit_campaign_for_review(campaign: Campaign) -> dict` | `campaigns insert-many`, `assets update-many` (status `campaign_draft_created` + link `campaign_id`), `approvals insert-many` | Three writes, one logical domain operation (sequential MCP calls — not a transaction; single-operator MVP per D-030). Returns `{campaign_id, approval_id}`. Called once per queued item. **No `reviewer_notes` input** — the approval is created `status="pending"` with empty `reviewer_notes` (the human's field, written later by `request_human_approval`). Takes a fully-built `Campaign`; lives in `src/db/campaigns.py`. |
+| `submit_campaign_for_review(campaign: Campaign) -> dict` | `campaigns insert-many`, `assets update-many` (status `campaign_draft_created` + link `campaign_id`), `approvals insert-many` | Three writes, one logical domain operation (sequential MCP calls — not a transaction; single-operator MVP per D-030). Returns `{campaign_id, approval_id}`. Called once per queued item. **No `reviewer_notes` input** — the approval is created `status="pending"` with empty `reviewer_notes` (the human's field, written later via `apply_approval_decisions`). Takes a fully-built `Campaign`; lives in `src/db/campaigns.py`. |
+| `get_edit_requested_campaigns(event_id: str) -> list[ApprovedCampaign]` | `approvals find` joined with `campaigns find` | **Redraft input (D-031).** Event-scoped `{event_id, status:"edit_requested"}`; carries the persisted `reviewer_notes`. The redraft path is a **state-consumer** — it reads these, not an `operator_notes` argument. |
+| `overwrite_campaign_draft(campaign: Campaign) -> None` | `campaigns update-many` | **Redraft (D-031).** Replaces `generated_copy` (+ bump `created_at`) on the existing campaign; asset stays `campaign_draft_created`. Paired with `reset_approval_to_pending` per item. |
 
 Reads reuse cross-cutting utilities:
 - `get_event(event_id)` — fetches the event including the narrative written by `build_event_context`.
@@ -200,14 +202,15 @@ Reads reuse cross-cutting utilities:
 
 ### `request_human_approval` capability (was: Step 6 — Human-in-the-Loop Review)
 
-The capability `request_human_approval` **is** the ADK `LongRunningFunctionTool` — no separate wrapper layer here. When the operator resolves the gate, internal wrappers handle the resulting state cascade. The decision write is one bundled operation: recording an approval decision without propagating it to the asset's status would leave the asset stranded.
+The capability `request_human_approval` **is** the ADK `LongRunningFunctionTool` — no separate wrapper layer here. **Correction (D-031):** the function body does **not** re-run on resume — the operator's `FunctionResponse` is delivered to the coordinator LLM, not back into the function. So the gate does **not** record decisions; it reads the pending queue, returns it as the initial pending payload, and suspends. Decision persistence happens on the **next LLM turn** via a separate coordinator tool, `apply_approval_decisions(decisions)` (in `src/agent.py`, not a db wrapper), which drives `record_approval_decision` per item. `execute_approved_campaigns` and the redraft path then re-read persisted state — they never take the raw payload.
 
 *(Pre-D-021 listed `await_human_approval` as the agent-facing tool; that role is now filled by the `request_human_approval` capability directly. The wrapper is retired.)*
 
 | Wrapper | Internal MCP calls | Notes |
 |---|---|---|
-| `get_pending_approvals(limit: int = 50) -> list[Approval]` | `approvals find` | Called by `request_human_approval` to fetch the queue before suspending. Also usable by the operator UI / dashboard directly. |
-| `record_approval_decision(approval_id: str, decision: ApprovalDecision) -> None` | `approvals update-many`, `assets update-many` | Called by `request_human_approval` on resume. Bundled write; status cascades to asset. |
+| `get_pending_approvals(event_id: str, limit: int = 50) -> list[Approval]` | `approvals find` | **Event-scoped** (`{event_id, status:"pending"}`) so a second batch can't bleed in. Called by `request_human_approval` to fetch the queue before suspending. Also usable by the operator UI / dashboard. *(Signature gains `event_id` per D-031.)* |
+| `record_approval_decision(approval_id: str, decision: ApprovalDecision) -> None` | `approvals update-many`, `campaigns update-many`, `assets update-many` | Called by **`apply_approval_decisions`** (the coordinator tool), **not** by `request_human_approval` on resume (D-031 — the gate's body doesn't re-run). Bundled write: approval `status`+`reviewer_notes`+`decided_at`; cascade campaign status (`approved`/`rejected`; stays `draft` for `edit_requested`); asset status (`rejected` only on reject). |
+| `reset_approval_to_pending(approval_id: str) -> None` | `approvals update-many` | Redraft: `status:"pending"`, clear `reviewer_notes` (consumed), `decided_at:None`. Called by the redraft path after `overwrite_campaign_draft`. *(New per D-031.)* |
 
 ### `execute_approved_campaigns` capability (was: Step 7 — Execution)
 
@@ -215,10 +218,10 @@ Execution has a clear temporal split: mark executing → make external calls →
 
 | Wrapper | Internal MCP calls | Notes |
 |---|---|---|
-| `get_approved_campaigns(limit: int = 50) -> list[ApprovedCampaign]` | `approvals find` joined with `campaigns find` | Returns approved-but-not-yet-executed campaigns. Useful for batch execution and dashboard. |
+| `get_approved_campaigns(event_id: str, limit: int = 50) -> list[ApprovedCampaign]` | `approvals find` joined with `campaigns find` | **Event-scoped** (`{event_id, status:"approved"}`); **filters `campaign.execution is None`** so already-executed items aren't re-picked (supports retriable failure + idempotent re-run). *(Signature gains `event_id` per D-031.)* |
 | `mark_asset_executing(asset_id: str) -> None` | `assets update-many` | State transition before external calls; visible in trace for debugging. |
-| `record_execution_result(asset_id: str, campaign_id: str, result: ExecutionResult) -> None` | `assets update-many`, `campaigns update-many` | Bundled — same outcome under two collection views. `ExecutionResult` carries channel results (shopify / printful / social) per `product_route`. |
-| `record_execution_failure(asset_id: str, campaign_id: str, error: ExecutionError) -> None` | `assets update-many`, `campaigns update-many` | Failure path; status → rejected with reason. |
+| `record_execution_result(asset_id: str, campaign_id: str, result: ExecutionResult) -> None` | `assets update-many`, `campaigns update-many` | Bundled — same outcome under two collection views. Asset → `published` + `published_urls`; campaign → `executed` + `execution`. `ExecutionResult` carries channel results (shopify / printful / social) per `product_route`. |
+| `record_execution_failure(asset_id: str, campaign_id: str, error: ExecutionError) -> None` | `assets update-many`, `campaigns update-many` | Failure path — **retriable (MVP, D-031):** leaves `campaign.execution = None` and approval `approved` (so a re-run re-picks it), reverts asset from `executing`; **not** a terminal `rejected` state. |
 
 Plus non-MongoDB (internal to `execute_approved_campaigns`, not agent-facing):
 - `shopify_create_product(...)`, `printful_create_mockup(...)`, `printful_poll_mockup(task_id)`, `simulate_social_post(...)`. The Printful polling is handled inside `execute_approved_campaigns` per `docs/specs/02-architecture.md`.
