@@ -1,5 +1,7 @@
 # Step 0 — Foundation: Implementation Plan
 
+> **⚠️ POINT-IN-TIME DOCUMENT.** Parts of this plan reflect pre-D-024 assumptions that have since been reversed — most notably the "emergent sequence from a single ReAct agent" thesis below. It is kept as an honest record of the project's starting point, **not** as current reference. Sections that no longer hold carry an inline `SUPERSEDED` marker. For current architecture see `CLAUDE.md`, `docs/specs/02-architecture.md`, and `tracking.md` (D-024).
+
 ## What this delivers
 
 The infrastructure everything else runs on: project scaffold, the `LlmAgent` shell with `McpToolset`, the prompt loader, and the initial mission-oriented system prompt. No step logic lives here. Verification: agent boots, can call a trivial echo tool, and its reasoning trace is visible in the terminal.
@@ -7,6 +9,8 @@ The infrastructure everything else runs on: project scaffold, the `LlmAgent` she
 ---
 
 ## The planning agent distinction
+
+> **⛔ SUPERSEDED (D-024).** This entire section is the reversed thesis. The project later moved to a **graph-orchestrated `Workflow` of `FunctionNode`s under a coordinator** — the sequence lives in code (`src/capabilities/__init__.py:build_pipeline_graph()`), it does **not** emerge from a single agent's reasoning. The one strategic LLM node is `propose_review_queue` (Step 5); everything else is graph-wired. Kept verbatim below as the original bet. See `tracking.md` D-023/D-024 and `docs/agentic-model.md`.
 
 This is **not** a `SequentialAgent` pipeline. The `LlmAgent` runs a ReAct loop — it reasons about what tool to call next based on current state, calls it, observes the result, and plans the next action. The sequence emerges from the agent's reasoning, not from code.
 
@@ -29,6 +33,8 @@ The LLM reasons its way to the correct sequence because the tool docstrings expr
 | 5 | Conftest helpers | `tests/conftest.py` | `build_valid_event()`, `build_valid_asset()` — reused across all test files |
 | 6 | Foundation smoke test | `tests/test_foundation.py` | Agent boots; echo tool is called; reasoning trace is non-empty |
 
+> **⛔ SUPERSEDED (D-024).** The single mission prompt `prompts/v1/agent_system.md` and the `build_agent`/`LlmAgent`-with-empty-tools shell no longer exist. Active prompts are per-functional-unit under `prompts/v3/` (`coordinator_system`, `clarification_system`, `build_event_context`, `propose_review_queue`, `score_asset_with_vision`, `draft_campaign_copy`); the shell is now `build_coordinator` + `build_workflow`.
+
 ---
 
 ## Dependency order
@@ -43,6 +49,8 @@ The LLM reasons its way to the correct sequence because the tool docstrings expr
 ---
 
 ## Prompt engineering notes
+
+> **⛔ SUPERSEDED (D-024).** Assumes one evolving system prompt and an 8-step frame. Reality: 9 capabilities, `PROMPT_VERSION=v3` (v1/v2 archived), and **multiple prompts split by functional unit** rather than a single growing one. The lifecycle table below is historical. See `CLAUDE.md` § Prompts.
 
 The system prompt is iterated across the build — it's not finalized at Step 0. Lifecycle:
 
@@ -72,12 +80,7 @@ The demo trace IS the eval for judge purposes. ADK surfaces the full reasoning t
 
 ## Env vars required
 
-```
-GOOGLE_API_KEY=...
-GEMINI_MODEL=gemini-2.5-flash-lite
-PROMPT_VERSION=v1
-MONGODB_URI=...
-```
+Env vars are owned by `README.md` (and `.env.template`) as the single source of truth — see the **Environment Variables** section there. The original Step 0 list (`GOOGLE_API_KEY`, `GEMINI_MODEL`, `PROMPT_VERSION`, `MONGODB_URI`) has since grown to include model-per-role vars, MongoDB MCP creds, and the vector-index name; it is not duplicated here to avoid drift.
 
 ---
 
@@ -86,5 +89,5 @@ MONGODB_URI=...
 | After | Command | Must pass |
 |-------|---------|-----------|
 | Scaffold | `.venv/bin/python -m pytest --collect-only` | Test files discovered, no import errors |
-| Agent shell | `.venv/bin/python -c "from src.agent import build_agent; print('ok')"` | Imports cleanly |
+| Agent shell | `.venv/bin/python -c "from src.agent import build_agent; print('ok')"` _(⛔ now `build_coordinator, build_workflow` per D-024)_ | Imports cleanly |
 | Smoke test | `.venv/bin/python -m pytest tests/test_foundation.py -v` | Agent boots, calls echo tool, trace non-empty |
