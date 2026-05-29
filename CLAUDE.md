@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**On branch `step/5-queue`. T-5.1–T-5.14 COMPLETE. All verification checkpoints pass. Next action: merge to `main` (fast-forward only).**
+**On branch `step/6-drafts` (cut from `main` at `cbfc68f`). Step 5 merged. Next action: write the Step 6 plan (`docs/plans/step-6-drafts.md`).**
 
 Step 5 = `propose_review_queue`, the one strategic decision (D-021). Implementation commits: `ec478a1` (T-5.1–T-5.14), `f994e67` (Tier-1 direct dispatch rewrite), `b45133c` (exception tightening), max_output_tokens fix. All unit tests green (98 pass); Tier-1 passes offline (0.02s, no API key); Tier-2 20/20 (440s, GOOGLE_API_KEY).
 
