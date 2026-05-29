@@ -5,6 +5,23 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# No extra="forbid": Gemini response_schema rejects additionalProperties:false
+# (established in Steps 2/4 — same constraint applies here).
+class QueueItem(BaseModel):
+    asset_id: str
+    queue_type: Literal["exploitation", "discovery"]
+    rank: int
+    product_route: Literal["poster", "tshirt", "social_only"] | None
+    rationale: str
+
+
+class ReviewQueue(BaseModel):
+    event_id: str
+    exploitation: list[QueueItem]
+    discovery: list[QueueItem]
+    strategy_summary: str
+
+
 class AssetScores(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -88,6 +105,8 @@ class Asset(BaseModel):
     upload_date: str
     product_route: str | None = None
     queue_type: str | None = None
+    queue_rank: int | None = None
+    queue_rationale: str | None = None
     embedding: list[float] | None = None
     scores: "AssetScores | None" = None
     detected_subjects: list[str] | None = None

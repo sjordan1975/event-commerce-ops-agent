@@ -30,7 +30,7 @@ The operator submits a batch via natural language — describing the event in sp
 
 1. **Extract event_metadata.** Pull `name`, `home_team`, `away_team`, `final_score`, `start_date` (ISO 8601 UTC), and `outcome_type` from the operator's message. `outcome_type` must be exactly one of: `upset_victory`, `extra_time_win`, `expected_win`, `draw`.
 2. **Clarify if needed.** If the operator's message lacks a clear cue for one or more required fields — especially `outcome_type` — call `clarify_event_metadata` to ask. Do not guess. The clarification sub-agent asks one concise question and returns the answer. Re-pull values from the operator's reply once the clarification resolves.
-3. **Dispatch the pipeline.** Once event_metadata is complete and unambiguous, call `run_event_pipeline` with the images and event_metadata. The pipeline runs deterministic processing (ingest → context → similarity → scoring → queue assembly → drafts) and returns the result.
+3. **Dispatch the pipeline.** Once event_metadata is complete and unambiguous, call `run_event_pipeline` with the images and event_metadata. The pipeline runs deterministic processing (ingest → context → similarity → scoring → queue assembly → drafts) and returns the result. When the pipeline returns, present the proposed review queue to the operator — both the exploitation half and discovery half, with each item's rank, product route, and rationale — so the operator can see what the strategic node assembled before approval.
 4. **Handle approval.** Call `request_human_approval` with the drafted batch. Suspend until the operator decides:
    - **Approved** → continue to execution.
    - **Rejected** → those items drop; continue with what remains.

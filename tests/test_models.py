@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.models import Asset, AssetScores, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, SimilarAsset, SimilarityResult, VisionScoringOutput
+from src.models import Asset, AssetScores, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, SimilarityResult, VisionScoringOutput
 
 
 def test_event():
@@ -353,6 +353,32 @@ def test_asset():
             similar_assets=[123],
         )
 
+    # queue_rank and queue_rationale default to None
+    assert asset_default.queue_rank is None
+    assert asset_default.queue_rationale is None
+
+    # queue_rank and queue_rationale accept explicit values
+    asset_queued = Asset(
+        asset_id="ast-005",
+        event_id="evt-001",
+        content_url="/tmp/photo5.jpg",
+        upload_date="2026-07-14T21:00:00Z",
+        queue_rank=1,
+        queue_rationale="Features the event's key figure",
+    )
+    assert asset_queued.queue_rank == 1
+    assert asset_queued.queue_rationale == "Features the event's key figure"
+
+    # queue_rank="first" rejected (must be int)
+    with pytest.raises(ValidationError):
+        Asset(
+            asset_id="ast-006",
+            event_id="evt-001",
+            content_url="/tmp/photo6.jpg",
+            upload_date="2026-07-14T21:00:00Z",
+            queue_rank="first",
+        )
+
 
 def test_similar_asset():
     # Happy-path construction
@@ -507,6 +533,120 @@ def test_vision_scoring_output():
                 "identity_score": 0.5,
             },
             detected_subjects=[],
+        )
+
+
+def test_queue_item():
+    # Happy-path construction
+    item = QueueItem(
+        asset_id="a1",
+        queue_type="exploitation",
+        rank=1,
+        product_route="poster",
+        rationale="Features the event's key figure",
+    )
+    assert item.asset_id == "a1"
+    assert item.queue_type == "exploitation"
+    assert item.rank == 1
+    assert item.product_route == "poster"
+
+    # product_route=None is valid
+    item_no_route = QueueItem(
+        asset_id="a2",
+        queue_type="discovery",
+        rank=1,
+        product_route=None,
+        rationale="Worth surfacing despite no match",
+    )
+    assert item_no_route.product_route is None
+
+    # Invalid queue_type rejected
+    with pytest.raises(ValidationError):
+        QueueItem(
+            asset_id="a3",
+            queue_type="exploration",
+            rank=1,
+            product_route="poster",
+            rationale="test",
+        )
+
+    # Invalid product_route rejected
+    with pytest.raises(ValidationError):
+        QueueItem(
+            asset_id="a4",
+            queue_type="exploitation",
+            rank=1,
+            product_route="mug",
+            rationale="test",
+        )
+
+    # Round-trips through model_validate_json
+    json_str = item.model_dump_json()
+    restored = QueueItem.model_validate_json(json_str)
+    assert restored.asset_id == item.asset_id
+
+    # model_validate on dict works (output_key lands a dict)
+    d = item.model_dump(mode="json")
+    restored_dict = QueueItem.model_validate(d)
+    assert restored_dict.rank == 1
+
+
+def test_review_queue():
+    item_expl = QueueItem(
+        asset_id="a1", queue_type="exploitation", rank=1,
+        product_route="poster", rationale="Messi in frame",
+    )
+    item_disc = QueueItem(
+        asset_id="a3", queue_type="discovery", rank=1,
+        product_route="social_only", rationale="Emotional shot worth surfacing",
+    )
+
+    # Happy-path construction
+    rq = ReviewQueue(
+        event_id="evt-demo-1",
+        exploitation=[item_expl],
+        discovery=[item_disc],
+        strategy_summary="Rich exploitation, one pointed discovery",
+    )
+    assert rq.event_id == "evt-demo-1"
+    assert len(rq.exploitation) == 1
+    assert len(rq.discovery) == 1
+    assert rq.strategy_summary != ""
+
+    # Empty lists are valid
+    rq_empty = ReviewQueue(
+        event_id="evt-demo-2",
+        exploitation=[],
+        discovery=[],
+        strategy_summary="No candidates",
+    )
+    assert rq_empty.exploitation == []
+    assert rq_empty.discovery == []
+
+    # Round-trips through model_validate_json
+    json_str = rq.model_dump_json()
+    restored = ReviewQueue.model_validate_json(json_str)
+    assert restored.event_id == "evt-demo-1"
+    assert restored.exploitation[0].queue_type == "exploitation"
+
+    # model_validate on dict works
+    d = rq.model_dump(mode="json")
+    restored_dict = ReviewQueue.model_validate(d)
+    assert restored_dict.discovery[0].product_route == "social_only"
+
+    # Invalid queue_type in nested item propagates
+    with pytest.raises(ValidationError):
+        ReviewQueue(
+            event_id="evt-demo-3",
+            exploitation=[{
+                "asset_id": "a1",
+                "queue_type": "invalid_type",
+                "rank": 1,
+                "product_route": "poster",
+                "rationale": "test",
+            }],
+            discovery=[],
+            strategy_summary="test",
         )
 
 

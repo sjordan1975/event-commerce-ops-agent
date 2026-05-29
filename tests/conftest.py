@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from src.models import Asset, AssetScores, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, SimilarAsset, VisionScoringOutput
+from src.models import Asset, AssetScores, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, VisionScoringOutput
 
 
 def build_valid_event(**overrides) -> Event:
@@ -95,6 +95,36 @@ def build_valid_vision_scoring_output(**overrides) -> VisionScoringOutput:
     }
     base.update(overrides)
     return VisionScoringOutput(**base)
+
+
+def build_valid_queue_item(**overrides) -> QueueItem:
+    """Return a valid QueueItem instance with sensible defaults."""
+    base = {
+        "asset_id": "a1",
+        "queue_type": "exploitation",
+        "rank": 1,
+        "product_route": "poster",
+        "rationale": "features the event's key figure",
+    }
+    base.update(overrides)
+    return QueueItem(**base)
+
+
+def build_valid_review_queue(**overrides) -> ReviewQueue:
+    """Return a valid ReviewQueue instance with one exploitation and one discovery item."""
+    base = {
+        "event_id": "evt-demo-1",
+        "exploitation": [build_valid_queue_item()],
+        "discovery": [build_valid_queue_item(
+            asset_id="a3",
+            queue_type="discovery",
+            product_route="social_only",
+            rationale="no match but worth surfacing",
+        )],
+        "strategy_summary": "rich exploitation, one pointed discovery",
+    }
+    base.update(overrides)
+    return ReviewQueue(**base)
 
 
 def build_valid_event_narrative(**overrides) -> EventNarrative:

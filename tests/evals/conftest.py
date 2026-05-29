@@ -9,11 +9,13 @@ bind the name at import time via `from src.db import get_client`.
 import json
 import re
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Union
 from unittest.mock import patch
 
 from src.agent import APP_NAME, build_coordinator, build_runner
+from src.models import AssetScores
 from tests.conftest import build_embedding_fixture, build_valid_vision_scoring_output
 
 
@@ -212,3 +214,191 @@ def dump_trace(events: list, label: str) -> str:
         encoding="utf-8",
     )
     return str(path)
+
+
+# ---------------------------------------------------------------------------
+# Step 5 eval scaffolding (T-5.12)
+# ---------------------------------------------------------------------------
+
+# Cutoff used by Step 5 (default; must match QUEUE_EXPLOITATION_SIMILARITY_CUTOFF)
+_STEP5_CUTOFF = 0.75
+
+# The four Step-5 assets: ast-0 (exploitation identity), ast-1 (exploitation),
+# ast-2 (worth-it discovery), ast-3 (not-worth discovery).
+_STEP5_ASSET_IDS = ["ast-0", "ast-1", "ast-2", "ast-3"]
+
+# Inferred routes for exploitation assets (mechanical, D-015)
+_STEP5_INFERRED_ROUTES = {
+    "ast-0": "poster",
+    "ast-1": "tshirt",
+}
+
+# Which assets land in which pool after prepare (determined by vector search fixture)
+STEP5_EXPLOITATION_IDS = {"ast-0", "ast-1"}
+STEP5_DISCOVERY_IDS = {"ast-2", "ast-3"}
+
+
+def _make_step5_assets_find_handler() -> Callable:
+    """Return a handler that produces 4 assets for the Step-5 seeded event."""
+    def handler(args: dict) -> list:
+        f = args.get("filter", {})
+        if "event_id" in f and "status" not in f:
+            event_id = f["event_id"]
+            return [
+                {
+                    "asset_id": f"ast-{i}",
+                    "event_id": event_id,
+                    "content_url": f"/tmp/wc-final/img0{i+1}.jpg",
+                    "status": "ingested",
+                    "upload_date": datetime.now(timezone.utc).isoformat(),
+                    "product_route": None,
+                    "queue_type": None,
+                    "queue_rank": None,
+                    "queue_rationale": None,
+                    "embedding": None,
+                    "scores": None,
+                    "detected_subjects": None,
+                    "campaign_id": None,
+                    "similar_assets": None,
+                }
+                for i in range(4)
+            ]
+        return []
+    return handler
+
+
+def _make_step5_vector_search_handler() -> Callable:
+    """Return a handler that gives ast-0/ast-1 strong neighbors, ast-2 weak, ast-3 empty.
+
+    Call order matches the per-asset loop in find_similar_assets (assets processed
+    in DB-insertion order, which matches the 4-asset fixture).
+    """
+    call_count: dict[str, int] = {"n": 0}
+
+    def handler(args: dict) -> list:
+        n = call_count["n"]
+        call_count["n"] += 1
+        if n == 0:
+            # ast-0: strong match → exploitation (poster, identity)
+            return [{"asset_id": "past-0", "event_id": "evt-past-1",
+                     "similarity": 0.91, "product_route": "poster", "scores": None}]
+        elif n == 1:
+            # ast-1: strong match → exploitation (tshirt)
+            return [{"asset_id": "past-1", "event_id": "evt-past-1",
+                     "similarity": 0.82, "product_route": "tshirt", "scores": None}]
+        elif n == 2:
+            # ast-2: weak match → discovery (high emotional, worth it)
+            return [{"asset_id": "past-2", "event_id": "evt-past-1",
+                     "similarity": 0.31, "product_route": None, "scores": None}]
+        else:
+            # ast-3: no match → discovery (low scores, not worth it)
+            return []
+    return handler
+
+
+def _step5_vision_provider(image_url: str, event_context: dict) -> Any:
+    """Per-asset differentiated Vision scores for Step 5 seeded fixture.
+
+    ast-0 (img01): high quality + identity match (Messi) — exploitation leader
+    ast-1 (img02): high merch — exploitation follow
+    ast-2 (img03): high emotional + Messi candid — worth-it discovery
+    ast-3 (img04): low scores — not worth surfacing
+    """
+    if "img01" in image_url:
+        return build_valid_vision_scoring_output(
+            scores=AssetScores(
+                quality_score=0.9, merch_score=0.8, emotional_score=0.7,
+                social_score=0.8, identity_score=0.95,
+            ),
+            detected_subjects=["Lionel Messi"],
+        )
+    elif "img02" in image_url:
+        return build_valid_vision_scoring_output(
+            scores=AssetScores(
+                quality_score=0.8, merch_score=0.85, emotional_score=0.6,
+                social_score=0.7, identity_score=0.3,
+            ),
+            detected_subjects=[],
+        )
+    elif "img03" in image_url:
+        return build_valid_vision_scoring_output(
+            scores=AssetScores(
+                quality_score=0.85, merch_score=0.4, emotional_score=0.92,
+                social_score=0.75, identity_score=0.8,
+            ),
+            detected_subjects=["Lionel Messi"],
+        )
+    else:
+        return build_valid_vision_scoring_output(
+            scores=AssetScores(
+                quality_score=0.35, merch_score=0.3, emotional_score=0.4,
+                social_score=0.3, identity_score=0.2,
+            ),
+            detected_subjects=[],
+        )
+
+
+@contextmanager
+def build_runner_with_step5_mock(narrative_fixture: dict):
+    """Context manager for Step 5 evals: mock DB + embedding + vision with step-5-shaped data.
+
+    Yields (runner, mock_client). The caller seeds mock_client with event / player /
+    performance data before using it.
+    """
+    mock_client = _MockMCPClient()
+    with (
+        patch("src.db.events.get_client", return_value=mock_client),
+        patch("src.db.assets.get_client", return_value=mock_client),
+        patch("src.db.performance.get_client", return_value=mock_client),
+        patch("src.db.player_context.get_client", return_value=mock_client),
+        patch(
+            "src.capabilities.similarity._compute_image_embedding",
+            return_value=build_embedding_fixture(),
+        ),
+        patch(
+            "src.capabilities.scoring._score_asset_with_vision",
+            side_effect=_step5_vision_provider,
+        ),
+    ):
+        agent = build_coordinator()
+        runner = build_runner(agent)
+        yield runner, mock_client
+
+
+@contextmanager
+def step5_fixture_response(canned: dict):
+    """Set/clear _FIXTURE_RESPONSE on the queue module (Tier-1 eval seam)."""
+    import src.capabilities.queue as q_module
+    old = q_module._FIXTURE_RESPONSE
+    try:
+        q_module._FIXTURE_RESPONSE = canned
+        yield
+    finally:
+        q_module._FIXTURE_RESPONSE = old
+
+
+async def run_with_transient_retry(coro_factory, max_retries: int = 1):
+    """Run coro_factory() and retry once on transient API errors (5xx / rate-limit / timeout).
+
+    Returns (events, excluded) where excluded=True means all attempts were transient
+    failures (caller should exclude this run from the pass-rate denominator).
+    Judgment-assertion failures are raised, not excluded.
+    """
+    _TRANSIENT_PATTERNS = (
+        "503", "429", "quota", "rate limit", "timeout", "deadline",
+        "ServiceUnavailable", "ResourceExhausted",
+    )
+
+    last_exc = None
+    for attempt in range(max_retries + 1):
+        try:
+            events = await coro_factory()
+            return events, False
+        except Exception as exc:
+            msg = str(exc)
+            if any(p.lower() in msg.lower() for p in _TRANSIENT_PATTERNS):
+                last_exc = exc
+                continue
+            raise
+    # All attempts were transient failures — exclude this run
+    return [], True

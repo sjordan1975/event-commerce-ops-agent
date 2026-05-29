@@ -114,3 +114,29 @@ async def save_asset_scores(
             "status": "scored",
         }},
     })
+
+
+async def save_queue_assignment(
+    asset_id: str,
+    queue_type: str,
+    product_route: str | None,
+    rank: int,
+    rationale: str,
+) -> None:
+    """Persist queue assignment fields onto the asset document.
+
+    Does NOT change status — assets stay 'scored' until Step 6 sets
+    'campaign_draft_created' (D-029). Writes queue_type, product_route,
+    queue_rank, queue_rationale only.
+    """
+    await get_client().call("update-many", {
+        "database": "event_commerce",
+        "collection": "assets",
+        "filter": {"asset_id": asset_id},
+        "update": {"$set": {
+            "queue_type": queue_type,
+            "product_route": product_route,
+            "queue_rank": rank,
+            "queue_rationale": rationale,
+        }},
+    })
