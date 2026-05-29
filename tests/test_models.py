@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.models import Asset, AssetScores, Event, EventNarrative, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, SimilarityResult, VisionScoringOutput
+from src.models import Approval, Asset, AssetScores, Campaign, Event, EventNarrative, GeneratedCopy, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, SimilarityResult, VisionScoringOutput
 
 
 def test_event():
@@ -695,4 +695,156 @@ def test_asset_scores_retype_and_detected_subjects():
             content_url="/tmp/photo4.jpg",
             upload_date="2026-07-14T21:00:00Z",
             detected_subjects=[123],
+        )
+
+
+def test_generated_copy():
+    # Happy-path construction
+    gc = GeneratedCopy(
+        headline="Messi caps Argentina's extra-time upset",
+        caption="The night Argentina ended France's reign — limited edition print.",
+        hashtags=["#WorldCup2026", "#ArgentinaVsFrance"],
+    )
+    assert gc.headline == "Messi caps Argentina's extra-time upset"
+    assert len(gc.hashtags) == 2
+
+    # Empty hashtags list is valid
+    gc_no_tags = GeneratedCopy(
+        headline="A win for the ages",
+        caption="Historic match.",
+        hashtags=[],
+    )
+    assert gc_no_tags.hashtags == []
+
+    # Round-trips through model_validate_json (the response_schema path)
+    json_str = gc.model_dump_json()
+    restored = GeneratedCopy.model_validate_json(json_str)
+    assert restored.headline == gc.headline
+    assert restored.hashtags == gc.hashtags
+
+    # Missing headline rejected (required field)
+    with pytest.raises(ValidationError):
+        GeneratedCopy(caption="A caption.", hashtags=[])
+
+    # No extra="forbid" — extra fields silently tolerated (Gemini response_schema compat)
+    gc_extra = GeneratedCopy(
+        headline="headline",
+        caption="caption",
+        hashtags=[],
+        extra_field="ignored",
+    )
+    assert gc_extra.headline == "headline"
+
+
+def test_campaign():
+    gc = GeneratedCopy(
+        headline="Messi caps Argentina's extra-time upset",
+        caption="Limited edition print.",
+        hashtags=["#WorldCup2026"],
+    )
+
+    # Happy-path construction
+    camp = Campaign(
+        campaign_id="cmp-1",
+        asset_id="a1",
+        event_id="evt-demo-1",
+        product_type="poster",
+        generated_copy=gc,
+        platform_target="shopify",
+        timing_recommendation="2026-07-14T22:00:00Z",
+        created_at="2026-07-14T21:00:00Z",
+    )
+    assert camp.campaign_id == "cmp-1"
+    assert camp.status == "draft"
+    assert camp.execution is None
+
+    # product_type=None accepted (social_only route)
+    camp_social = Campaign(
+        campaign_id="cmp-2",
+        asset_id="a2",
+        event_id="evt-demo-1",
+        product_type=None,
+        generated_copy=gc,
+        platform_target="social",
+        timing_recommendation="2026-07-14T22:00:00Z",
+        created_at="2026-07-14T21:00:00Z",
+    )
+    assert camp_social.product_type is None
+
+    # platform_target rejects value outside the three literals
+    with pytest.raises(ValidationError):
+        Campaign(
+            campaign_id="cmp-3",
+            asset_id="a3",
+            event_id="evt-demo-1",
+            product_type=None,
+            generated_copy=gc,
+            platform_target="instagram",
+            timing_recommendation="2026-07-14T22:00:00Z",
+            created_at="2026-07-14T21:00:00Z",
+        )
+
+    # product_type rejects value outside poster/tshirt/None
+    with pytest.raises(ValidationError):
+        Campaign(
+            campaign_id="cmp-4",
+            asset_id="a4",
+            event_id="evt-demo-1",
+            product_type="mug",
+            generated_copy=gc,
+            platform_target="shopify",
+            timing_recommendation="2026-07-14T22:00:00Z",
+            created_at="2026-07-14T21:00:00Z",
+        )
+
+    # extra="forbid" rejects unknown field
+    with pytest.raises(ValidationError):
+        Campaign(
+            campaign_id="cmp-5",
+            asset_id="a5",
+            event_id="evt-demo-1",
+            product_type="poster",
+            generated_copy=gc,
+            platform_target="shopify",
+            timing_recommendation="2026-07-14T22:00:00Z",
+            created_at="2026-07-14T21:00:00Z",
+            unknown_field="oops",
+        )
+
+
+def test_approval():
+    # Happy-path construction
+    apr = Approval(
+        approval_id="apr-1",
+        campaign_id="cmp-1",
+        asset_id="a1",
+        created_at="2026-07-14T21:00:00Z",
+    )
+    assert apr.approval_id == "apr-1"
+    assert apr.status == "pending"
+    assert apr.reviewer_notes is None
+    assert apr.decided_at is None
+
+    # Explicit status, reviewer_notes, decided_at accepted
+    apr_full = Approval(
+        approval_id="apr-2",
+        campaign_id="cmp-1",
+        asset_id="a1",
+        status="approved",
+        reviewer_notes="Looks good",
+        created_at="2026-07-14T21:00:00Z",
+        decided_at="2026-07-14T22:00:00Z",
+    )
+    assert apr_full.status == "approved"
+    assert apr_full.reviewer_notes == "Looks good"
+    assert apr_full.decided_at == "2026-07-14T22:00:00Z"
+
+    # extra="forbid" rejects unknown field
+    with pytest.raises(ValidationError):
+        Approval(
+            approval_id="apr-3",
+            campaign_id="cmp-1",
+            asset_id="a1",
+            created_at="2026-07-14T21:00:00Z",
+            bad_field="oops",
         )

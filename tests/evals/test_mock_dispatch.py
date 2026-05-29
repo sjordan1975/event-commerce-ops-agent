@@ -1,4 +1,4 @@
-"""Smoke tests: verify _MockMCPClient dispatch correctly seeds all Step 2 and Step 3 wrapper calls.
+"""Smoke tests: verify _MockMCPClient dispatch correctly seeds all Step 2–6 wrapper calls.
 
 Does NOT run the agent — exercises wrappers directly against the mock client to
 confirm the envelope encoding matches what each wrapper's parse logic expects.
@@ -12,8 +12,18 @@ from tests.conftest import (
     build_valid_player,
     build_embedding_fixture,
     build_valid_similar_asset,
+    build_valid_generated_copy,
 )
-from tests.evals.conftest import _MockMCPClient, build_runner_with_mock_db
+from tests.evals.conftest import (
+    _MockMCPClient,
+    _CANNED_COPY,
+    STEP6_QUEUED_IDS,
+    STEP6_UNSURFACED_ID,
+    STEP6_CROWD_ASSET_ID,
+    _make_step6_assets_find_handler,
+    patch_draft_copy_for_asset,
+    build_runner_with_mock_db,
+)
 
 
 def _make_event_find_handler(seeded_event, past_events):
@@ -153,3 +163,68 @@ def test_embedding_helper_is_patched_in_runner():
 
     assert isinstance(result, list)
     assert len(result) == 3072
+
+
+# ---------------------------------------------------------------------------
+# Step 6 scaffolding smoke tests (T-6.11)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_step6_assets_handler_returns_route_spanning_queued_assets():
+    """_make_step6_assets_find_handler returns correct corpus for each filter shape."""
+    import unittest.mock as mock
+    from src.db.assets import get_assets_for_event
+
+    mock_client = _MockMCPClient()
+    mock_client.register("find", "assets", _make_step6_assets_find_handler())
+
+    with mock.patch("src.db.assets.get_client", return_value=mock_client):
+        # status="scored" → pre-seeded route-spanning assets
+        scored = await get_assets_for_event("evt-demo-1", status="scored")
+
+    asset_ids = {a.asset_id for a in scored}
+    assert STEP6_QUEUED_IDS <= asset_ids, "All queued asset IDs must be present"
+    assert STEP6_UNSURFACED_ID in asset_ids, "Un-surfaced asset must be present"
+
+    # Route span: poster, tshirt, social_only all present among queued
+    queued = [a for a in scored if a.queue_type is not None]
+    routes = {a.product_route for a in queued}
+    assert "poster" in routes
+    assert "tshirt" in routes
+    assert "social_only" in routes
+
+    # Un-surfaced asset has queue_type=None
+    unsurfaced = next(a for a in scored if a.asset_id == STEP6_UNSURFACED_ID)
+    assert unsurfaced.queue_type is None
+
+    # Crowd shot has empty detected_subjects
+    crowd = next(a for a in scored if a.asset_id == STEP6_CROWD_ASSET_ID)
+    assert crowd.detected_subjects == []
+
+
+@pytest.mark.anyio
+async def test_step6_assets_handler_no_status_returns_base_corpus():
+    """_make_step6_assets_find_handler falls back to Step 5 base corpus for no-status queries."""
+    import unittest.mock as mock
+    from src.db.assets import get_assets_for_event
+
+    mock_client = _MockMCPClient()
+    mock_client.register("find", "assets", _make_step6_assets_find_handler())
+
+    with mock.patch("src.db.assets.get_client", return_value=mock_client):
+        all_assets = await get_assets_for_event("evt-demo-1")
+
+    # Step 5 base corpus is 4 assets (ast-0 through ast-3)
+    assert len(all_assets) == 4
+
+
+def test_patch_draft_copy_for_asset_round_trips():
+    """patch_draft_copy_for_asset returns the canned copy when set."""
+    from src.capabilities.drafts import _draft_copy_for_asset
+
+    with patch_draft_copy_for_asset(_CANNED_COPY):
+        import src.capabilities.drafts as drafts_module
+        result = drafts_module._draft_copy_for_asset({}, {})
+
+    assert result.headline == _CANNED_COPY.headline
+    assert result.hashtags == _CANNED_COPY.hashtags

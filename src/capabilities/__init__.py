@@ -7,7 +7,7 @@ so a single n-element tuple expands to n-1 edges.
 
 Current pipeline: START → ingest_event_batch → build_event_context →
   find_similar_assets → score_assets_with_vision → prepare_queue_candidates →
-  propose_review_queue → persist_review_queue
+  propose_review_queue → persist_review_queue → draft_campaigns_for_queue
 
 Adapter functions (prefix `_node_*`) wrap each capability so the workflow node
 writes its outputs back to `ctx.state` for downstream nodes to read. The LlmAgent
@@ -21,6 +21,7 @@ from typing import Any
 from google.adk.workflow import FunctionNode, START
 
 from src.capabilities.context import build_event_context as _build_event_context
+from src.capabilities.drafts import draft_campaigns_for_queue
 from src.capabilities.ingest import ingest_event_batch as _ingest_event_batch
 from src.capabilities.queue import (
     build_review_queue_node,
@@ -155,13 +156,34 @@ persist_review_queue_node = FunctionNode(
 )
 
 
+async def _node_draft_campaigns_for_queue(ctx: Any) -> dict:
+    """Workflow adapter: calls draft_campaigns_for_queue and writes outputs to state.
+
+    Reads event_id from state (written by the upstream ingest node).
+    Writes campaign_ids, approval_ids, and drafts back to state.
+    """
+    event_id = ctx.state["event_id"]
+    result = await draft_campaigns_for_queue(event_id)
+    ctx.state["campaign_ids"] = result["campaign_ids"]
+    ctx.state["approval_ids"] = result["approval_ids"]
+    ctx.state["drafts"] = result["drafts"]
+    return result
+
+
+draft_campaigns_for_queue_node = FunctionNode(
+    func=_node_draft_campaigns_for_queue,
+    name="draft_campaigns_for_queue",
+    parameter_binding="state",
+)
+
+
 def build_pipeline_graph() -> list:
     """Returns the edge list for the event pipeline workflow.
 
     A single chain-tuple expands to pairwise edges (ADK _process_chain semantics).
-    Pipeline (8 nodes): START → ingest_event_batch → build_event_context →
+    Pipeline (9 nodes): START → ingest_event_batch → build_event_context →
       find_similar_assets → score_assets_with_vision → prepare_queue_candidates →
-      propose_review_queue → persist_review_queue.
+      propose_review_queue → persist_review_queue → draft_campaigns_for_queue.
     """
     return [
         (
@@ -173,5 +195,6 @@ def build_pipeline_graph() -> list:
             prepare_queue_candidates_node,
             propose_review_queue_node,
             persist_review_queue_node,
+            draft_campaigns_for_queue_node,
         ),
     ]
