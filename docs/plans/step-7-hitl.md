@@ -249,7 +249,7 @@ class ExecutionError(BaseModel):
 
 ## Execution scope (Option 1 — stub at the seam now; live at demo prep)
 
-Per user decision: Step 7 builds the **full execution capability** — fetch approved → per-item channel dispatch by `product_route` → status machine → result/failure persistence — but the four external helpers (`_shopify_create_product`, `_printful_create_mockup`, `_printful_poll_mockup`, `_simulate_social_post`) have **stubbed bodies returning realistic canned payloads** (a Shopify `product_id`/`product_url`, a Printful `task_id`/`mockup_url`, a social `queued` package). The orchestration, status transitions, persistence, and route-driven channel selection are fully built and tested; only the three live integration bodies are deferred.
+Per user decision: Step 7 builds the **full execution capability** — fetch approved → per-item channel dispatch by `product_route` → status machine → result/failure persistence. The **three** Shopify/Printful helpers (`_shopify_create_product`, `_printful_create_mockup`, `_printful_poll_mockup`) have **stubbed bodies returning realistic canned payloads** (a Shopify `product_id`/`product_url`, a Printful `task_id`/`mockup_url`). `_simulate_social_post` is **not** a stub — simulation is social's *final form* (Hard Constraint #6), so it writes a real, queryable `queued` post package. The orchestration, status transitions, persistence, and route-driven channel selection are fully built and tested; only the live Shopify/Printful calls are deferred to demo-prep.
 
 - **CI never hits live APIs** regardless — the helpers are the mock seam (analogous to `_draft_copy_for_asset`).
 - **Channel selection by `product_route`** (not `platform_target` — D-030): `poster`/`tshirt` → Shopify product + Printful mockup; `social_only` (and defensive `None`) → social package only.
@@ -327,7 +327,7 @@ draft_campaigns_for_queue(event_id, operator_notes=None)
 | 5 | `request_human_approval(event_id)` (flesh stub) | `src/agent.py` | Read `get_pending_approvals`, join copy, echo `approval_id`-keyed batch, suspend; no decision writes. Signature `approval_batch` → `event_id` |
 | 6 | `apply_approval_decisions` | `src/agent.py` (new tool) | Persist decisions → bucketed summary |
 | 7 | `redraft_campaigns` shim + cap | `src/agent.py` (new tool) | Dispatch redraft mode; tool-level cycle cap in `tool_context.state` |
-| 8 | `execute_approved_campaigns` + 4 stubbed helpers | `src/capabilities/execution.py` (new) | Capability + channel dispatch + internal Printful poll loop |
+| 8 | `execute_approved_campaigns` + 3 stubbed Shopify/Printful helpers + real `_simulate_social_post` | `src/capabilities/execution.py` (new) | Capability + channel dispatch + internal Printful poll loop; social package write is real (final form) |
 | 9 | redraft branch | `src/capabilities/drafts.py` (extend) | Redraft mode (state-driven; D-030) |
 | 10 | register new tools | `src/agent.py:build_coordinator` | Add `apply_approval_decisions`, `redraft_campaigns`, `execute_approved_campaigns` |
 | 11 | **Coordinator prompt — first-class** | `prompts/v3/coordinator_system.md` (substantial edit) | The post-approval protocol: receive decisions → `apply` → branch (resolve-then-execute) → redraft-loop (3-cycle rule) → execute. |
@@ -355,7 +355,7 @@ draft_campaigns_for_queue(event_id, operator_notes=None)
 
 **Phase B — execution behind seams.**
 10. **`src/db/campaigns.py` writes + `src/db/assets.py`** — `mark_asset_executing`, `record_execution_result`, `record_execution_failure`. Unit-tested.
-11. **`src/capabilities/execution.py`** — `execute_approved_campaigns` + 4 stubbed helpers + internal Printful poll loop. Unit-tested (route dispatch, success + failure paths, status machine).
+11. **`src/capabilities/execution.py`** — `execute_approved_campaigns` + 3 stubbed Shopify/Printful helpers + the real `_simulate_social_post` (writes the package) + internal Printful poll loop. Unit-tested (route dispatch, success + failure paths, status machine).
 12. **Register `execute_approved_campaigns`**; extend the coordinator prompt's branch to call it (resolve-then-execute).
 13. **Tier-1 trace eval (full)** — extend step 9 through to `execute`; assert end-state (published + execution persisted).
 14. **Behavioral branch eval** — repetition over the protocol order.
