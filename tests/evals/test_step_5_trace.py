@@ -260,10 +260,9 @@ async def test_step_5_tier1_trace():
             ):
                 pass
         except ValueError as exc:
+            # Cosmetic OTel warning on generator exit — ignore.
             if "Token was created in a different Context" not in str(exc):
                 raise
-        except Exception:
-            pass
 
         final = await session_service.get_session(
             app_name=WORKFLOW_NAME,
