@@ -50,3 +50,4 @@ pytest>=8.0
 - Review all `# TODO` / `# FIXME` comments left in code
 - Confirm `.env.example` covers every env var the agent reads
 - Remove or archive any spike files not needed for the demo
+- Final review of hackathon rules (https://rapid-agent.devpost.com/rules) — e.g. submitted code must be open-source licensed (see "What to Submit:" section)
