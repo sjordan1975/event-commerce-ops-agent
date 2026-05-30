@@ -134,6 +134,8 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 - Build incrementally — one capability end-to-end before moving to the next (per D-021's capability surface)
 - Fix root causes, not symptoms; never suppress errors to unblock tests
 - Test utility scripts with both happy path and intentional failure inputs before wiring into agent capabilities
+- **Verify tooling before use:** Before using any CLI flag, plugin, or library method, confirm it is listed in `pyproject.toml` (or equivalent manifest). Do not reach for something from habit without checking it is installed in this project.
+- **Default to standard, latest-stable approaches:** Use well-supported, contemporary, widely-adopted tools and library patterns unless there is a specific documented reason to do otherwise. No experimental flags or clever one-offs without justification.
 
 ### Testing (unit + scaffolding — distinct from evals)
 - **TDD for all core logic:** Pydantic models, scoring functions, prompt construction, output parsing
