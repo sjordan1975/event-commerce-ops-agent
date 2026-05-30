@@ -39,6 +39,9 @@ GEMINI_VISION_MODEL=gemini-2.5-flash        # score_assets_with_vision (judgment
 # Atlas Vector Search (Step 3)
 VECTOR_INDEX_NAME=assets_embedding_index    # Atlas vector search index name on assets.embedding
 
+# HITL redraft cap (Step 7)
+MAX_REDRAFT_CYCLES=3                        # tool-level hard cap on redraft cycles (default 3)
+
 # Prompt version
 PROMPT_VERSION=v3
 

@@ -13,8 +13,9 @@ from uuid import uuid4
 from google import genai
 from google.genai.types import GenerateContentConfig
 
+from src.db.approvals import reset_approval_to_pending
 from src.db.assets import get_assets_for_event
-from src.db.campaigns import submit_campaign_for_review
+from src.db.campaigns import get_edit_requested_campaigns, overwrite_campaign_draft, submit_campaign_for_review
 from src.db.events import get_event
 from src.errors import PreconditionError
 from src.models import Campaign, GeneratedCopy
@@ -57,6 +58,7 @@ def _draft_copy_for_asset(narrative_context: dict, item_context: dict) -> Genera
         queue_rationale=item_context.get("queue_rationale", ""),
         product_route=item_context.get("product_route", ""),
         detected_subjects=item_context.get("detected_subjects", []),
+        operator_revision=item_context.get("operator_revision", "(none)"),
     )
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     response = client.models.generate_content(
@@ -74,12 +76,14 @@ def _draft_copy_for_asset(narrative_context: dict, item_context: dict) -> Genera
 async def draft_campaigns_for_queue(event_id: str, operator_notes: dict | None = None) -> dict:
     """Generates copy + writes campaign/approval docs for every surfaced queue item.
 
-    Reads the persisted queue from Mongo (event_id-based, D-022). Per queued asset:
-    calls _draft_copy_for_asset (the eval-mock seam), derives product/platform from
-    product_route, and calls submit_campaign_for_review (bundled write).
+    On first pass: reads the persisted scored+queued assets from Mongo, generates copy,
+    and writes campaign/approval docs via submit_campaign_for_review.
 
-    operator_notes is reserved but unused — redraft lands in Step 7 with the HITL
-    loop that defines the payload.
+    On redraft pass: when edit_requested approvals exist for this event, reads those
+    instead (state-consumer path). Per item: regenerates copy with reviewer_notes
+    injected, overwrites the campaign draft, and resets the approval to pending.
+    operator_notes is retained for signature stability + unit injection only; the
+    production redraft path reads notes from persisted edit_requested approvals.
 
     Returns {"event_id", "campaign_ids", "approval_ids", "drafts"}.
     Raises PreconditionError for missing event / no scored assets / missing narrative.
@@ -92,6 +96,59 @@ async def draft_campaigns_for_queue(event_id: str, operator_notes: dict | None =
             context=event_id,
             missing={"event": "event not found; call ingest_event_batch first"},
         )
+
+    # Redraft path: state-consumer — reads edit_requested approvals instead of scored assets.
+    edit_requested = await get_edit_requested_campaigns(event_id)
+    if edit_requested:
+        if event.event_narrative is None:
+            raise PreconditionError(
+                capability="draft_campaigns_for_queue",
+                context=event_id,
+                missing={"narrative": "call build_event_context first"},
+            )
+        narrative_context = {
+            "narrative_angle": event.event_narrative.narrative_angle,
+            "key_figures": ", ".join(kf.name for kf in event.event_narrative.key_figures),
+        }
+        campaign_ids: list[str] = []
+        approval_ids: list[str] = []
+        drafts: list[dict] = []
+        for ac in edit_requested:
+            # reviewer_notes come from the persisted edit_requested approval (state-consumer path).
+            # operator_notes is ignored on the production path; retained for signature stability + unit injection.
+            notes = (operator_notes or {}).get(ac.approval_id) if operator_notes else ac.reviewer_notes
+            item_context = {
+                "queue_rationale": ac.campaign.generated_copy.headline,  # original headline as context
+                "product_route": ac.product_route or "",
+                "detected_subjects": "(redraft — original subjects unchanged)",
+                "operator_revision": notes or "",
+            }
+            copy = await asyncio.to_thread(_draft_copy_for_asset, narrative_context, item_context)
+            revised = Campaign(
+                campaign_id=ac.campaign.campaign_id,
+                asset_id=ac.asset_id,
+                event_id=event_id,
+                product_type=ac.campaign.product_type,
+                generated_copy=copy,
+                platform_target=ac.campaign.platform_target,
+                timing_recommendation=ac.campaign.timing_recommendation,
+                status="draft",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                execution=None,
+            )
+            await overwrite_campaign_draft(revised)
+            await reset_approval_to_pending(ac.approval_id)
+            campaign_ids.append(ac.campaign.campaign_id)
+            approval_ids.append(ac.approval_id)
+            drafts.append({
+                "asset_id": ac.asset_id,
+                "product_route": ac.product_route,
+                "headline": copy.headline,
+                "caption": copy.caption,
+                "timing_recommendation": ac.campaign.timing_recommendation,
+                "queue_rationale": ac.campaign.generated_copy.caption,
+            })
+        return {"event_id": event_id, "campaign_ids": campaign_ids, "approval_ids": approval_ids, "drafts": drafts}
 
     scored = await get_assets_for_event(event_id, status="scored")
     missing: dict[str, str] = {}
@@ -133,6 +190,7 @@ async def draft_campaigns_for_queue(event_id: str, operator_notes: dict | None =
             "queue_rationale": asset.queue_rationale or "",
             "product_route": asset.product_route or "",
             "detected_subjects": detected_str,
+            "operator_revision": "(none)",
         }
         copy = await asyncio.to_thread(_draft_copy_for_asset, narrative_context, item_context)
         product_type, platform_target = _route_to_campaign_fields(asset.product_route)

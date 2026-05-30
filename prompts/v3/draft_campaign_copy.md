@@ -19,6 +19,7 @@ Key figures (event-level, not necessarily in this frame): {key_figures}
 Queue rationale: {queue_rationale}
 Product route: {product_route}
 Detected subjects in this frame: {detected_subjects}
+Operator revision request: {operator_revision}
 
 ## WRITE THE COPY
 

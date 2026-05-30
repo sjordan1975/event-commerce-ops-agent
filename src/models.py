@@ -159,7 +159,41 @@ class Approval(BaseModel):
     approval_id: str
     campaign_id: str
     asset_id: str
+    event_id: str
     status: str = "pending"
     reviewer_notes: str | None = None
     created_at: str
     decided_at: str | None = None
+
+
+# Boundary input model — parsed from operator's FunctionResponse. extra="forbid"
+# rejects malformed/typo'd decisions before any Mongo write.
+class ApprovalDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    approval_id: str
+    decision: Literal["approved", "rejected", "edit_requested"]
+    reviewer_notes: str | None = None
+
+
+class ApprovedCampaign(BaseModel):
+    """Join view returned by get_approved_campaigns / get_edit_requested_campaigns. Not persisted."""
+
+    approval_id: str
+    campaign: Campaign
+    asset_id: str
+    product_route: str | None
+    reviewer_notes: str | None = None  # populated by get_edit_requested_campaigns; None for approved/rejected
+
+
+class ExecutionResult(BaseModel):
+    shopify: dict | None = None
+    printful: dict | None = None
+    social: dict | None = None
+    executed_at: str
+
+
+class ExecutionError(BaseModel):
+    channel: str
+    message: str
+    failed_at: str

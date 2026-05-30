@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from src.models import Approval, Asset, AssetScores, Campaign, Event, EventNarrative, GeneratedCopy, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, VisionScoringOutput
+from src.models import Approval, ApprovalDecision, ApprovedCampaign, Asset, AssetScores, Campaign, Event, EventNarrative, ExecutionResult, GeneratedCopy, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, VisionScoringOutput
 
 
 def build_valid_event(**overrides) -> Event:
@@ -162,6 +162,7 @@ def build_valid_approval(**overrides) -> Approval:
         "approval_id": "apr-1",
         "campaign_id": "cmp-1",
         "asset_id": "a1",
+        "event_id": "evt-demo-1",
         "status": "pending",
         "reviewer_notes": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -169,6 +170,42 @@ def build_valid_approval(**overrides) -> Approval:
     }
     base.update(overrides)
     return Approval(**base)
+
+
+def build_valid_approval_decision(**overrides) -> ApprovalDecision:
+    """Return a valid ApprovalDecision with sensible defaults."""
+    base = {
+        "approval_id": "apr-1",
+        "decision": "approved",
+        "reviewer_notes": None,
+    }
+    base.update(overrides)
+    return ApprovalDecision(**base)
+
+
+def build_valid_approved_campaign(**overrides) -> ApprovedCampaign:
+    """Return a valid ApprovedCampaign with sensible defaults."""
+    base = {
+        "approval_id": "apr-1",
+        "campaign": build_valid_campaign(),
+        "asset_id": "a1",
+        "product_route": "poster",
+    }
+    base.update(overrides)
+    return ApprovedCampaign(**base)
+
+
+def build_valid_execution_result(**overrides) -> ExecutionResult:
+    """Return a valid ExecutionResult with realistic shopify+printful payload."""
+    from datetime import datetime, timezone
+    base = {
+        "shopify": {"product_id": "gid://shopify/Product/1", "product_url": "https://demo.myshopify.com/products/x"},
+        "printful": {"task_id": "t-1", "mockup_url": "https://printful.com/mockups/x.jpg"},
+        "social": None,
+        "executed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    base.update(overrides)
+    return ExecutionResult(**base)
 
 
 def build_valid_event_narrative(**overrides) -> EventNarrative:

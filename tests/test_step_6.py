@@ -4,6 +4,14 @@ import inspect
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
+# Shared patch for get_edit_requested_campaigns — all Step 6 tests use the first-pass path
+# (no edit_requested approvals exist yet; redraft is a Step 7 concern).
+_NO_EDIT_REQUESTED = patch(
+    "src.capabilities.drafts.get_edit_requested_campaigns",
+    new_callable=AsyncMock,
+    return_value=[],
+)
+
 import pytest
 
 from src.models import Campaign, GeneratedCopy
@@ -58,6 +66,7 @@ async def test_submit_campaign_for_review():
     assert approval_doc["decided_at"] is None
     assert approval_doc["campaign_id"] == campaign.campaign_id
     assert approval_doc["asset_id"] == campaign.asset_id
+    assert approval_doc["event_id"] == campaign.event_id
 
     # Returns both ids
     assert result["campaign_id"] == campaign.campaign_id
@@ -207,6 +216,7 @@ async def test_draft_campaigns_one_draft_per_queued_asset():
         patch("src.capabilities.drafts.get_assets_for_event", return_value=[asset_queued, asset_unsurfaced]),
         patch("src.capabilities.drafts._draft_copy_for_asset", return_value=canned_copy),
         patch("src.capabilities.drafts.submit_campaign_for_review", return_value={"campaign_id": "cmp-1", "approval_id": "apr-1"}) as mock_submit,
+        _NO_EDIT_REQUESTED,
     ):
         result = await draft_campaigns_for_queue("evt-demo-1")
 
@@ -236,6 +246,7 @@ async def test_draft_campaigns_zero_surfaced_returns_empty():
     with (
         patch("src.capabilities.drafts.get_event", return_value=event),
         patch("src.capabilities.drafts.get_assets_for_event", return_value=[asset_unqueued]),
+        _NO_EDIT_REQUESTED,
     ):
         result = await draft_campaigns_for_queue("evt-demo-1")
 
@@ -265,6 +276,7 @@ async def test_draft_campaigns_precondition_no_scored_assets():
     with (
         patch("src.capabilities.drafts.get_event", return_value=event),
         patch("src.capabilities.drafts.get_assets_for_event", return_value=[]),
+        _NO_EDIT_REQUESTED,
     ):
         with pytest.raises(PreconditionError) as exc_info:
             await draft_campaigns_for_queue("evt-demo-1")
@@ -287,6 +299,7 @@ async def test_draft_campaigns_precondition_no_narrative():
     with (
         patch("src.capabilities.drafts.get_event", return_value=event),
         patch("src.capabilities.drafts.get_assets_for_event", return_value=[asset]),
+        _NO_EDIT_REQUESTED,
     ):
         with pytest.raises(PreconditionError) as exc_info:
             await draft_campaigns_for_queue("evt-demo-1")
@@ -326,6 +339,7 @@ async def test_draft_campaigns_route_mapping_flows_to_campaign():
         patch("src.capabilities.drafts.get_assets_for_event", return_value=[asset_poster, asset_social]),
         patch("src.capabilities.drafts._draft_copy_for_asset", return_value=canned_copy),
         patch("src.capabilities.drafts.submit_campaign_for_review", side_effect=capture_submit),
+        _NO_EDIT_REQUESTED,
     ):
         await draft_campaigns_for_queue("evt-demo-1")
 

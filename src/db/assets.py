@@ -5,6 +5,8 @@ import os
 from src.db import _parse_docs_response, get_client
 from src.models import Asset, AssetScores, SimilarAsset
 
+
+
 NUM_CANDIDATES_MULTIPLIER = 10  # numCandidates = NUM_CANDIDATES_MULTIPLIER * top_k (Atlas guidance for high-recall vector search)
 
 
@@ -74,6 +76,29 @@ async def vector_search_assets(
     })
     docs = _parse_docs_response(envelope)
     return [SimilarAsset.model_validate(doc) for doc in docs]
+
+
+async def mark_asset_executing(asset_id: str) -> None:
+    """Pre-execution state transition — visible in trace for debugging."""
+    await get_client().call("update-many", {
+        "database": "event_commerce",
+        "collection": "assets",
+        "filter": {"asset_id": asset_id},
+        "update": {"$set": {"status": "executing"}},
+    })
+
+
+async def get_assets_by_ids(asset_ids: list[str]) -> list[Asset]:
+    """Fetch assets by a list of asset_ids (display-batch join helper)."""
+    if not asset_ids:
+        return []
+    envelope = await get_client().call("find", {
+        "database": "event_commerce",
+        "collection": "assets",
+        "filter": {"asset_id": {"$in": asset_ids}},
+    })
+    docs = _parse_docs_response(envelope)
+    return [Asset.model_validate({k: v for k, v in doc.items() if k != "_id"}) for doc in docs]
 
 
 async def save_asset_embedding(asset_id: str, embedding: list[float]) -> None:

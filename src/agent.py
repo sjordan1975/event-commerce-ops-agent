@@ -31,6 +31,12 @@ from google.adk.workflow import Workflow
 from google.genai import types
 
 from src.capabilities import WORKFLOW_NAME, build_pipeline_graph
+from src.capabilities.drafts import draft_campaigns_for_queue
+from src.capabilities.execution import execute_approved_campaigns
+from src.db.approvals import get_pending_approvals, record_approval_decision
+from src.db.assets import get_assets_by_ids
+from src.db.campaigns import get_campaigns_by_ids
+from src.models import ApprovalDecision
 from src.prompt_loader import load_prompt
 
 load_dotenv()
@@ -133,21 +139,147 @@ async def run_event_pipeline(
     }
 
 
-def request_human_approval(
-    approval_batch: dict,
+async def request_human_approval(
+    event_id: str,
     tool_context: ToolContext,
 ) -> dict | None:
-    """Submits a batch of drafted campaigns for operator approval.
+    """Reads pending approval batch and suspends waiting for operator decisions.
 
-    Returns None to signal pending — the agent suspends and resumes when the
-    caller posts a FunctionResponse with the operator's decision(s) per item.
+    Builds a display batch grouped by queue half (exploitation / exploration)
+    with each item keyed by approval_id. Stores the batch in tool_context.state
+    so the approval surface can read it via get_pending_approvals(event_id).
+    Returns None to suspend; no decision writes are made here.
+    Decisions are persisted by apply_approval_decisions on resume.
+
+    Note: returns None (verified suspension pattern from adk_hitl_test.py spike).
+    The surface fetches the batch independently via get_pending_approvals(event_id)
+    since it already has event_id. Batch is also stored in state["pending_batch"]
+    for debugging / operator UI.
 
     Args:
-        approval_batch: dict with `event_id` and `items` (list of {campaign_id,
-            asset_id, draft_summary}).
+        event_id: the event whose pending approvals to fetch.
+
+    Returns:
+        None — suspends until a decisions FunctionResponse arrives.
     """
     tool_context.actions.skip_summarization = True
-    return None
+
+    pending = await get_pending_approvals(event_id)
+
+    campaign_ids = [a.campaign_id for a in pending]
+    asset_ids = [a.asset_id for a in pending]
+
+    campaigns = await get_campaigns_by_ids(campaign_ids)
+    assets = await get_assets_by_ids(asset_ids)
+
+    campaign_by_id = {c.campaign_id: c for c in campaigns}
+    asset_by_id = {a.asset_id: a for a in assets}
+
+    exploitation: list[dict] = []
+    exploration: list[dict] = []
+
+    for approval in pending:
+        campaign = campaign_by_id.get(approval.campaign_id)
+        asset = asset_by_id.get(approval.asset_id)
+        if not campaign or not asset:
+            continue
+
+        item: dict = {
+            "approval_id": approval.approval_id,
+            "campaign_id": campaign.campaign_id,
+            "asset_id": asset.asset_id,
+            "content_url": asset.content_url,
+            "queue_rank": asset.queue_rank,
+            "queue_rationale": asset.queue_rationale,
+            "product_route": asset.product_route,
+            "headline": campaign.generated_copy.headline,
+            "caption": campaign.generated_copy.caption,
+            "hashtags": campaign.generated_copy.hashtags,
+            "timing_recommendation": campaign.timing_recommendation,
+        }
+
+        if asset.queue_type == "exploitation":
+            exploitation.append(item)
+        else:
+            exploration.append(item)
+
+    # Store for operator surface / debugging; surface fetches independently by event_id.
+    tool_context.state["pending_batch"] = {
+        "event_id": event_id,
+        "exploitation": exploitation,
+        "exploration": exploration,
+    }
+
+    return None  # suspend; FunctionResponse delivers decisions to the coordinator LLM
+
+
+async def apply_approval_decisions(decisions: list[dict], tool_context: ToolContext) -> dict:
+    """Persists per-item operator decisions to MongoDB. The only place decisions hit Mongo.
+
+    Validates each entry as ApprovalDecision (boundary extra='forbid'), then
+    records each decision and returns a summary bucket.
+
+    Args:
+        decisions: list of {approval_id, decision, reviewer_notes?}.
+
+    Returns:
+        {"approved": [campaign_id...], "rejected": [campaign_id...],
+         "edit_requested": [{approval_id, campaign_id, asset_id, reviewer_notes}...]}
+    """
+    approved: list[str] = []
+    rejected: list[str] = []
+    edit_requested: list[dict] = []
+
+    for raw in decisions:
+        d = ApprovalDecision(**raw)  # raises ValidationError on bad input before any write
+        await record_approval_decision(d.approval_id, d)
+
+        # Resolve campaign_id and asset_id from the approval doc (fetched inside record_approval_decision,
+        # but not returned — get them from the raw dict which caller constructs from the FunctionResponse).
+        # The decisions list carries approval_id; we infer campaign_id below from the bucketing result.
+        # Since we only have approval_id here, we return it per bucket for the LLM to act on.
+        if d.decision == "approved":
+            approved.append(d.approval_id)
+        elif d.decision == "rejected":
+            rejected.append(d.approval_id)
+        else:
+            edit_requested.append({
+                "approval_id": d.approval_id,
+                "reviewer_notes": d.reviewer_notes,
+            })
+
+    return {"approved": approved, "rejected": rejected, "edit_requested": edit_requested}
+
+
+MAX_REDRAFT_CYCLES = int(os.environ.get("MAX_REDRAFT_CYCLES", "3"))
+
+# ADK iteration backstop (per safety-measures.md Gap 1). The load-bearing bound is
+# MAX_REDRAFT_CYCLES (3); this 30-call cap is the catch-all framework backstop.
+# Callers pass RunConfig(max_llm_calls=COORDINATOR_MAX_LLM_CALLS) to run_async.
+COORDINATOR_MAX_LLM_CALLS = 30
+
+
+async def redraft_campaigns(event_id: str, tool_context: ToolContext) -> dict:
+    """Shim: increment the redraft cap counter and call draft_campaigns_for_queue in redraft mode.
+
+    Refuses past MAX_REDRAFT_CYCLES (tool-level hard cap, defense-in-depth against
+    the coordinator's prompt-level 3-cycle rule). The cap counter survives suspend/resume
+    because it lives in tool_context.state (session state).
+
+    Args:
+        event_id: the event whose edit_requested campaigns to redraft.
+
+    Returns:
+        The draft result dict, or {"status": "cap_reached", "message": ...} if capped.
+    """
+    n = tool_context.state.get("redraft_cycles", 0) + 1
+    if n > MAX_REDRAFT_CYCLES:
+        return {
+            "status": "cap_reached",
+            "message": f"escalate to operator; revision limit hit ({MAX_REDRAFT_CYCLES} cycles)",
+        }
+    tool_context.state["redraft_cycles"] = n
+    return await draft_campaigns_for_queue(event_id)
 
 
 def build_coordinator(extra_tools: list[Any] | None = None) -> LlmAgent:
@@ -155,6 +287,9 @@ def build_coordinator(extra_tools: list[Any] | None = None) -> LlmAgent:
     tools: list[Any] = [
         FunctionTool(run_event_pipeline),
         LongRunningFunctionTool(func=request_human_approval),
+        FunctionTool(apply_approval_decisions),
+        FunctionTool(redraft_campaigns),
+        FunctionTool(execute_approved_campaigns),
     ]
     if extra_tools:
         tools.extend(extra_tools)

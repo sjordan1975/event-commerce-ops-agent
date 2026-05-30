@@ -48,20 +48,14 @@ These cover the *catastrophic* failure modes. The two below cover the *operation
 
 ## Gap 1 — Loop iteration bound
 
-**State today:** ADK has a default max-iterations cap. We have not chosen a value or written it down.
+**State today (pre-Step 7):** ADK has a default max-iterations cap. We have not chosen a value or written it down.
 
 **Concrete failure mode:** the `edit_requested → draft_campaigns_for_queue` loop-back at `request_human_approval` has no framework-level revision cap. **Partially mitigated:** `prompts/v2/agent_system.md` instructs the agent to stop redrafting after 3 cycles and surface a recommendation to escalate. That prompt-level rule is the demo-day safety net but is not enforced — a model that ignores the rule still spins until ADK's default iteration cap fires (whatever value that is).
-
-**Followup actions:**
-- Pick an ADK iteration cap value explicitly; document in `agentic-model.md`
-- The prompt-level revision cap is in place (`prompts/v2/agent_system.md`); consider adding a hard tool-level cap inside `request_human_approval` for defense-in-depth before that capability ships
-
-**Priority:** medium overall. The demo-visible failure mode is partially defended by the v2 prompt's 3-cycle rule; **high before `request_human_approval` ships** if we want defense-in-depth via a tool-level cap rather than relying on the prompt alone.
 
 **Resolution (Step 7 / D-031) — CLOSED.** All three layers land with `request_human_approval` (the capability that triggers the loop):
 1. **Tool-level hard cap** — `redraft_campaigns` increments `tool_context.state["redraft_cycles"]` and **refuses** past `MAX_REDRAFT_CYCLES` (env, default **3**), returning an "escalate to operator" result instead of redrafting. Robust to LLM mis-ordering because it counts *actual* invocations, not prompt compliance. The cap counter is asserted to survive the HITL suspend/resume park (Tier-1 eval).
 2. **Prompt-level rule** — the 3-cycle escalation rule is ported from `prompts/v2/agent_system.md` into `prompts/v3/coordinator_system.md` (v3 has no `agent_system.md`).
-3. **ADK iteration cap (framework backstop)** — set explicitly to **30** on the coordinator runner: comfortable headroom over the worst-case *legitimate* turn count (dispatch + apply + 3 redraft cycles + execute + terminal ≈ 12–15). The load-bearing bound is the redraft cap (3); 30 is the catch-all backstop. Recorded in `CLAUDE.md` § ADK-Specific Rules.
+3. **ADK iteration cap (framework backstop)** — `COORDINATOR_MAX_LLM_CALLS = 30` in `src/agent.py`; pass as `RunConfig(max_llm_calls=30)` to `run_async`. Comfortable headroom over the worst-case *legitimate* turn count (dispatch + apply + 3 redraft cycles + execute + terminal ≈ 12–15). The load-bearing bound is the redraft cap (3); 30 is the catch-all backstop. Recorded in `CLAUDE.md` § ADK-Specific Rules.
 
 ---
 

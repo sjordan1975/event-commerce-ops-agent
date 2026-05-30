@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.models import Approval, Asset, AssetScores, Campaign, Event, EventNarrative, GeneratedCopy, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, SimilarityResult, VisionScoringOutput
+from src.models import Approval, ApprovalDecision, ApprovedCampaign, Asset, AssetScores, Campaign, Event, EventNarrative, ExecutionError, ExecutionResult, GeneratedCopy, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, SimilarityResult, VisionScoringOutput
 
 
 def test_event():
@@ -812,12 +812,120 @@ def test_campaign():
         )
 
 
+def test_approval_decision():
+    # Three valid decisions
+    for decision in ("approved", "rejected", "edit_requested"):
+        ad = ApprovalDecision(approval_id="apr-1", decision=decision)
+        assert ad.decision == decision
+        assert ad.reviewer_notes is None
+
+    # reviewer_notes accepted when provided
+    ad_with_notes = ApprovalDecision(
+        approval_id="apr-2",
+        decision="edit_requested",
+        reviewer_notes="Make the headline punchier",
+    )
+    assert ad_with_notes.reviewer_notes == "Make the headline punchier"
+
+    # Fourth decision value rejected
+    with pytest.raises(ValidationError):
+        ApprovalDecision(approval_id="apr-3", decision="maybe")
+
+    # Unknown field rejected (extra="forbid")
+    with pytest.raises(ValidationError):
+        ApprovalDecision(approval_id="apr-4", decision="approved", unknown="oops")
+
+
+def test_approved_campaign():
+    gc = GeneratedCopy(
+        headline="Messi caps Argentina's extra-time upset",
+        caption="Limited edition print.",
+        hashtags=["#WorldCup2026"],
+    )
+    campaign = Campaign(
+        campaign_id="cmp-1",
+        asset_id="a1",
+        event_id="evt-demo-1",
+        product_type="poster",
+        generated_copy=gc,
+        platform_target="shopify",
+        timing_recommendation="2026-07-14T22:00:00Z",
+        created_at="2026-07-14T21:00:00Z",
+    )
+
+    ac = ApprovedCampaign(
+        approval_id="apr-1",
+        campaign=campaign,
+        asset_id="a1",
+        product_route="poster",
+    )
+    assert ac.approval_id == "apr-1"
+    assert ac.campaign.campaign_id == "cmp-1"
+    assert ac.asset_id == "a1"
+    assert ac.product_route == "poster"
+
+    # product_route=None accepted (social_only)
+    ac_social = ApprovedCampaign(
+        approval_id="apr-2",
+        campaign=campaign,
+        asset_id="a2",
+        product_route=None,
+    )
+    assert ac_social.product_route is None
+
+
+def test_execution_result():
+    # All channels present
+    er = ExecutionResult(
+        shopify={"product_id": "gid://shopify/Product/1", "product_url": "https://demo.myshopify.com/products/x"},
+        printful={"task_id": "t-1", "mockup_url": "https://printful.com/mockups/x.jpg"},
+        social=None,
+        executed_at="2026-07-14T22:00:00Z",
+    )
+    assert er.shopify is not None
+    assert er.printful is not None
+    assert er.social is None
+    assert er.executed_at == "2026-07-14T22:00:00Z"
+
+    # Social-only result
+    er_social = ExecutionResult(
+        social={"status": "queued", "queued_at": "2026-07-14T22:00:00Z"},
+        executed_at="2026-07-14T22:00:00Z",
+    )
+    assert er_social.shopify is None
+    assert er_social.printful is None
+    assert er_social.social is not None
+
+    # Round-trip
+    d = er.model_dump(mode="json")
+    restored = ExecutionResult.model_validate(d)
+    assert restored.shopify == er.shopify
+    assert restored.executed_at == er.executed_at
+
+
+def test_execution_error():
+    ee = ExecutionError(
+        channel="shopify",
+        message="rate limit exceeded",
+        failed_at="2026-07-14T22:05:00Z",
+    )
+    assert ee.channel == "shopify"
+    assert ee.message == "rate limit exceeded"
+    assert ee.failed_at == "2026-07-14T22:05:00Z"
+
+    # Round-trip
+    d = ee.model_dump(mode="json")
+    restored = ExecutionError.model_validate(d)
+    assert restored.channel == ee.channel
+
+
 def test_approval():
     # Happy-path construction
     apr = Approval(
         approval_id="apr-1",
         campaign_id="cmp-1",
         asset_id="a1",
+        event_id="evt-demo-1",
         created_at="2026-07-14T21:00:00Z",
     )
     assert apr.approval_id == "apr-1"
@@ -830,6 +938,7 @@ def test_approval():
         approval_id="apr-2",
         campaign_id="cmp-1",
         asset_id="a1",
+        event_id="evt-demo-1",
         status="approved",
         reviewer_notes="Looks good",
         created_at="2026-07-14T21:00:00Z",
@@ -845,6 +954,7 @@ def test_approval():
             approval_id="apr-3",
             campaign_id="cmp-1",
             asset_id="a1",
+            event_id="evt-demo-1",
             created_at="2026-07-14T21:00:00Z",
             bad_field="oops",
         )

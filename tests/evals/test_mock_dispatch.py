@@ -20,7 +20,10 @@ from tests.evals.conftest import (
     STEP6_QUEUED_IDS,
     STEP6_UNSURFACED_ID,
     STEP6_CROWD_ASSET_ID,
+    STEP7_APPROVAL_IDS,
     _make_step6_assets_find_handler,
+    make_step7_approvals_find_handler,
+    build_decisions_function_response,
     patch_draft_copy_for_asset,
     build_runner_with_mock_db,
 )
@@ -228,3 +231,43 @@ def test_patch_draft_copy_for_asset_round_trips():
 
     assert result.headline == _CANNED_COPY.headline
     assert result.hashtags == _CANNED_COPY.hashtags
+
+
+# ---------------------------------------------------------------------------
+# Step 7 scaffolding smoke tests (T-7.9)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_step7_approvals_handler_returns_correct_docs_per_status():
+    """Combined approvals handler returns the right docs per status filter."""
+    import unittest.mock as mock
+    from src.db.approvals import get_pending_approvals
+
+    mock_client = _MockMCPClient()
+    mock_client.register(
+        "find", "approvals",
+        make_step7_approvals_find_handler("evt-demo-1", statuses={"apr-0": "approved", "apr-1": "pending", "apr-2": "edit_requested"}),
+    )
+
+    with mock.patch("src.db.approvals.get_client", return_value=mock_client):
+        pending = await get_pending_approvals("evt-demo-1")
+
+    assert len(pending) == 1
+    assert pending[0].approval_id == "apr-1"
+    assert pending[0].status == "pending"
+
+
+def test_step7_decisions_function_response_round_trips():
+    """build_decisions_function_response builds a list-keyed FunctionResponse correctly."""
+    decisions = [
+        {"approval_id": "apr-0", "decision": "approved"},
+        {"approval_id": "apr-1", "decision": "edit_requested", "reviewer_notes": "Redo this"},
+    ]
+    content = build_decisions_function_response("tool-call-id-123", decisions)
+
+    assert content.role == "user"
+    assert len(content.parts) == 1
+    fr = content.parts[0].function_response
+    assert fr.id == "tool-call-id-123"
+    assert fr.name == "request_human_approval"
+    assert fr.response["decisions"] == decisions

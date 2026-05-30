@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any, Callable, Union
 from unittest.mock import patch
 
+from google.genai import types
+
 from src.agent import APP_NAME, build_coordinator, build_runner
 from src.models import AssetScores, GeneratedCopy
 from tests.conftest import build_embedding_fixture, build_valid_generated_copy, build_valid_vision_scoring_output
@@ -554,6 +556,300 @@ def patch_draft_copy_for_asset(canned: GeneratedCopy | None = None):
         return
     with patch("src.capabilities.drafts._draft_copy_for_asset", return_value=canned):
         yield
+
+
+# ---------------------------------------------------------------------------
+# Step 7 eval scaffolding (T-7.9)
+# ---------------------------------------------------------------------------
+
+# Approval IDs used in Step 7 seeded corpus.
+# apr-0: poster/exploitation (campaign cmp-0, asset ast-0)
+# apr-1: tshirt/exploitation (campaign cmp-1, asset ast-1)
+# apr-2: social_only/discovery (campaign cmp-2, asset ast-2)
+STEP7_APPROVAL_IDS = ["apr-0", "apr-1", "apr-2"]
+STEP7_CAMPAIGN_IDS = ["cmp-0", "cmp-1", "cmp-2"]
+STEP7_ASSET_IDS = ["ast-0", "ast-1", "ast-2"]
+
+
+def _make_step7_approval_doc(
+    approval_id: str,
+    campaign_id: str,
+    asset_id: str,
+    event_id: str,
+    status: str = "pending",
+    reviewer_notes: str | None = None,
+) -> dict:
+    return {
+        "approval_id": approval_id,
+        "campaign_id": campaign_id,
+        "asset_id": asset_id,
+        "event_id": event_id,
+        "status": status,
+        "reviewer_notes": reviewer_notes,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "decided_at": None,
+    }
+
+
+def _make_step7_campaign_doc(
+    campaign_id: str,
+    asset_id: str,
+    event_id: str,
+    product_type: str | None,
+    platform_target: str,
+    status: str = "draft",
+) -> dict:
+    return {
+        "campaign_id": campaign_id,
+        "asset_id": asset_id,
+        "event_id": event_id,
+        "product_type": product_type,
+        "generated_copy": {
+            "headline": f"Draft headline for {asset_id}",
+            "caption": f"Draft caption for {asset_id}",
+            "hashtags": ["#WorldCup2026"],
+        },
+        "platform_target": platform_target,
+        "timing_recommendation": "2026-06-01T23:00:00Z",
+        "status": status,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "execution": None,
+    }
+
+
+def _make_step7_asset_doc(
+    asset_id: str,
+    event_id: str,
+    product_route: str | None,
+    queue_type: str,
+) -> dict:
+    return {
+        "asset_id": asset_id,
+        "event_id": event_id,
+        "content_url": f"gs://bucket/{asset_id}.jpg",
+        "status": "campaign_draft_created",
+        "upload_date": datetime.now(timezone.utc).isoformat(),
+        "product_route": product_route,
+        "queue_type": queue_type,
+        "queue_rank": 1,
+        "queue_rationale": f"Test rationale for {asset_id}",
+        "embedding": None,
+        "scores": {"quality_score": 0.8, "merch_score": 0.8, "emotional_score": 0.7, "social_score": 0.7, "identity_score": 0.8},
+        "detected_subjects": ["Lionel Messi"] if "ast-0" in asset_id else [],
+        "campaign_id": f"cmp-{asset_id[-1]}",
+        "similar_assets": None,
+    }
+
+
+def _make_step7_approvals(event_id: str, statuses: dict[str, str] | None = None) -> list[dict]:
+    """Build the three seeded approval docs with optional status overrides.
+
+    statuses: dict mapping approval_id → status (defaults to "pending" for all).
+    """
+    if statuses is None:
+        statuses = {}
+    return [
+        _make_step7_approval_doc(
+            "apr-0", "cmp-0", "ast-0", event_id,
+            status=statuses.get("apr-0", "pending"),
+            reviewer_notes=None if statuses.get("apr-0") != "edit_requested" else "Make the headline punchier",
+        ),
+        _make_step7_approval_doc(
+            "apr-1", "cmp-1", "ast-1", event_id,
+            status=statuses.get("apr-1", "pending"),
+        ),
+        _make_step7_approval_doc(
+            "apr-2", "cmp-2", "ast-2", event_id,
+            status=statuses.get("apr-2", "pending"),
+        ),
+    ]
+
+
+def _make_step7_campaigns(event_id: str) -> list[dict]:
+    return [
+        _make_step7_campaign_doc("cmp-0", "ast-0", event_id, "poster", "shopify"),
+        _make_step7_campaign_doc("cmp-1", "ast-1", event_id, "tshirt", "shopify"),
+        _make_step7_campaign_doc("cmp-2", "ast-2", event_id, None, "social"),
+    ]
+
+
+def _make_step7_assets(event_id: str) -> list[dict]:
+    return [
+        _make_step7_asset_doc("ast-0", event_id, "poster", "exploitation"),
+        _make_step7_asset_doc("ast-1", event_id, "tshirt", "exploitation"),
+        _make_step7_asset_doc("ast-2", event_id, "social_only", "discovery"),
+    ]
+
+
+def make_step7_approvals_find_handler(event_id: str, statuses: dict[str, str] | None = None) -> Callable:
+    """Combined (find, approvals) handler branching on the status filter value.
+
+    Handles:
+    - {event_id, status:"pending"} → pending approvals
+    - {event_id, status:"approved"} → approved approvals
+    - {event_id, status:"edit_requested"} → edit_requested approvals
+    - {approval_id: <id>} → single approval by id (internal record_approval_decision find)
+    """
+    all_approvals = _make_step7_approvals(event_id, statuses)
+    approvals_by_id = {a["approval_id"]: a for a in all_approvals}
+
+    def handler(args: dict) -> list:
+        f = args.get("filter", {})
+        if "approval_id" in f:
+            # Single approval by id (internal find in record_approval_decision)
+            aid = f["approval_id"]
+            return [approvals_by_id[aid]] if aid in approvals_by_id else []
+        status = f.get("status")
+        if status:
+            return [a for a in all_approvals if a["status"] == status]
+        return all_approvals
+
+    return handler
+
+
+def make_step7_campaigns_find_handler(event_id: str) -> Callable:
+    """Combined (find, campaigns) handler for Step 7 evals.
+
+    Handles get_approved_campaigns / get_edit_requested_campaigns joins and
+    get_campaigns_by_ids display-batch reads.
+    """
+    all_campaigns = _make_step7_campaigns(event_id)
+    campaigns_by_id = {c["campaign_id"]: c for c in all_campaigns}
+
+    def handler(args: dict) -> list:
+        f = args.get("filter", {})
+        cid_filter = f.get("campaign_id", {})
+        if isinstance(cid_filter, dict) and "$in" in cid_filter:
+            ids = cid_filter["$in"]
+            # Filter by execution=None if present (get_approved_campaigns)
+            result = [campaigns_by_id[cid] for cid in ids if cid in campaigns_by_id]
+            if "execution" in f and f["execution"] is None:
+                result = [c for c in result if c["execution"] is None]
+            return result
+        return all_campaigns
+
+    return handler
+
+
+def make_step7_assets_find_handler(event_id: str) -> Callable:
+    """Combined (find, assets) handler for Step 7 display-batch reads (get_assets_by_ids)."""
+    all_assets = _make_step7_assets(event_id)
+    assets_by_id = {a["asset_id"]: a for a in all_assets}
+
+    def handler(args: dict) -> list:
+        f = args.get("filter", {})
+        aid_filter = f.get("asset_id", {})
+        if isinstance(aid_filter, dict) and "$in" in aid_filter:
+            ids = aid_filter["$in"]
+            return [assets_by_id[aid] for aid in ids if aid in assets_by_id]
+        # event_id + status queries (from existing Step 5/6 handlers)
+        event_id_f = f.get("event_id")
+        status = f.get("status")
+        if event_id_f:
+            result = [a for a in all_assets if a["event_id"] == event_id_f]
+            if status:
+                result = [a for a in result if a["status"] == status]
+            return result
+        return all_assets
+
+    return handler
+
+
+def build_decisions_function_response(
+    tool_call_id: str,
+    decisions: list[dict],
+) -> types.Content:
+    """Build a FunctionResponse Content carrying a list of per-item decisions.
+
+    decisions: list of {approval_id, decision, reviewer_notes?}
+    tool_call_id: the id from event.long_running_tool_ids on suspension.
+    """
+    return types.Content(
+        role="user",
+        parts=[types.Part(
+            function_response=types.FunctionResponse(
+                id=tool_call_id,
+                name="request_human_approval",
+                response={"decisions": decisions},
+            )
+        )],
+    )
+
+
+def all_approved_decisions(approval_ids: list[str]) -> list[dict]:
+    """Build an all-approved decisions list for the given approval_ids."""
+    return [{"approval_id": aid, "decision": "approved"} for aid in approval_ids]
+
+
+def mixed_decisions_with_edit(
+    approved_ids: list[str],
+    edit_ids: list[str],
+    rejected_ids: list[str] | None = None,
+    edit_notes: str = "Please revise the copy",
+) -> list[dict]:
+    """Build a mixed decisions list with some approved, some edit_requested, some rejected."""
+    decisions = [{"approval_id": aid, "decision": "approved"} for aid in approved_ids]
+    decisions += [{"approval_id": aid, "decision": "edit_requested", "reviewer_notes": edit_notes} for aid in edit_ids]
+    decisions += [{"approval_id": aid, "decision": "rejected"} for aid in (rejected_ids or [])]
+    return decisions
+
+
+@contextmanager
+def patch_execution_helpers():
+    """Patch Shopify/Printful helpers to canned payloads; let _simulate_social_post write through."""
+    with (
+        patch(
+            "src.capabilities.execution._shopify_create_product",
+            return_value={"product_id": "gid://shopify/Product/1", "product_url": "https://demo.myshopify.com/products/x"},
+        ),
+        patch(
+            "src.capabilities.execution._printful_create_mockup",
+            return_value={"task_id": "t-1"},
+        ),
+        patch(
+            "src.capabilities.execution._printful_poll_mockup",
+            return_value={"status": "completed", "mockup_url": "https://printful.com/mockups/x.jpg"},
+        ),
+    ):
+        yield
+
+
+@contextmanager
+def build_runner_with_step7_mock(event_id: str = "evt-demo-1", statuses: dict[str, str] | None = None):
+    """Context manager for Step 7 evals: Step 6 scaffolding + approvals DB patch.
+
+    Seeds approvals/campaigns/assets for one event spanning poster/tshirt/social_only routes.
+    Patches all db module get_client bindings including approvals. Does NOT patch
+    _draft_copy_for_asset or execution helpers — use patch_draft_copy_for_asset() and
+    patch_execution_helpers() separately.
+
+    Yields (runner, mock_client).
+    statuses: optional override of approval statuses (approval_id → status).
+    """
+    mock_client = _MockMCPClient()
+    mock_client.register("find", "approvals", make_step7_approvals_find_handler(event_id, statuses))
+    mock_client.register("find", "campaigns", make_step7_campaigns_find_handler(event_id))
+    mock_client.register("find", "assets", make_step7_assets_find_handler(event_id))
+
+    with (
+        patch("src.db.events.get_client", return_value=mock_client),
+        patch("src.db.assets.get_client", return_value=mock_client),
+        patch("src.db.performance.get_client", return_value=mock_client),
+        patch("src.db.player_context.get_client", return_value=mock_client),
+        patch("src.db.campaigns.get_client", return_value=mock_client),
+        patch("src.db.approvals.get_client", return_value=mock_client),
+        patch(
+            "src.capabilities.similarity._compute_image_embedding",
+            return_value=build_embedding_fixture(),
+        ),
+        patch(
+            "src.capabilities.scoring._score_asset_with_vision",
+            side_effect=_step5_vision_provider,
+        ),
+    ):
+        agent = build_coordinator()
+        runner = build_runner(agent)
+        yield runner, mock_client
 
 
 @contextmanager

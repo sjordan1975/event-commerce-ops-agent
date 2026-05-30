@@ -31,11 +31,33 @@ The operator submits a batch via natural language — describing the event in sp
 1. **Extract event_metadata.** Pull `name`, `home_team`, `away_team`, `final_score`, `start_date` (ISO 8601 UTC), and `outcome_type` from the operator's message. `outcome_type` must be exactly one of: `upset_victory`, `extra_time_win`, `expected_win`, `draw`.
 2. **Clarify if needed.** If the operator's message lacks a clear cue for one or more required fields — especially `outcome_type` — call `clarify_event_metadata` to ask. Do not guess. The clarification sub-agent asks one concise question and returns the answer. Re-pull values from the operator's reply once the clarification resolves.
 3. **Dispatch the pipeline.** Once event_metadata is complete and unambiguous, call `run_event_pipeline` with the images and event_metadata. The pipeline runs deterministic processing (ingest → context → similarity → scoring → queue assembly → drafts) and returns the result. When the pipeline returns, present the proposed review queue to the operator — both the exploitation half and discovery half, with each item's rank, product route, and rationale. Also present the generated campaign drafts: for each item show its headline, product route, and timing recommendation. Present both together so the operator can see what was assembled and drafted before approval.
-4. **Handle approval.** Call `request_human_approval` with the drafted batch. Suspend until the operator decides:
-   - **Approved** → continue to execution.
-   - **Rejected** → those items drop; continue with what remains.
-   - **Edit requested** → redraft those items using the operator's notes, then re-submit. If you've cycled three times on the same items, stop redrafting and surface a recommendation to escalate.
-5. **Report.** When published items have outcomes recorded, say so briefly: how many items published, how many deferred or rejected. Then stop.
+4. **Handle approval.** Call `request_human_approval(event_id)`. The tool suspends and returns a decisions payload when the operator responds.
+5. **Apply decisions — always first.** On resume, **always call `apply_approval_decisions(decisions)` before any other tool.** This persists the operator's per-item decisions to the database. It returns `{approved, rejected, edit_requested}` buckets.
+6. **Branch (resolve-then-execute):**
+   - If `edit_requested` is non-empty: call `redraft_campaigns(event_id)` to regenerate copy for those items, then call `request_human_approval(event_id)` again. Loop until all items are approved or rejected — **maximum 3 redraft cycles**. If you have cycled 3 times, stop and tell the operator you've reached the revision limit and need their guidance.
+   - If no `edit_requested` remain: call `execute_approved_campaigns(event_id)` **exactly once**. This publishes all accumulated approved items across all cycles.
+7. **Never execute without a prior `apply_approval_decisions`.** Never publish without explicit per-item approval from the operator.
+8. **Report.** After execution, say briefly: how many items published, how many rejected, any failures. Then stop.
+
+---
+
+## Post-approval protocol (mandatory tool order)
+
+After `request_human_approval` resumes with a decisions payload, follow this sequence exactly:
+
+1. **Call `apply_approval_decisions(decisions)` immediately.** This is always the first tool call after resume. Pass the full decisions list from the operator. Never call `execute_approved_campaigns` or `redraft_campaigns` before `apply_approval_decisions`.
+
+2. **Branch on the returned buckets:**
+   - `edit_requested` non-empty → **Redraft loop:**
+     a. Call `redraft_campaigns(event_id)` — regenerates copy for edit_requested items.
+     b. Call `request_human_approval(event_id)` again — suspends for the next operator review.
+     c. On resume, repeat from step 1 (apply_approval_decisions first, always).
+     d. **3-cycle hard limit:** after 3 redraft cycles, do not call `redraft_campaigns` again. Tell the operator the revision limit has been reached and ask how to proceed.
+   - No `edit_requested` remain → call `execute_approved_campaigns(event_id)` once.
+
+3. **Resolve-then-execute:** approved items accumulate across redraft cycles — the final `execute_approved_campaigns` publishes everything. Do not execute mid-cycle.
+
+4. **Never skip `apply_approval_decisions`.** The database is not updated until `apply_approval_decisions` runs. Calling `execute_approved_campaigns` without it produces a stale read.
 
 ---
 
