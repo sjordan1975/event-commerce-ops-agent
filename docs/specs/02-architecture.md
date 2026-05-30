@@ -420,6 +420,96 @@ Spike code: `spike/adk_hitl_test.py` (HITL primitive — pre-D-024), `spike/adk_
 
 ---
 
+## UI Layer (D-033)
+
+The operator console is a Next.js frontend backed by a thin FastAPI HTTP layer that wraps the ADK coordinator. Full UI design spec: `docs/plans/approval-ui-spec.md`.
+
+### Directory layout
+
+```
+project-root/
+├── src/                  ← existing Python agent (unchanged)
+│   ├── agent.py
+│   ├── capabilities/
+│   ├── db/
+│   └── ...
+├── src/api/              ← NEW: FastAPI HTTP + SSE bridge
+│   ├── __init__.py
+│   ├── app.py            ← FastAPI app, all endpoints
+│   └── session_bridge.py ← translates ADK Runner events → SSE messages
+├── ui/                   ← NEW: Next.js operator console
+│   ├── src/app/          ← App Router pages
+│   ├── src/components/   ← UI components (AppShell, AssetCard, etc.)
+│   ├── src/lib/          ← API client, SSE hooks, mock fixtures
+│   ├── public/
+│   ├── package.json
+│   └── next.config.ts    ← dev proxy: /api/* → localhost:8000
+├── pyproject.toml        ← add fastapi, uvicorn
+└── package.json          ← optional root: "dev" script runs both servers
+```
+
+### Two servers
+
+| Server | Command | Port | Responsibility |
+|--------|---------|------|---------------|
+| Python API | `uvicorn src.api.app:app --reload` | 8000 | ADK coordinator, SSE stream, approval resumption |
+| Next.js | `cd ui && npm run dev` | 3000 | Operator console UI |
+
+In development, `next.config.ts` proxies all `/api/*` requests from port 3000 → port 8000 so the UI never references the backend port directly. In production on Cloud Run, the options are two separate services (recommended) or a single service that serves the Next.js static build from FastAPI.
+
+### API surface
+
+```
+POST  /api/sessions
+      body: { message: string }
+      → { session_id: string }
+      Starts a coordinator session, delivers the operator's kickoff message.
+
+GET   /api/sessions/{session_id}/stream
+      → SSE stream of agent events (see event types below)
+
+POST  /api/sessions/{session_id}/messages
+      body: { message: string }
+      → 200 OK
+      Delivers a follow-up message (clarification exchange).
+
+POST  /api/approvals/{approval_id}
+      body: [{ asset_id, decision: "approved"|"rejected"|"edit_requested", notes? }]
+      → 200 OK
+      Delivers HITL decisions; triggers LongRunningFunctionTool resume.
+```
+
+### SSE event types
+
+The `/stream` endpoint emits a sequence of typed events the UI renders in real time:
+
+```
+capability_started       { capability, event_id }
+capability_completed     { capability, result_summary, event_id }
+coordinator_message      { text, role: "coordinator"|"operator" }
+approval_ready           { approval_id, items: ApprovalItem[], event_id }
+execution_evidence       { shopify_products, social_posts, event_id }
+mockup_resolved          { asset_id, mockup_url }          ← async, arrives after execution_evidence
+atlas_state              { collection_counts }
+pipeline_complete        { event_id }
+```
+
+### HITL resumption across the HTTP boundary
+
+The `LongRunningFunctionTool` at `request_human_approval` suspends the coordinator runner. The runner holds an open async task; the session state is live in the session service. When the operator POSTs decisions to `/api/approvals/{approval_id}`, `session_bridge.py` calls `apply_approval_decisions` via the existing ADK pattern, which writes the per-item decisions to MongoDB and delivers a `FunctionResponse` back to the suspended runner. The runner resumes the coordinator, which reads the persisted decisions and calls `execute_approved_campaigns`.
+
+With `InMemorySessionService` this is straightforward — session is in process memory. **The demo video runs on localhost; `InMemorySessionService` is sufficient.**
+
+For Cloud Run: the `LongRunningFunctionTool` suspension is a live async coroutine held inside `runner.run_async()` — it is process-local, not a checkpoint in the session service. `DatabaseSessionService` persists conversation history across restarts but does **not** solve cross-instance HITL resumption (the suspended coroutine cannot be handed to a different process). The pragmatic solution for the hackathon submission is single-instance Cloud Run (`--min-instances=1 --max-instances=1`): one process, always warm, session stays in memory. `DatabaseSessionService` (MongoDB-backed) is still worth wiring for conversation history persistence and honest architecture framing, but it does not change HITL resumption behavior. Tracked in `docs/plans/delivery-roadmap.md` § Track 4.
+
+### Phase A / Phase B
+
+**Phase A (mock-first):** `src/api/` does not exist yet. The Next.js app runs standalone. All API calls are intercepted by `ui/src/lib/mock-api.ts`, which reads from JSON fixtures in `ui/src/mock/` and simulates event timing with delays. No Python server needed.
+
+**Phase B (wire-up):** Replace the mock API layer with real `fetch` + `EventSource` calls to the Python server. The UI components are unchanged — only the data source swaps.
+
+---
+
 ## Hard Constraints
 
 These must not be changed without explicit user decision:

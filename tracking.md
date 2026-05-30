@@ -667,6 +667,29 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 ---
 
+### D-033 — UI Layer: Next.js Operator Console + FastAPI/SSE Bridge
+**Date:** 2026-05-30
+**Decision:** Add a UI layer to the project: a Next.js operator console fronted by a thin FastAPI HTTP + SSE bridge that wraps the ADK coordinator. This is a delivery-phase component — it does not touch `src/agent.py`, `src/capabilities/`, or any existing Python code.
+
+**Architecture:**
+- `ui/` — Next.js app (App Router, Tailwind). The operator console: chat input, streaming notices column, activity timeline, HITL approval batch, execution evidence. Full design: `docs/plans/approval-ui-spec.md`.
+- `src/api/` — FastAPI app + `session_bridge.py`. Exposes four endpoints: `POST /api/sessions` (start session + deliver kickoff message), `GET /api/sessions/{id}/stream` (SSE event stream), `POST /api/sessions/{id}/messages` (follow-up messages), `POST /api/approvals/{approval_id}` (deliver HITL decisions, triggers `LongRunningFunctionTool` resume).
+- Dev: two servers (uvicorn port 8000, Next.js port 3000); `next.config.ts` proxies `/api/*` → port 8000.
+- Production: two Cloud Run services, or Next.js static build served by FastAPI (single service).
+
+**HITL resumption:** approval POST delivers a `FunctionResponse` to the suspended `LongRunningFunctionTool` runner via `session_bridge.py`. Requires live session state — i.e., `InMemorySessionService` is fine for local dev but must be swapped for `DatabaseSessionService` (MongoDB-backed, preferred for partner track story) or `VertexAiSessionService` before Cloud Run deploy.
+
+**Phase A (mock-first):** `src/api/` is not built yet. The Next.js app runs standalone against JSON fixtures in `ui/src/mock/` with simulated event timing. No Python server needed. Phase B replaces the mock layer with real `fetch` + `EventSource` calls in a single swap — UI components are unchanged.
+
+**Why FastAPI + SSE over alternatives:**
+- ADK's `Runner` is async Python; FastAPI + uvicorn integrates naturally via `asyncio`.
+- SSE is sufficient for the one-directional event stream (backend → UI); no WebSocket needed.
+- Next.js App Router proxy is idiomatic for this pattern — no CORS friction in dev.
+
+**Recorded in:** `docs/specs/02-architecture.md` § UI Layer.
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta
