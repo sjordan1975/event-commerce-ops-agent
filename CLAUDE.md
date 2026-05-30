@@ -4,11 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Step 7 merged to `main`. Next action: cut `step/8-outcomes` and implement capability 9 (`record_outcomes`).**
+**On `step/8-outcomes`. Step 7 merged to `main`. Next action: write the plan (`docs/plans/step-8-outcomes.md`) for capability 9 (`record_outcomes`).**
 
-Step 7 note: async `LongRunningFunctionTool` suspend mechanic verified by ADK source inspection (`flows/llm_flows/functions.py:get_long_running_function_calls` — triggered by `is_long_running=True`, independent of function type or return value). Coordinator protocol (apply-before-execute, 3-cycle cap) has unit coverage; live protocol behavior is T-7.15 (deferred to demo-prep).
-
-Step 7 = capabilities 7 (`request_human_approval`) + 8 (`execute_approved_campaigns`) + the redraft loop (closes D-030's `operator_notes` reservation). **First coordinator-plane step — zero new workflow nodes.** Spine (D-031): the HITL `LongRunningFunctionTool` body does **not** re-run on resume → a separate `apply_approval_decisions` tool persists the per-item decisions list, and `execute`/`redraft` are pure consumers of persisted Mongo state (corrects `db-wrapper-inventory.md`:210 + arch 287-293). Execution **stubbed at the seam** (Option 1 — live Shopify/Printful is demo-prep). Gap 1 closed (redraft cap 3 + ADK iteration cap 30). Plan phased A (gate+protocol+loop+cap) / B (execution). Reference: `docs/plans/step-7-hitl.md`, `docs/tasks/step-7-tasks.md`, `tracking.md` D-031.
+Step 7 = capabilities 7 (`request_human_approval`) + 8 (`execute_approved_campaigns`) + the redraft loop (closes D-030's `operator_notes` reservation). **First coordinator-plane step — zero new workflow nodes.** Spine (D-031): the HITL `LongRunningFunctionTool` body does **not** re-run on resume → a separate `apply_approval_decisions` tool persists the per-item decisions list, and `execute`/`redraft` are pure consumers of persisted Mongo state (corrects `db-wrapper-inventory.md`:210 + arch 287-293). Execution **stubbed at the seam** (Option 1 — live Shopify/Printful is demo-prep). Gap 1 closed (redraft cap 3 + ADK iteration cap 30). Plan phased A (gate+protocol+loop+cap) / B (execution). Reference: `docs/plans/step-7-hitl.md`, `docs/tasks/step-7-tasks.md`, `tracking.md` D-031. Known deviations: `apply_approval_decisions` buckets return `approval_id` (not `campaign_id`); T-7.15 behavioral probe deferred to demo-prep; async LRFT suspend verified by ADK source inspection (not a running spike). 153 unit tests + 11 Tier-1 eval assertions green.
 
 Step 6 = `draft_campaigns_for_queue` (capability 6) — complete (merged `d2205c7`). 118 unit tests + Tier 1 gate + grounding probe all green.
 
