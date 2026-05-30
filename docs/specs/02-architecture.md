@@ -171,6 +171,8 @@ Post-execution engagement and conversion data. Written by `record_outcomes`. Fee
 Metrics represent cumulative totals over a rolling 7-day window from `published_at` (stored as `window_days: 7`).
 Channel population follows `product_route`: poster/tshirt assets populate `shopify` + `printful`; social_only assets populate `social` only.
 
+**MVP write shape (D-032):** `record_outcomes` writes a **provenance record** with `metrics: null` and a `metrics_status: "pending_sync"` discriminator — the zeroed `metrics` object shown above is the **measured** shape the external sync populates later (enterprise path), not what the coda writes. The provenance doc also carries `channels` (awaiting measurement, derived from `product_route`) and `window_start` (publish time). **Consumers must honor the discriminator:** `aggregate_performance_for_events` (the Step-2 baseline reader) excludes `metrics_status == "pending_sync"` so pending rows never dilute the baseline — any future reader of `performance` must do the same.
+
 ### `player_context`
 Static reference corpus. Seeded at onboarding; read by `build_event_context` to ground the event narrative.
 
@@ -308,11 +310,14 @@ campaigns.updateOne       → record execution outcome (campaign status: "execut
 ```
 Channel selection is by `product_route` (poster/tshirt → shopify+printful; social_only → social). Failure is **retriable** (leaves `execution: null`, approval stays `approved`), not terminal. **MVP build:** the four external helpers are **stubbed at the seam** (canned payloads); live Shopify/Printful wiring is a demo-prep task (D-031). The redraft loop on `edit_requested` re-reads persisted `edit_requested` approvals and overwrites the campaign drafts (Step 7 implements it; reconciles D-030's deferral).
 
-### `record_outcomes`
+### `record_outcomes` (coordinator-side; D-032)
 ```
-performance.insertMany    → store engagement + conversion metrics
-assets.aggregate          → find assets similar to best performers (informs future runs)
+assets.find               → { event_id, status: "published" } — the published set (reuses get_assets_for_event)
+campaigns.find            → by campaign_id — pull execution.executed_at (window anchor; reuses get_campaigns_by_ids)
+performance.updateMany    → UPSERT one provenance row per published asset (key: asset_id+event_id);
+                            metrics: null, metrics_status: "pending_sync" — NO fabricated metrics
 ```
+**Thin honest coda (D-032):** a provenance write only — `metrics` are synced asynchronously by an external process over the 7-day window, not written here. **Upsert** (not `insertMany`) for idempotency — execution is retriable, so a re-run must not double-write. No LLM call, no external API call. The forward-looking `get_top_performers_by_channel` analytics aggregate (`performance aggregate` + `assets find`, "find best performers") is **deferred** (designed-not-built; enterprise/demo-prep).
 
 ---
 

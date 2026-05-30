@@ -258,7 +258,7 @@ The edit-requested loop is the agent's reasoning, not a separate capability. A r
 - **Printful:** initiate async mockup generation (`POST /mockups` → poll `GET /mockups/{task_id}`); polling is internal to this capability
 - **Social:** write complete post package to MongoDB with `status: "queued"` (simulated — no live API call)
 
-**9. `record_outcomes`** — Engagement and conversion metrics are written back to the `performance` collection. On subsequent runs, vector search in `find_similar_assets` returns richer signals because past assets now carry real performance data. This is how the system improves over time without retraining.
+**9. `record_outcomes`** — For each published asset, a **provenance record** is written to the `performance` collection: true linkage (`asset_id` / `campaign_id` / `event_id`), the channels awaiting measurement, and the **7-day measurement window** anchored at publish time. **Metrics are left null/pending** (`metrics_status: "pending_sync"`) — they are populated **asynchronously by an external sync** (Shopify order webhooks / channel analytics) over the window, not fabricated at execution time. This is the **thin, honest coda** (D-032): it records that outcomes are *tracked and awaiting sync* without inventing a sale. On subsequent runs the corpus of *measured* exemplars grows, so similarity-grounded exploitation gets better-grounded over time without retraining — consumed via the **Step-2 historical baseline** (`build_event_context`), not via the `find_similar_assets` vector search (which never reads metrics). The external sync that populates the metrics, and a `get_top_performers_by_channel` analytics view, are the **enterprise path** (descope, not removal — capability 9 runs end-to-end).
 
 ---
 

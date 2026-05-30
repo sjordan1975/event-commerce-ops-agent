@@ -232,8 +232,8 @@ The performance write is the primary runtime concern. The "find best performers"
 
 | Wrapper | Internal MCP calls | Notes |
 |---|---|---|
-| `record_performance(asset_id: str, campaign_id: str, event_id: str, metrics: PerformanceMetrics) -> None` | `performance insert-many` | Primary runtime write. Channel breakdown follows `product_route`. |
-| `get_top_performers_by_channel(channel: str, since: datetime \| None = None, limit: int = 20) -> list[Asset]` | `performance aggregate` joined with `assets find` | Analytics view for demo storytelling. Not on the runtime path. Optional for MVP. |
+| `record_performance(asset_id: str, campaign_id: str, event_id: str, product_route: str \| None, window_start: str \| None, metrics: PerformanceMetrics \| None = None) -> None` | `performance update-many` (**upsert**, key `asset_id`+`event_id`) | Primary runtime write — a **provenance record** (D-032): `metrics=None` → `metrics_status="pending_sync"`; `channels` derived from `product_route`. **Upsert, not `insert-many`** — idempotent against retriable execution. No fabricated metrics. |
+| `get_top_performers_by_channel(channel: str, since: datetime \| None = None, limit: int = 20) -> list[Asset]` | `performance aggregate` joined with `assets find` | Analytics view for demo storytelling. Not on the runtime path. **Deferred (designed-not-built, D-032)** — bolts on later with zero retrofit cost; build only if the demo needs a top-performers view. |
 
 ---
 
