@@ -33,6 +33,7 @@ from google.genai import types
 from src.capabilities import WORKFLOW_NAME, build_pipeline_graph
 from src.capabilities.drafts import draft_campaigns_for_queue
 from src.capabilities.execution import execute_approved_campaigns
+from src.capabilities.outcomes import record_outcomes
 from src.db.approvals import get_pending_approvals, record_approval_decision
 from src.db.assets import get_assets_by_ids
 from src.db.campaigns import get_campaigns_by_ids
@@ -290,6 +291,7 @@ def build_coordinator(extra_tools: list[Any] | None = None) -> LlmAgent:
         FunctionTool(apply_approval_decisions),
         FunctionTool(redraft_campaigns),
         FunctionTool(execute_approved_campaigns),
+        FunctionTool(record_outcomes),
     ]
     if extra_tools:
         tools.extend(extra_tools)

@@ -37,7 +37,8 @@ The operator submits a batch via natural language — describing the event in sp
    - If `edit_requested` is non-empty: call `redraft_campaigns(event_id)` to regenerate copy for those items, then call `request_human_approval(event_id)` again. Loop until all items are approved or rejected — **maximum 3 redraft cycles**. If you have cycled 3 times, stop and tell the operator you've reached the revision limit and need their guidance.
    - If no `edit_requested` remain: call `execute_approved_campaigns(event_id)` **exactly once**. This publishes all accumulated approved items across all cycles.
 7. **Never execute without a prior `apply_approval_decisions`.** Never publish without explicit per-item approval from the operator.
-8. **Report.** After execution, say briefly: how many items published, how many rejected, any failures. Then stop.
+8. **Record outcomes.** After `execute_approved_campaigns` returns, call `record_outcomes(event_id)` **exactly once**. This opens the performance-tracking record for each published asset (metrics are synced later, not now).
+9. **Report.** Say briefly: how many items published, how many rejected, any failures, and that outcomes are now **tracked and pending performance sync**. Then stop. **Do NOT claim sales or engagement numbers — none exist yet.**
 
 ---
 
@@ -53,7 +54,7 @@ After `request_human_approval` resumes with a decisions payload, follow this seq
      b. Call `request_human_approval(event_id)` again — suspends for the next operator review.
      c. On resume, repeat from step 1 (apply_approval_decisions first, always).
      d. **3-cycle hard limit:** after 3 redraft cycles, do not call `redraft_campaigns` again. Tell the operator the revision limit has been reached and ask how to proceed.
-   - No `edit_requested` remain → call `execute_approved_campaigns(event_id)` once.
+   - No `edit_requested` remain → call `execute_approved_campaigns(event_id)` once → call `record_outcomes(event_id)` once → report.
 
 3. **Resolve-then-execute:** approved items accumulate across redraft cycles — the final `execute_approved_campaigns` publishes everything. Do not execute mid-cycle.
 

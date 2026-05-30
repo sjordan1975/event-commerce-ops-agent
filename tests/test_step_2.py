@@ -155,7 +155,14 @@ async def test_aggregate_performance_no_docs():
     assert call_args[0][0] == "aggregate"
     assert call_args[0][1]["collection"] == "performance"
     pipeline = call_args[0][1]["pipeline"]
-    assert pipeline[0]["$match"]["event_id"]["$in"] == ["evt-1", "evt-2"]
+    # Spine fix (T-8.4) adds a leading $match{metrics_status:$ne pending_sync} stage;
+    # the event_id $match follows it. Locate it by content, not by index.
+    event_id_matches = [s for s in pipeline if "$match" in s and "event_id" in s["$match"]]
+    assert event_id_matches, "event_id $match stage missing from pipeline"
+    assert event_id_matches[0]["$match"]["event_id"]["$in"] == ["evt-1", "evt-2"]
+    # Spine fix stage must be present
+    spine_matches = [s for s in pipeline if "$match" in s and "metrics_status" in s.get("$match", {})]
+    assert spine_matches, "spine fix $match stage missing — pending docs could dilute baseline"
 
 
 @pytest.mark.anyio

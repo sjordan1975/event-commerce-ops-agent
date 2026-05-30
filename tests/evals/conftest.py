@@ -879,3 +879,134 @@ def build_runner_with_step6_mock():
         agent = build_coordinator()
         runner = build_runner(agent)
         yield runner, mock_client
+
+
+# ---------------------------------------------------------------------------
+# Step 8 eval scaffolding (T-8.8)
+# ---------------------------------------------------------------------------
+
+# Step 8 asset IDs: ast-0 (poster), ast-1 (tshirt), ast-2 (social_only)
+# Post-execution state: status="published", campaign_id linked, execution has executed_at
+STEP8_PUBLISHED_AT = "2026-06-01T21:05:00Z"
+
+
+def _make_step8_published_asset_doc(
+    asset_id: str,
+    event_id: str,
+    product_route: str | None,
+    campaign_id: str,
+) -> dict:
+    return {
+        "asset_id": asset_id,
+        "event_id": event_id,
+        "content_url": f"gs://bucket/{asset_id}.jpg",
+        "status": "published",
+        "upload_date": datetime.now(timezone.utc).isoformat(),
+        "product_route": product_route,
+        "queue_type": "exploitation" if product_route in ("poster", "tshirt") else "discovery",
+        "queue_rank": 1,
+        "queue_rationale": f"Test rationale for {asset_id}",
+        "embedding": None,
+        "scores": {"quality_score": 0.8, "merch_score": 0.8, "emotional_score": 0.7, "social_score": 0.7, "identity_score": 0.8},
+        "detected_subjects": ["Lionel Messi"] if "ast-0" in asset_id else [],
+        "campaign_id": campaign_id,
+        "similar_assets": None,
+        "published_urls": {"shopify": "https://demo.myshopify.com/products/x"} if product_route in ("poster", "tshirt") else None,
+    }
+
+
+def _make_step8_executed_campaign_doc(
+    campaign_id: str,
+    asset_id: str,
+    event_id: str,
+    product_route: str | None,
+) -> dict:
+    """Campaign doc post-execution with execution.executed_at set."""
+    return {
+        "campaign_id": campaign_id,
+        "asset_id": asset_id,
+        "event_id": event_id,
+        "product_type": "poster" if product_route == "poster" else ("tshirt" if product_route == "tshirt" else None),
+        "generated_copy": {
+            "headline": f"Headline for {asset_id}",
+            "caption": f"Caption for {asset_id}",
+            "hashtags": ["#WorldCup2026"],
+        },
+        "platform_target": "shopify" if product_route in ("poster", "tshirt") else "social",
+        "timing_recommendation": "2026-06-01T23:00:00Z",
+        "status": "executed",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "execution": {
+            "executed_at": STEP8_PUBLISHED_AT,
+            "shopify": {"product_id": "gid://shopify/Product/1"} if product_route in ("poster", "tshirt") else None,
+            "printful": {"mockup_url": "https://printful.com/mockups/x.jpg"} if product_route in ("poster", "tshirt") else None,
+            "social": {"post_url": "https://social.example/p/1"} if product_route == "social_only" else None,
+        },
+    }
+
+
+def _make_step8_published_assets(event_id: str) -> list[dict]:
+    return [
+        _make_step8_published_asset_doc("ast-0", event_id, "poster", "cmp-0"),
+        _make_step8_published_asset_doc("ast-1", event_id, "tshirt", "cmp-1"),
+        _make_step8_published_asset_doc("ast-2", event_id, "social_only", "cmp-2"),
+    ]
+
+
+def _make_step8_executed_campaigns(event_id: str) -> list[dict]:
+    return [
+        _make_step8_executed_campaign_doc("cmp-0", "ast-0", event_id, "poster"),
+        _make_step8_executed_campaign_doc("cmp-1", "ast-1", event_id, "tshirt"),
+        _make_step8_executed_campaign_doc("cmp-2", "ast-2", event_id, "social_only"),
+    ]
+
+
+def make_step8_assets_find_handler(event_id: str) -> Callable:
+    """Combined (find, assets) handler for Step 8 evals.
+
+    Branches by filter:
+    - status="published" → published assets (Step 8 record_outcomes reads this)
+    - all other shapes → delegate to Step 7 handler (approval display-batch reads, etc.)
+
+    Per mock-handler-clobber rule: ONE combined handler, not two registrations.
+    """
+    _step7_handler = make_step7_assets_find_handler(event_id)
+    published_assets = _make_step8_published_assets(event_id)
+    published_by_id = {a["asset_id"]: a for a in published_assets}
+
+    def handler(args: dict) -> list:
+        f = args.get("filter", {})
+        status = f.get("status")
+        if status == "published":
+            event_id_f = f.get("event_id")
+            if event_id_f:
+                return [a for a in published_assets if a["event_id"] == event_id_f]
+            return published_assets
+        return _step7_handler(args)
+
+    return handler
+
+
+def make_step8_campaigns_find_handler(event_id: str) -> Callable:
+    """Combined (find, campaigns) handler for Step 8 evals.
+
+    Branches by filter:
+    - campaign_id.$in → return executed campaign docs (record_outcomes reads via get_campaigns_by_ids)
+    - other shapes → delegate to Step 7 handler
+    """
+    _step7_handler = make_step7_campaigns_find_handler(event_id)
+    executed_campaigns = _make_step8_executed_campaigns(event_id)
+    executed_by_id = {c["campaign_id"]: c for c in executed_campaigns}
+
+    def handler(args: dict) -> list:
+        f = args.get("filter", {})
+        cid_filter = f.get("campaign_id", {})
+        if isinstance(cid_filter, dict) and "$in" in cid_filter:
+            ids = cid_filter["$in"]
+            # Step 8 needs executed campaigns (with execution.executed_at)
+            result = [executed_by_id[cid] for cid in ids if cid in executed_by_id]
+            if result:
+                return result
+        return _step7_handler(args)
+
+    return handler

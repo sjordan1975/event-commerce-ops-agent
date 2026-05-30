@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.models import Approval, ApprovalDecision, ApprovedCampaign, Asset, AssetScores, Campaign, Event, EventNarrative, ExecutionError, ExecutionResult, GeneratedCopy, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, SimilarityResult, VisionScoringOutput
+from src.models import Approval, ApprovalDecision, ApprovedCampaign, Asset, AssetScores, Campaign, Event, EventNarrative, ExecutionError, ExecutionResult, GeneratedCopy, HistoricalBaseline, KeyFigure, Performance, PerformanceMetrics, Player, QueueItem, ReviewQueue, SimilarAsset, SimilarityResult, VisionScoringOutput
 
 
 def test_event():
@@ -958,3 +958,85 @@ def test_approval():
             created_at="2026-07-14T21:00:00Z",
             bad_field="oops",
         )
+
+
+def test_performance_model():
+    # Valid full doc
+    perf = Performance(
+        performance_id="perf-001",
+        asset_id="ast-0",
+        campaign_id="cmp-0",
+        event_id="evt-demo-1",
+        product_route="poster",
+        channels=["shopify", "printful"],
+        metrics=None,
+        metrics_status="pending_sync",
+        window_days=7,
+        window_start="2026-06-01T21:00:00Z",
+        recorded_at="2026-06-01T21:01:00Z",
+    )
+    assert perf.performance_id == "perf-001"
+    assert perf.metrics is None
+    assert perf.metrics_status == "pending_sync"
+    assert perf.window_days == 7
+
+    # Defaults: metrics=None, metrics_status="pending_sync", window_days=7
+    perf_defaults = Performance(
+        performance_id="perf-002",
+        asset_id="ast-1",
+        campaign_id="cmp-1",
+        event_id="evt-demo-1",
+        product_route=None,
+        channels=["social"],
+        window_start=None,
+        recorded_at="2026-06-01T21:01:00Z",
+    )
+    assert perf_defaults.metrics is None
+    assert perf_defaults.metrics_status == "pending_sync"
+    assert perf_defaults.window_days == 7
+
+    # extra="forbid" rejects unknown field
+    with pytest.raises(ValidationError):
+        Performance(
+            performance_id="perf-003",
+            asset_id="ast-0",
+            campaign_id="cmp-0",
+            event_id="evt-demo-1",
+            product_route="poster",
+            channels=["shopify"],
+            window_start=None,
+            recorded_at="2026-06-01T21:01:00Z",
+            bad_field="oops",
+        )
+
+    # metrics_status rejects a value outside the Literal
+    with pytest.raises(ValidationError):
+        Performance(
+            performance_id="perf-004",
+            asset_id="ast-0",
+            campaign_id="cmp-0",
+            event_id="evt-demo-1",
+            product_route="poster",
+            channels=["shopify"],
+            metrics_status="unknown_value",
+            window_start=None,
+            recorded_at="2026-06-01T21:01:00Z",
+        )
+
+
+def test_performance_metrics_model():
+    # All-None round-trip
+    pm_none = PerformanceMetrics()
+    assert pm_none.shopify is None
+    assert pm_none.printful is None
+    assert pm_none.social is None
+
+    # Populated channel dicts round-trip
+    pm_full = PerformanceMetrics(
+        shopify={"views": 1000, "orders": 12, "revenue_usd": 420.0},
+        printful={"units_fulfilled": 10},
+        social={"impressions": 5000, "saves": 200},
+    )
+    assert pm_full.shopify["orders"] == 12
+    assert pm_full.printful["units_fulfilled"] == 10
+    assert pm_full.social["impressions"] == 5000

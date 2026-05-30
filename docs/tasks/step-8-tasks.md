@@ -172,6 +172,10 @@ Acceptance — all green:
 
 Verify: all commands above pass; `main` is green; the 9-capability arc is complete.
 
+Known deviations from plan:
+- **`published_urls` added to `Asset` model** — `get_assets_for_event` is the first code to read a published asset back through `Asset.model_validate`; Step 7's `record_execution_result` writes `published_urls` to the asset doc which `extra="forbid"` would reject. Added `published_urls: dict | None = None` to `Asset`. Not a `docs/specs/` change; no D-entry needed.
+- **T1-a/T1-e eval framing** — "(T1-a) coordinator calls `record_outcomes` once" and "(T1-e) honest terminal text" are enforced by the prompt edit + no-op guard; the eval verifies the return-dict shape and written-doc shape (the correct proxy for a no-LLM capability). Live coordinator behaviour is deferred like T-7.15.
+
 ---
 
 ## Task dependency summary

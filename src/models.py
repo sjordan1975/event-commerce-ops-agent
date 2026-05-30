@@ -112,6 +112,7 @@ class Asset(BaseModel):
     detected_subjects: list[str] | None = None
     campaign_id: str | None = None
     similar_assets: list[str] | None = None
+    published_urls: dict | None = None
 
 
 class SimilarAsset(BaseModel):
@@ -197,3 +198,30 @@ class ExecutionError(BaseModel):
     channel: str
     message: str
     failed_at: str
+
+
+# PerformanceMetrics: the future measured shape (all channels optional).
+# The coda writes metrics=None; the enterprise sync populates this and
+# flips metrics_status to "synced". No extra="forbid" — LLM response_schema
+# carve-out does not apply (never passed as response_schema), but we leave it
+# open for forward-compat with the external sync's payload shape.
+class PerformanceMetrics(BaseModel):
+    shopify: dict | None = None
+    printful: dict | None = None
+    social: dict | None = None
+
+
+class Performance(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    performance_id: str
+    asset_id: str
+    campaign_id: str
+    event_id: str
+    product_route: str | None
+    channels: list[str]
+    metrics: PerformanceMetrics | None = None
+    metrics_status: Literal["pending_sync", "synced"] = "pending_sync"
+    window_days: int = 7
+    window_start: str | None
+    recorded_at: str

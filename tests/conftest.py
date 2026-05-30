@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from src.models import Approval, ApprovalDecision, ApprovedCampaign, Asset, AssetScores, Campaign, Event, EventNarrative, ExecutionResult, GeneratedCopy, HistoricalBaseline, KeyFigure, Player, QueueItem, ReviewQueue, SimilarAsset, VisionScoringOutput
+from src.models import Approval, ApprovalDecision, ApprovedCampaign, Asset, AssetScores, Campaign, Event, EventNarrative, ExecutionResult, GeneratedCopy, HistoricalBaseline, KeyFigure, Performance, Player, QueueItem, ReviewQueue, SimilarAsset, VisionScoringOutput
 
 
 def build_valid_event(**overrides) -> Event:
@@ -234,3 +234,22 @@ def build_valid_event_narrative(**overrides) -> EventNarrative:
     }
     base.update(overrides)
     return EventNarrative(**base)
+
+
+def build_valid_performance(**overrides) -> Performance:
+    """Return a valid Performance provenance doc with pending_sync defaults."""
+    base = {
+        "performance_id": "perf-ast-0-evt-demo-1",
+        "asset_id": "ast-0",
+        "campaign_id": "cmp-0",
+        "event_id": "evt-demo-1",
+        "product_route": "poster",
+        "channels": ["shopify", "printful"],
+        "metrics": None,
+        "metrics_status": "pending_sync",
+        "window_days": 7,
+        "window_start": "2026-06-01T21:00:00Z",
+        "recorded_at": "2026-06-01T21:01:00Z",
+    }
+    base.update(overrides)
+    return Performance(**base)
