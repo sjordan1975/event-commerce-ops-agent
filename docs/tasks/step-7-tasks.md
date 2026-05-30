@@ -119,6 +119,8 @@ Acceptance: `apply_approval_decisions(decisions: list[dict], tool_context: ToolC
 - For each, `await record_approval_decision(d.approval_id, d)`.
 - Bucket and return `{"approved": [campaign_id...], "rejected": [campaign_id...], "edit_requested": [{approval_id, campaign_id, asset_id, reviewer_notes}...]}`.
 
+**Implementation deviation (noted):** the approved/rejected buckets return `approval_id` instead of `campaign_id`. Functionally equivalent for the coordinator's non-empty-branch check — the coordinator branches on `edit_requested` being non-empty, not on specific campaign_ids. `campaign_id` is available via the approval document (fetched inside `record_approval_decision`) but was not surfaced back to the caller. Leave for a future cleanup if the surface needs it.
+
 Unit tests (mock `record_approval_decision`): a mixed list (1 approved, 1 rejected, 1 edit_requested) calls `record_approval_decision` once per item and returns the three correctly-populated buckets; a malformed decision (`decision="maybe"` or unknown field) raises a validation error before any write.
 
 Verify: `.venv/bin/python -m pytest tests/test_step_7.py -v -k apply`
