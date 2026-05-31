@@ -60,7 +60,7 @@
       "capability": "propose_review_queue",
       "label": "Review queue assembled",
       "result_summary": "8 items staged · 5 proven · 3 discovery",
-      "strategy_summary": "Strong proven set this event — similarity engine found 5 strong historical matches above threshold. Supplemented with 3 exploration picks: two action shots the model flagged as novel compositions, one bench moment with Messi that has no historical parallel.",
+      "strategy_summary": "Strong proven set this event — similarity engine found 5 historical matches above threshold. Supplemented with 3 discovery picks: low similarity scores, no strong historical precedent. One features Messi; all three surfaced for operator review on the strength of their emotional and social scores.",
       "delay_ms": 1400
     },
     {
@@ -102,7 +102,7 @@
           "caption": "You were there when it happened. Wear the result.",
           "hashtags": ["#WorldCup2026", "#ArgentinaVsFrance", "#AlbicelestePride"]
         },
-        "agent_reasoning": "Proven match — #2 similarity to previous upset-victory t-shirt sellers. Dynamic action framing typical of high-converting merch shots. Quality: 3.9/5. Identity: Argentina squad visible. Clean jersey print surface.",
+        "agent_reasoning": "Proven match — #2 similarity to previous upset-victory t-shirt sellers. Quality: 3.9/5. Identity: Argentina squad visible. Clean jersey print surface.",
         "scores": { "quality": 3.9, "emotional": 4.1, "social": 3.6, "merch": 4.3, "identity": 3.5 }
       },
       {
@@ -118,7 +118,7 @@
           "caption": "Every great team has a story that doesn't make the highlights reel.",
           "hashtags": ["#WorldCup2026", "#ArgentinaVsFrance", "#BehindTheGame"]
         },
-        "agent_reasoning": "Discovery pick — no historical parallel for this bench composition. Novel framing; emotional resonance high (team unity, non-action moment). Risk: lower merch conversion rate historically for bench shots. Surfaced for operator review.",
+        "agent_reasoning": "Discovery pick — similarity below threshold, no strong historical match. Emotional score high (4.3/5); merch score below threshold (2.8/5) flagged as conversion risk. Surfaced for operator review.",
         "scores": { "quality": 3.7, "emotional": 4.3, "social": 4.1, "merch": 2.8, "identity": 2.5 }
       },
       {
@@ -150,7 +150,7 @@
           "caption": "The moment Argentina's bench erupted. 90+3 and the world stopped breathing. 🇦🇷 #WorldCup2026",
           "hashtags": ["#ArgentinaVsFrance", "#WC2026", "#HistoricMoment", "#Albiceleste"]
         },
-        "agent_reasoning": "Proven match — crowd/bench reaction shot. High social engagement predicted for reaction-moment content. Historical: reaction shots outperform goal frames by 2.1× on Instagram saves.",
+        "agent_reasoning": "Proven match — high similarity to past top-performing social assets. Social score: 4.4/5, emotional: 4.6/5. Historical: similar assets outperform baseline by 2.1× on social engagement.",
         "scores": { "quality": 3.6, "emotional": 4.6, "social": 4.4, "merch": 2.1, "identity": 2.0 }
       },
       {
@@ -182,7 +182,7 @@
           "caption": "This is what 3–2 looks like. Pure. Raw. Unstoppable. 🏆 #WorldCup2026",
           "hashtags": ["#ArgentinaVsFrance", "#WC2026", "#GOAT", "#WorldCup"]
         },
-        "agent_reasoning": "Proven match — goal celebration frame, peak action. Strong similarity to high-performing social content from 2022 WC Final. Social engagement historical: 4.3× baseline for celebration content on tournament nights.",
+        "agent_reasoning": "Proven match — strong similarity to high-performing social content from 2022 WC Final. Social score: 4.5/5, emotional: 4.5/5. Historical: similar assets from tournament finals outperform baseline 4.3× on social engagement.",
         "scores": { "quality": 3.8, "emotional": 4.5, "social": 4.5, "merch": 2.3, "identity": 3.2 }
       },
       {
@@ -198,7 +198,7 @@
           "caption": "Ground level. Corner flag. The view nobody talks about. 🌍 #WorldCup2026",
           "hashtags": ["#ArgentinaVsFrance", "#WC2026", "#Football", "#AlternativeAngle"]
         },
-        "agent_reasoning": "Discovery pick — unique low-angle composition. Novel visual framing flagged by model. No historical match. Predicted to perform well on photography-focused accounts. Social: 3.9/5. Quality: 4.0/5.",
+        "agent_reasoning": "Discovery pick — similarity below threshold, no strong historical match. Quality score high (4.0/5), social score 3.9/5. Surfaced for operator review.",
         "scores": { "quality": 4.0, "emotional": 3.2, "social": 3.9, "merch": 1.8, "identity": 2.1 }
       }
     ]
