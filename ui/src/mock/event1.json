@@ -1,0 +1,295 @@
+{
+  "event": {
+    "event_id": "wc2026-match-42",
+    "name": "Argentina vs. France",
+    "home_team": "Argentina",
+    "away_team": "France",
+    "outcome_type": "upset_victory",
+    "final_score": "Argentina 3–2 France",
+    "timeliness": 0.92,
+    "timeliness_label": "Peak window"
+  },
+  "messages": [
+    {
+      "id": "msg-coord-1",
+      "role": "coordinator",
+      "text": "Got it — Argentina vs. France, 3–2. That's one of the tournament's defining moments. Confirming: match kicked off at 19:00 UTC, batch at /tmp/wc-final/?"
+    },
+    {
+      "id": "msg-op-1",
+      "role": "operator",
+      "text": "Yes, 19:00 UTC. 47 photos in the batch."
+    },
+    {
+      "id": "msg-coord-2",
+      "role": "coordinator",
+      "text": "Perfect. Ingesting now. Timeliness is peak — upset victory at 0.95 base, ~2 hours post-kickoff puts effective score at 0.92. Messi and Di María flagged as high commercial signal from squad context."
+    },
+    {
+      "id": "msg-coord-3",
+      "role": "coordinator",
+      "text": "Vision scoring complete — strong batch overall. Similarity engine found 5 exploitation matches above threshold. Queue assembled: 8 items, 5 exploitation + 3 exploration. Awaiting your review."
+    }
+  ],
+  "capabilities": [
+    {
+      "capability": "ingest_event_batch",
+      "label": "Batch ingested",
+      "result_summary": "47 photos indexed to Atlas",
+      "delay_ms": 900
+    },
+    {
+      "capability": "build_event_context",
+      "label": "Event context built",
+      "result_summary": "Upset victory · peak timeliness window · 2 key players identified",
+      "delay_ms": 1300
+    },
+    {
+      "capability": "find_similar_assets",
+      "label": "Historical matches found",
+      "result_summary": "12 exploitation matches · 3 high-confidence",
+      "delay_ms": 1500
+    },
+    {
+      "capability": "score_assets_with_vision",
+      "label": "Assets scored",
+      "result_summary": "Vision analysis complete · 47 assets",
+      "delay_ms": 1900
+    },
+    {
+      "capability": "propose_review_queue",
+      "label": "Review queue assembled",
+      "result_summary": "8 items staged · 5 exploitation · 3 exploration",
+      "strategy_summary": "Rich exploitation set this event — similarity engine found 5 strong historical matches above threshold. Supplemented with 3 exploration picks: two action shots the model flagged as novel compositions, one bench moment with Messi that has no historical parallel.",
+      "delay_ms": 1400
+    },
+    {
+      "capability": "draft_campaigns_for_queue",
+      "label": "Campaign copy drafted",
+      "result_summary": "8 drafts ready · 4 Shopify · 4 social",
+      "delay_ms": 1100
+    }
+  ],
+  "approval": {
+    "approval_id": "apr-wc2026-42",
+    "items": [
+      {
+        "asset_id": "asset-001",
+        "approval_id": "apri-001",
+        "channel": "shopify",
+        "product_type": "poster",
+        "queue_type": "exploitation",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Messi_vs_Nigeria_2018.jpg",
+        "filename": "FILE_0023.jpg",
+        "copy_draft": {
+          "headline": "The Miracle on the Pitch",
+          "caption": "Three goals. One night. A moment Argentina will never forget. Limited-edition match poster.",
+          "hashtags": ["#WorldCup2026", "#ArgentinaVsFrance", "#Messi", "#WCFinal"]
+        },
+        "agent_reasoning": "Exploitation match — ranked #1 similarity to past poster revenue leaders. Identity signal: Messi, high commercial value. Quality: 4.2/5. Strong merch potential for upset victory narrative. Historical precedent: 2022 WC Final poster sold out in under 4 hours.",
+        "scores": { "quality": 4.2, "emotional": 4.5, "social": 3.2, "merch": 4.7, "identity": 4.8 }
+      },
+      {
+        "asset_id": "asset-002",
+        "approval_id": "apri-002",
+        "channel": "shopify",
+        "product_type": "tshirt",
+        "queue_type": "exploitation",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Argentina_vs_France_2018_World_Cup_22.jpg",
+        "filename": "FILE_0031.jpg",
+        "copy_draft": {
+          "headline": "Argentina 3 · France 2",
+          "caption": "You were there when it happened. Wear the result.",
+          "hashtags": ["#WorldCup2026", "#ArgentinaVsFrance", "#AlbicelestePride"]
+        },
+        "agent_reasoning": "Exploitation match — #2 similarity to previous upset-victory t-shirt sellers. Dynamic action framing typical of high-converting merch shots. Quality: 3.9/5. Identity: Argentina squad visible. Clean jersey print surface.",
+        "scores": { "quality": 3.9, "emotional": 4.1, "social": 3.6, "merch": 4.3, "identity": 3.5 }
+      },
+      {
+        "asset_id": "asset-003",
+        "approval_id": "apri-003",
+        "channel": "shopify",
+        "product_type": "poster",
+        "queue_type": "discovery",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Argentina_3-3_Francia_-_Copa_Mundial_2022_-_Celebraci%C3%B3n_de_victoria.jpg",
+        "filename": "FILE_0041.jpg",
+        "copy_draft": {
+          "headline": "Bench Witness",
+          "caption": "Every great team has a story that doesn't make the highlights reel.",
+          "hashtags": ["#WorldCup2026", "#ArgentinaVsFrance", "#BehindTheGame"]
+        },
+        "agent_reasoning": "Discovery pick — no historical parallel for this bench composition. Novel framing; emotional resonance high (team unity, non-action moment). Risk: lower merch conversion rate historically for bench shots. Surfaced for operator review.",
+        "scores": { "quality": 3.7, "emotional": 4.3, "social": 4.1, "merch": 2.8, "identity": 2.5 }
+      },
+      {
+        "asset_id": "asset-004",
+        "approval_id": "apri-004",
+        "channel": "shopify",
+        "product_type": "tshirt",
+        "queue_type": "exploitation",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Argentina_vs_France_2018_World_Cup_34.jpg",
+        "filename": "FILE_0038.jpg",
+        "copy_draft": {
+          "headline": "Di María · The Architect",
+          "caption": "Two assists. The veteran who scripted the win. Heritage print.",
+          "hashtags": ["#WorldCup2026", "#DiMaria", "#ArgentinaVsFrance"]
+        },
+        "agent_reasoning": "Exploitation match — Di María identity signal, high commercial value for player-specific merch. Quality: 4.1/5. Clean composition suitable for t-shirt print. Historical match: Di María jersey sales spiked +340% after 2022 WC performance.",
+        "scores": { "quality": 4.1, "emotional": 3.8, "social": 3.4, "merch": 4.1, "identity": 4.4 }
+      },
+      {
+        "asset_id": "asset-005",
+        "approval_id": "apri-005",
+        "channel": "social",
+        "product_type": null,
+        "queue_type": "exploitation",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Iran_vs_Portugal_2018_FIFA_World_Cup_%282%29.jpg",
+        "filename": "FILE_0007.jpg",
+        "copy_draft": {
+          "headline": null,
+          "caption": "The moment Argentina's bench erupted. 90+3 and the world stopped breathing. 🇦🇷 #WorldCup2026",
+          "hashtags": ["#ArgentinaVsFrance", "#WC2026", "#HistoricMoment", "#Albiceleste"]
+        },
+        "agent_reasoning": "Exploitation match — crowd/bench reaction shot. High social engagement predicted for reaction-moment content. Historical: reaction shots outperform goal frames by 2.1× on Instagram saves.",
+        "scores": { "quality": 3.6, "emotional": 4.6, "social": 4.4, "merch": 2.1, "identity": 2.0 }
+      },
+      {
+        "asset_id": "asset-006",
+        "approval_id": "apri-006",
+        "channel": "social",
+        "product_type": null,
+        "queue_type": "discovery",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/e/e5/Kylian_Mbapp%C3%A9_2018.jpg",
+        "filename": "FILE_0012.jpg",
+        "copy_draft": {
+          "headline": null,
+          "caption": "Even legends have their nights. The game's best player, outrun by history. 🤍 #WorldCup2026",
+          "hashtags": ["#ArgentinaVsFrance", "#Mbappe", "#WC2026", "#Respect"]
+        },
+        "agent_reasoning": "Discovery pick — narrative contrast angle (France perspective). No historical match for Mbappé-loss framing. High engagement predicted: empathy content performs well post-upset. Identity: Mbappé, global signal. Social: 4.2/5.",
+        "scores": { "quality": 3.5, "emotional": 4.4, "social": 4.2, "merch": 1.5, "identity": 4.6 }
+      },
+      {
+        "asset_id": "asset-007",
+        "approval_id": "apri-007",
+        "channel": "social",
+        "product_type": null,
+        "queue_type": "exploitation",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Argentina_vs_France_2018_World_Cup_22.jpg",
+        "filename": "FILE_0019.jpg",
+        "copy_draft": {
+          "headline": null,
+          "caption": "This is what 3–2 looks like. Pure. Raw. Unstoppable. 🏆 #WorldCup2026",
+          "hashtags": ["#ArgentinaVsFrance", "#WC2026", "#GOAT", "#WorldCup"]
+        },
+        "agent_reasoning": "Exploitation match — goal celebration frame, peak action. Strong similarity to high-performing social content from 2022 WC Final. Social engagement historical: 4.3× baseline for celebration content on tournament nights.",
+        "scores": { "quality": 3.8, "emotional": 4.5, "social": 4.5, "merch": 2.3, "identity": 3.2 }
+      },
+      {
+        "asset_id": "asset-008",
+        "approval_id": "apri-008",
+        "channel": "social",
+        "product_type": null,
+        "queue_type": "discovery",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Argentina_vs_France_2018_World_Cup_34.jpg",
+        "filename": "FILE_0044.jpg",
+        "copy_draft": {
+          "headline": null,
+          "caption": "Ground level. Corner flag. The view nobody talks about. 🌍 #WorldCup2026",
+          "hashtags": ["#ArgentinaVsFrance", "#WC2026", "#Football", "#AlternativeAngle"]
+        },
+        "agent_reasoning": "Discovery pick — unique low-angle composition. Novel visual framing flagged by model. No historical match. Predicted to perform well on photography-focused accounts. Social: 3.9/5. Quality: 4.0/5.",
+        "scores": { "quality": 4.0, "emotional": 3.2, "social": 3.9, "merch": 1.8, "identity": 2.1 }
+      }
+    ]
+  },
+  "redraft_items": [
+    {
+      "asset_id": "asset-003",
+      "approval_id": "apri-003-r1",
+      "channel": "shopify",
+      "product_type": "poster",
+      "queue_type": "discovery",
+      "photo_url": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Argentina_3-3_Francia_-_Copa_Mundial_2022_-_Celebraci%C3%B3n_de_victoria.jpg",
+      "filename": "FILE_0041.jpg",
+      "copy_draft": {
+        "headline": "The 26-Man Story",
+        "caption": "Championships aren't won by eleven. A tribute to the squad behind the squad. Limited print.",
+        "hashtags": ["#WorldCup2026", "#ArgentinaVsFrance", "#TheSquad", "#Albiceleste"]
+      },
+      "agent_reasoning": "Redraft: operator requested stronger team-unity angle. Revised headline emphasises full squad contribution; collectible narrative addresses the merch conversion concern flagged in initial review. Discovery pick maintained.",
+      "scores": { "quality": 3.7, "emotional": 4.3, "social": 4.1, "merch": 3.4, "identity": 2.5 }
+    }
+  ],
+  "execution_evidence": {
+    "shopify_products": [
+      {
+        "asset_id": "asset-001",
+        "product_id": "gid://shopify/Product/8842301001",
+        "title": "The Miracle on the Pitch — Argentina vs. France Poster",
+        "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-poster-arg-fra-001",
+        "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Messi_vs_Nigeria_2018.jpg",
+        "product_type": "poster"
+      },
+      {
+        "asset_id": "asset-002",
+        "product_id": "gid://shopify/Product/8842301002",
+        "title": "Argentina 3 · France 2 — Match Day Tee",
+        "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-tshirt-arg-fra-002",
+        "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Argentina_vs_France_2018_World_Cup_22.jpg",
+        "product_type": "tshirt"
+      },
+      {
+        "asset_id": "asset-003",
+        "product_id": "gid://shopify/Product/8842301003",
+        "title": "The 26-Man Story — Squad Tribute Poster",
+        "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-poster-arg-fra-003",
+        "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Argentina_3-3_Francia_-_Copa_Mundial_2022_-_Celebraci%C3%B3n_de_victoria.jpg",
+        "product_type": "poster"
+      },
+      {
+        "asset_id": "asset-004",
+        "product_id": "gid://shopify/Product/8842301004",
+        "title": "Di María · The Architect — Heritage Print Tee",
+        "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-tshirt-arg-fra-004",
+        "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Argentina_vs_France_2018_World_Cup_34.jpg",
+        "product_type": "tshirt"
+      }
+    ],
+    "social_posts": [
+      {
+        "asset_id": "asset-005",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Iran_vs_Portugal_2018_FIFA_World_Cup_%282%29.jpg",
+        "caption": "The moment Argentina's bench erupted. 90+3 and the world stopped breathing. 🇦🇷 #WorldCup2026",
+        "hashtags": ["#ArgentinaVsFrance", "#WC2026", "#HistoricMoment", "#Albiceleste"]
+      },
+      {
+        "asset_id": "asset-006",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/e/e5/Kylian_Mbapp%C3%A9_2018.jpg",
+        "caption": "Even legends have their nights. The game's best player, outrun by history. 🤍 #WorldCup2026",
+        "hashtags": ["#ArgentinaVsFrance", "#Mbappe", "#WC2026", "#Respect"]
+      },
+      {
+        "asset_id": "asset-007",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Argentina_vs_France_2018_World_Cup_22.jpg",
+        "caption": "This is what 3–2 looks like. Pure. Raw. Unstoppable. 🏆 #WorldCup2026",
+        "hashtags": ["#ArgentinaVsFrance", "#WC2026", "#GOAT", "#WorldCup"]
+      }
+    ],
+    "atlas_state": {
+      "events": 1,
+      "assets": 47,
+      "campaigns": 7,
+      "approvals": {
+        "total": 9,
+        "approved": 7,
+        "rejected": 1,
+        "edit_requested": 1
+      },
+      "performance": {
+        "total": 7,
+        "metrics_status": "pending_sync"
+      }
+    }
+  }
+}

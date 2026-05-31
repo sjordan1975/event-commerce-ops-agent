@@ -1,0 +1,202 @@
+{
+  "event": {
+    "event_id": "wc2026-match-17",
+    "name": "Germany vs. Spain",
+    "home_team": "Germany",
+    "away_team": "Spain",
+    "outcome_type": "draw",
+    "final_score": "Germany 1–1 Spain",
+    "timeliness": 0.35,
+    "timeliness_label": "Moderate window"
+  },
+  "messages": [
+    {
+      "id": "msg-coord-e2-1",
+      "role": "coordinator",
+      "text": "Group stage draw — Germany vs. Spain, 1–1. Timeliness is lower: draw base at 0.40, ~4 hours post-kickoff puts effective score at 0.35. I'll adjust queue balance toward exploration given the weaker exploitation signal."
+    },
+    {
+      "id": "msg-coord-e2-2",
+      "role": "coordinator",
+      "text": "Similarity search found only 2 exploitation matches above threshold — both moderate confidence. Vision scoring complete. Strong photographic composition in this batch. Exploration picks may outperform. Queue assembled: 5 items, leaning social."
+    }
+  ],
+  "capabilities": [
+    {
+      "capability": "ingest_event_batch",
+      "label": "Batch ingested",
+      "result_summary": "31 photos indexed to Atlas",
+      "delay_ms": 800
+    },
+    {
+      "capability": "build_event_context",
+      "label": "Event context built",
+      "result_summary": "Group stage draw · moderate timeliness · Müller, Morata identified",
+      "delay_ms": 1100
+    },
+    {
+      "capability": "find_similar_assets",
+      "label": "Historical matches found",
+      "result_summary": "4 exploitation matches · 2 moderate-confidence",
+      "delay_ms": 1300
+    },
+    {
+      "capability": "score_assets_with_vision",
+      "label": "Assets scored",
+      "result_summary": "Vision analysis complete · 31 assets",
+      "delay_ms": 1600
+    },
+    {
+      "capability": "propose_review_queue",
+      "label": "Review queue assembled",
+      "result_summary": "5 items staged · 2 exploitation · 3 exploration",
+      "strategy_summary": "Thinner exploitation set — draw narrative with moderate timeliness limits historical match confidence. Leaning exploration: 3 novel picks including a standout goalkeeper composition and a mid-game tactical sideline shot. Social-first batch this event.",
+      "delay_ms": 1200
+    },
+    {
+      "capability": "draft_campaigns_for_queue",
+      "label": "Campaign copy drafted",
+      "result_summary": "5 drafts ready · 1 Shopify · 4 social",
+      "delay_ms": 900
+    }
+  ],
+  "approval": {
+    "approval_id": "apr-wc2026-17",
+    "items": [
+      {
+        "asset_id": "asset-e2-001",
+        "approval_id": "apri-e2-001",
+        "channel": "shopify",
+        "product_type": "poster",
+        "queue_type": "exploitation",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Mario_G%C3%B6tze_GOL_-_The_2014_FIFA_World_Cup_Final_-_140713-9112-jikatu_%2814463413827%29.jpg",
+        "filename": "FILE_0009.jpg",
+        "copy_draft": {
+          "headline": "Der Punkt · The Point That Mattered",
+          "caption": "Not a win. Not a loss. A statement. The draw that said: Germany is back. Limited edition.",
+          "hashtags": ["#WorldCup2026", "#GermanyVsSpain", "#DieMannnschaft"]
+        },
+        "agent_reasoning": "Exploitation match — #1 similarity to post-draw limited posters from 2022 WC qualifiers. Moderate confidence. Identity: Germany player, medium commercial signal. Quality: 4.0/5. Draw narrative has shorter commercial window — recommend expedited release.",
+        "scores": { "quality": 4.0, "emotional": 3.4, "social": 2.9, "merch": 3.6, "identity": 3.2 }
+      },
+      {
+        "asset_id": "asset-e2-002",
+        "approval_id": "apri-e2-002",
+        "channel": "social",
+        "product_type": null,
+        "queue_type": "exploitation",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Football_%28Soccer%29.JPG",
+        "filename": "FILE_0014.jpg",
+        "copy_draft": {
+          "headline": null,
+          "caption": "One point each. Both teams walk away with something to prove. This group stage just got interesting. ⚽ #WC2026",
+          "hashtags": ["#GermanyVsSpain", "#WC2026", "#GroupStage", "#Football"]
+        },
+        "agent_reasoning": "Exploitation match — group stage tension narrative. Historical: stakes content outperforms celebration in group phase by 1.8×. Quality: 3.5/5. Social: 3.8/5.",
+        "scores": { "quality": 3.5, "emotional": 3.6, "social": 3.8, "merch": 1.6, "identity": 1.8 }
+      },
+      {
+        "asset_id": "asset-e2-003",
+        "approval_id": "apri-e2-003",
+        "channel": "social",
+        "product_type": null,
+        "queue_type": "discovery",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Mario_G%C3%B6tze_GOL_-_The_2014_FIFA_World_Cup_Final_-_140713-9112-jikatu_%2814463413827%29.jpg",
+        "filename": "FILE_0022.jpg",
+        "copy_draft": {
+          "headline": null,
+          "caption": "The save that kept Spain level. Goalkeepers don't get enough credit. 🧤 #WC2026",
+          "hashtags": ["#GermanyVsSpain", "#WC2026", "#GK", "#Goalkeeper"]
+        },
+        "agent_reasoning": "Discovery pick — outstanding goalkeeper composition, no historical match. Model flagged unusual low-angle: ball mid-save. Goalkeeper content underrepresented in sports commerce; high differentiation potential. Social: 4.1/5.",
+        "scores": { "quality": 4.3, "emotional": 3.8, "social": 4.1, "merch": 2.0, "identity": 2.8 }
+      },
+      {
+        "asset_id": "asset-e2-004",
+        "approval_id": "apri-e2-004",
+        "channel": "social",
+        "product_type": null,
+        "queue_type": "discovery",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Football_%28Soccer%29.JPG",
+        "filename": "FILE_0031.jpg",
+        "copy_draft": {
+          "headline": null,
+          "caption": "Mid-game. Both managers reading the same script. This tactical draw had a predetermined feel. 📋 #WC2026",
+          "hashtags": ["#GermanyVsSpain", "#WC2026", "#Tactics", "#Football"]
+        },
+        "agent_reasoning": "Discovery pick — sideline tactical moment. Football analytics accounts respond well to this content type. Predicted engagement: specialist audience, moderate volume, high saves ratio. Social: 3.7/5.",
+        "scores": { "quality": 3.3, "emotional": 3.1, "social": 3.7, "merch": 1.2, "identity": 1.5 }
+      },
+      {
+        "asset_id": "asset-e2-005",
+        "approval_id": "apri-e2-005",
+        "channel": "social",
+        "product_type": null,
+        "queue_type": "discovery",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Iran_vs_Portugal_2018_FIFA_World_Cup_%282%29.jpg",
+        "filename": "FILE_0038.jpg",
+        "copy_draft": {
+          "headline": null,
+          "caption": "Rivals. Equals. Neither backed down. When it ends 1–1, the real story is in the stalemate. ⚡ #WC2026",
+          "hashtags": ["#GermanyVsSpain", "#WC2026", "#EqualMatch", "#WorldCup"]
+        },
+        "agent_reasoning": "Discovery pick — rivalry narrative framing. Both Germany and Spain are historic powerhouses; 'meeting of equals' angle has strong international appeal. No historical match. Social: 4.0/5. Narrative risk: may read as neither team won.",
+        "scores": { "quality": 3.8, "emotional": 4.0, "social": 4.0, "merch": 1.4, "identity": 2.2 }
+      }
+    ]
+  },
+  "redraft_items": [],
+  "execution_evidence": {
+    "shopify_products": [
+      {
+        "asset_id": "asset-e2-001",
+        "product_id": "gid://shopify/Product/8842302001",
+        "title": "Der Punkt · Germany vs. Spain Draw Poster",
+        "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-poster-ger-esp-001",
+        "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Mario_G%C3%B6tze_GOL_-_The_2014_FIFA_World_Cup_Final_-_140713-9112-jikatu_%2814463413827%29.jpg",
+        "product_type": "poster"
+      }
+    ],
+    "social_posts": [
+      {
+        "asset_id": "asset-e2-002",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Football_%28Soccer%29.JPG",
+        "caption": "One point each. Both teams walk away with something to prove. ⚽ #WC2026",
+        "hashtags": ["#GermanyVsSpain", "#WC2026", "#GroupStage", "#Football"]
+      },
+      {
+        "asset_id": "asset-e2-003",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Mario_G%C3%B6tze_GOL_-_The_2014_FIFA_World_Cup_Final_-_140713-9112-jikatu_%2814463413827%29.jpg",
+        "caption": "The save that kept Spain level. Goalkeepers don't get enough credit. 🧤 #WC2026",
+        "hashtags": ["#GermanyVsSpain", "#WC2026", "#GK", "#Goalkeeper"]
+      },
+      {
+        "asset_id": "asset-e2-004",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Football_%28Soccer%29.JPG",
+        "caption": "Mid-game. Both managers reading the same script. 📋 #WC2026",
+        "hashtags": ["#GermanyVsSpain", "#WC2026", "#Tactics", "#Football"]
+      },
+      {
+        "asset_id": "asset-e2-005",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Iran_vs_Portugal_2018_FIFA_World_Cup_%282%29.jpg",
+        "caption": "Rivals. Equals. Neither backed down. ⚡ #WC2026",
+        "hashtags": ["#GermanyVsSpain", "#WC2026", "#EqualMatch", "#WorldCup"]
+      }
+    ],
+    "atlas_state": {
+      "events": 2,
+      "assets": 78,
+      "campaigns": 12,
+      "approvals": {
+        "total": 14,
+        "approved": 12,
+        "rejected": 2,
+        "edit_requested": 1
+      },
+      "performance": {
+        "total": 12,
+        "metrics_status": "pending_sync"
+      }
+    }
+  }
+}
