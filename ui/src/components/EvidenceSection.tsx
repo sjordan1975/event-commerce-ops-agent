@@ -19,7 +19,7 @@ function ShopifyCard({
   return (
     <div className="border border-border rounded-lg p-4 bg-surface flex gap-4">
       {/* Mockup thumbnail */}
-      <div className="w-20 h-20 shrink-0 rounded-md bg-surface-3 border border-border overflow-hidden flex items-center justify-center">
+      <div className="shrink-0 rounded-md bg-surface-3 border border-border overflow-hidden flex items-center justify-center" style={{ width: 100, height: 100 }}>
         {mockupUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
@@ -28,33 +28,31 @@ function ShopifyCard({
             className="w-full h-full object-cover animate-fade-in"
           />
         ) : (
-          <div className="flex flex-col items-center gap-1">
-            <div className="w-4 h-4 border-2 border-border border-t-accent rounded-full animate-spin-slow" />
-            <span className="font-mono text-[8px] text-text-muted">rendering</span>
+          <div className="flex flex-col items-center gap-1.5">
+            <div className="w-5 h-5 border-2 border-border border-t-accent rounded-full animate-spin-slow" />
+            <span className="font-mono text-xs text-text-muted">rendering</span>
           </div>
         )}
       </div>
 
       {/* Product info */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-start gap-2 mb-1.5">
-          <span className="font-mono text-[9px] tracking-widest uppercase text-accent/70 shrink-0 mt-0.5">
-            {product.productType}
-          </span>
-        </div>
-        <p className="text-xs font-semibold text-text-primary leading-snug mb-2">
+        <span className="font-mono text-xs tracking-widest uppercase text-accent/70 block mb-1.5">
+          {product.productType}
+        </span>
+        <p className="text-sm font-semibold text-text-primary leading-snug mb-2">
           {product.title}
         </p>
         <a
           href={product.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 font-mono text-[10px] text-text-secondary hover:text-accent transition-colors"
+          className="inline-flex items-center gap-1.5 font-mono text-xs text-text-secondary hover:text-accent transition-colors"
         >
-          <ExternalLink size={9} />
+          <ExternalLink size={11} />
           View on Shopify
         </a>
-        <p className="font-mono text-[9px] text-text-muted mt-1">
+        <p className="font-mono text-xs text-text-muted mt-1">
           Draft · {product.productId.split('/').pop()}
         </p>
       </div>
@@ -68,9 +66,9 @@ function SocialPostCard({
   post: ExecutionEvidence['socialPosts'][0]
 }) {
   return (
-    <div className="border border-border rounded-lg p-3 bg-surface flex gap-3">
+    <div className="border border-border rounded-lg p-3 bg-surface flex gap-4">
       {/* Photo */}
-      <div className="w-14 h-14 shrink-0 rounded-md overflow-hidden bg-surface-3 border border-border">
+      <div className="shrink-0 rounded-md overflow-hidden bg-surface-3 border border-border" style={{ width: 100, height: 100 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={post.photoUrl}
@@ -81,13 +79,13 @@ function SocialPostCard({
       </div>
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] text-text-secondary leading-relaxed mb-1">
+        <p className="text-sm text-text-secondary leading-relaxed mb-1">
           {post.caption}
         </p>
-        <p className="font-mono text-[9px] text-text-muted leading-relaxed">
+        <p className="font-mono text-xs text-text-muted leading-relaxed">
           {post.hashtags.join(' ')}
         </p>
-        <span className="inline-flex items-center gap-1 mt-1.5 font-mono text-[8px] tracking-widest uppercase text-status-green/70 border border-status-green/20 rounded px-1.5 py-0.5 bg-status-green-dim">
+        <span className="inline-flex items-center gap-1 mt-2 font-mono text-xs tracking-widest uppercase text-status-green/80 border border-status-green/20 rounded px-1.5 py-0.5 bg-status-green-dim">
           queued in atlas
         </span>
       </div>
@@ -103,7 +101,7 @@ function AtlasStatePanel({ state }: { state: AtlasState }) {
     {
       label: 'approvals',
       value: (
-        <span className="flex gap-2">
+        <span className="flex gap-3 flex-wrap">
           <span>{state.approvals.total} total</span>
           <span className="text-status-green">{state.approvals.approved} approved</span>
           <span className="text-status-red">{state.approvals.rejected} rejected</span>
@@ -116,7 +114,7 @@ function AtlasStatePanel({ state }: { state: AtlasState }) {
     {
       label: 'performance',
       value: (
-        <span className="flex gap-2">
+        <span className="flex gap-3 flex-wrap">
           <span>{state.performance.total} docs</span>
           <span className="text-status-amber">{state.performance.metrics_status}</span>
           <span className="text-text-muted">· 7-day window open</span>
@@ -127,19 +125,19 @@ function AtlasStatePanel({ state }: { state: AtlasState }) {
 
   return (
     <div className="border border-border rounded-lg p-4 bg-surface">
-      <div className="flex items-center gap-2 mb-3">
-        <Package size={12} className="text-text-secondary" />
-        <span className="font-mono text-[9px] tracking-widest uppercase text-text-secondary select-none">
+      <div className="flex items-center gap-2 mb-4">
+        <Package size={13} className="text-text-secondary" />
+        <span className="font-mono text-xs tracking-widest uppercase text-text-secondary select-none">
           Atlas State
         </span>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {rows.map((row) => (
-          <div key={row.label} className="flex items-start gap-4">
-            <span className="font-mono text-[10px] text-text-secondary w-20 shrink-0 select-none">
+          <div key={row.label} className="flex items-start gap-6">
+            <span className="font-mono text-xs text-text-secondary w-24 shrink-0 select-none">
               {row.label}
             </span>
-            <span className="font-mono text-[10px] text-text-primary flex-1 min-w-0">
+            <span className="font-mono text-xs text-text-primary flex-1 min-w-0">
               {row.value}
             </span>
           </div>
@@ -157,7 +155,7 @@ export function EvidenceSection({ evidence, atlasState, mockupUrls }: Props) {
         <div>
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px flex-1 bg-border" />
-            <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-text-secondary select-none">
+            <span className="font-mono text-xs tracking-[0.2em] uppercase text-text-secondary select-none">
               Shopify Products Created
             </span>
             <div className="h-px flex-1 bg-border" />
@@ -179,7 +177,7 @@ export function EvidenceSection({ evidence, atlasState, mockupUrls }: Props) {
         <div>
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px flex-1 bg-border" />
-            <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-text-secondary select-none">
+            <span className="font-mono text-xs tracking-[0.2em] uppercase text-text-secondary select-none">
               Social Queue — {evidence.socialPosts.length} Posts
             </span>
             <div className="h-px flex-1 bg-border" />
@@ -197,7 +195,7 @@ export function EvidenceSection({ evidence, atlasState, mockupUrls }: Props) {
         <div>
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px flex-1 bg-border" />
-            <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-text-secondary select-none">
+            <span className="font-mono text-xs tracking-[0.2em] uppercase text-text-secondary select-none">
               Database State
             </span>
             <div className="h-px flex-1 bg-border" />

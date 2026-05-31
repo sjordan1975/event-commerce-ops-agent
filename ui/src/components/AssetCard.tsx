@@ -15,7 +15,7 @@ function ChannelBadge({ channel, productType }: { channel: string; productType: 
       ? 'text-accent border-accent/30 bg-accent/5'
       : 'text-[#3B82F6] border-[#3B82F6]/30 bg-[#3B82F6]/5'
   return (
-    <span className={`font-mono text-[9px] tracking-widest uppercase border rounded px-1.5 py-0.5 ${cls}`}>
+    <span className={`font-mono text-xs tracking-widest uppercase border rounded px-1.5 py-0.5 ${cls}`}>
       {label}
     </span>
   )
@@ -27,7 +27,7 @@ function QueueBadge({ type }: { type: string }) {
       ? 'text-[#F97316] border-[#F97316]/30 bg-[#F97316]/5'
       : 'text-[#9B59B6] border-[#9B59B6]/30 bg-[#9B59B6]/5'
   return (
-    <span className={`font-mono text-[9px] tracking-widest uppercase border rounded px-1.5 py-0.5 ${cls}`}>
+    <span className={`font-mono text-xs tracking-widest uppercase border rounded px-1.5 py-0.5 ${cls}`}>
       {type}
     </span>
   )
@@ -48,8 +48,8 @@ export function AssetCard({ item, onDecision, currentDecision }: Props) {
   const dec = currentDecision?.decision
 
   const borderCls =
-    dec === 'approved'       ? 'border-status-green/40'
-    : dec === 'rejected'     ? 'border-status-red/40'
+    dec === 'approved'         ? 'border-status-green/40'
+    : dec === 'rejected'       ? 'border-status-red/40'
     : dec === 'edit_requested' ? 'border-status-amber/40'
     : 'border-border'
 
@@ -81,9 +81,9 @@ export function AssetCard({ item, onDecision, currentDecision }: Props) {
       </div>
 
       {/* Main content: photo + text */}
-      <div className="flex gap-4 mb-4">
-        {/* Thumbnail */}
-        <div className="w-28 h-28 shrink-0 rounded-md overflow-hidden bg-surface-3 border border-border">
+      <div className="flex gap-5 mb-4">
+        {/* Thumbnail — larger so photo content is actually evaluable */}
+        <div className="shrink-0 rounded-md overflow-hidden bg-surface-3 border border-border" style={{ width: 220, height: 220 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={item.photoUrl}
@@ -95,34 +95,34 @@ export function AssetCard({ item, onDecision, currentDecision }: Props) {
 
         {/* Text content */}
         <div className="flex-1 min-w-0">
-          <p className="font-mono text-[9px] text-text-muted mb-2 tracking-wide select-none">
+          <p className="font-mono text-xs text-text-muted mb-2 tracking-wide select-none">
             {item.filename}
           </p>
 
           {/* Copy draft */}
           <div className="mb-3">
-            <p className="font-mono text-[9px] tracking-widest uppercase text-text-secondary mb-1 select-none">
+            <p className="font-mono text-xs tracking-widest uppercase text-text-secondary mb-1 select-none">
               Copy Draft
             </p>
             {item.copyDraft.headline && (
-              <p className="text-sm font-semibold text-text-primary leading-snug mb-0.5">
+              <p className="text-sm font-semibold text-text-primary leading-snug mb-1">
                 &ldquo;{item.copyDraft.headline}&rdquo;
               </p>
             )}
-            <p className="text-xs text-text-secondary leading-relaxed">
+            <p className="text-sm text-text-secondary leading-relaxed">
               {item.copyDraft.caption}
             </p>
-            <p className="font-mono text-[10px] text-text-muted mt-1 leading-relaxed">
+            <p className="font-mono text-xs text-text-muted mt-1 leading-relaxed">
               {item.copyDraft.hashtags.join(' ')}
             </p>
           </div>
 
           {/* Agent reasoning */}
           <div>
-            <p className="font-mono text-[9px] tracking-widest uppercase text-text-secondary mb-1 select-none">
+            <p className="font-mono text-xs tracking-widest uppercase text-text-secondary mb-1 select-none">
               Agent Reasoning
             </p>
-            <p className="text-[11px] text-text-secondary leading-relaxed">
+            <p className="text-sm text-text-secondary leading-relaxed">
               {item.agentReasoning}
             </p>
           </div>
@@ -130,7 +130,7 @@ export function AssetCard({ item, onDecision, currentDecision }: Props) {
       </div>
 
       {/* Score bars */}
-      <div className="space-y-1.5 pt-3 border-t border-border mb-4">
+      <div className="space-y-2 pt-3 border-t border-border mb-4">
         <ScoreBar label="quality"   value={item.scores.quality}   />
         <ScoreBar label="emotional" value={item.scores.emotional} />
         <ScoreBar label="social"    value={item.scores.social}    />
@@ -140,42 +140,39 @@ export function AssetCard({ item, onDecision, currentDecision }: Props) {
 
       {/* Decision buttons */}
       <div className="flex gap-2">
-        {/* Approve */}
         <button
           onClick={() => decide('approved')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded border text-[11px] font-mono transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded border text-xs font-mono transition-all ${
             dec === 'approved'
               ? 'border-status-green bg-status-green-dim text-status-green'
               : 'border-border text-text-secondary hover:border-status-green hover:text-status-green hover:bg-status-green-dim'
           }`}
         >
-          <Check size={11} />
+          <Check size={12} />
           {dec === 'approved' ? 'Approved' : 'Approve'}
         </button>
 
-        {/* Reject */}
         <button
           onClick={() => decide('rejected')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded border text-[11px] font-mono transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded border text-xs font-mono transition-all ${
             dec === 'rejected'
               ? 'border-status-red bg-status-red-dim text-status-red'
               : 'border-border text-text-secondary hover:border-status-red hover:text-status-red hover:bg-status-red-dim'
           }`}
         >
-          <X size={11} />
+          <X size={12} />
           {dec === 'rejected' ? 'Rejected' : 'Reject'}
         </button>
 
-        {/* Edit request */}
         <button
           onClick={() => decide('edit_requested')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded border text-[11px] font-mono transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded border text-xs font-mono transition-all ${
             dec === 'edit_requested'
               ? 'border-status-amber bg-status-amber-dim text-status-amber'
               : 'border-border text-text-secondary hover:border-status-amber hover:text-status-amber hover:bg-status-amber-dim'
           }`}
         >
-          <Pencil size={11} />
+          <Pencil size={12} />
           {dec === 'edit_requested' ? 'Edit Requested' : 'Request Edit'}
         </button>
       </div>
@@ -188,7 +185,7 @@ export function AssetCard({ item, onDecision, currentDecision }: Props) {
             onChange={(e) => handleEditNoteChange(e.target.value)}
             placeholder="Describe what to change..."
             rows={2}
-            className="w-full bg-surface-3 border border-status-amber/30 rounded-md px-3 py-2 text-xs text-text-primary placeholder-text-secondary resize-none font-sans outline-none focus:border-status-amber/60 transition-colors"
+            className="w-full bg-surface-3 border border-status-amber/30 rounded-md px-3 py-2 text-sm text-text-primary placeholder-text-secondary resize-none font-sans outline-none focus:border-status-amber/60 transition-colors"
           />
         </div>
       )}

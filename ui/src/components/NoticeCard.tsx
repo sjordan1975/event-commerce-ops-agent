@@ -42,7 +42,7 @@ export function NoticeCard({ notice, isNew }: Props) {
       `}
     >
       <span className="mt-px text-text-secondary shrink-0">{icon}</span>
-      <span className="font-mono text-[10px] text-text-secondary leading-relaxed flex-1 min-w-0 break-words">
+      <span className="font-mono text-xs text-text-secondary leading-relaxed flex-1 min-w-0 break-words">
         {notice.text}
       </span>
     </div>

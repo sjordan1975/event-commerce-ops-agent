@@ -33,7 +33,7 @@ function CapabilityRow({ step }: { step: CapabilityStep }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-3 flex-wrap">
           <span
-            className={`font-mono text-[10px] tracking-widest uppercase select-none ${
+            className={`font-mono text-xs tracking-widest uppercase select-none ${
               step.status === 'complete' ? 'text-text-primary'
               : step.status === 'running' ? 'text-accent'
               : 'text-text-muted'
@@ -42,14 +42,14 @@ function CapabilityRow({ step }: { step: CapabilityStep }) {
             {label}
           </span>
           {step.resultSummary && (
-            <span className="font-mono text-[10px] text-text-secondary">
+            <span className="font-mono text-xs text-text-secondary">
               {step.resultSummary}
             </span>
           )}
         </div>
         {/* Strategy excerpt for propose_review_queue */}
         {isQueue && step.strategyExcerpt && (
-          <p className="mt-1 text-[11px] text-text-secondary leading-relaxed font-sans italic border-l-2 border-accent/30 pl-2.5">
+          <p className="mt-1 text-sm text-text-secondary leading-relaxed font-sans italic border-l-2 border-accent/30 pl-2.5">
             &ldquo;{step.strategyExcerpt}&rdquo;
           </p>
         )}
