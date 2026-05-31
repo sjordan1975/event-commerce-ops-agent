@@ -440,7 +440,8 @@ project-root/
 ├── ui/                   ← NEW: Next.js operator console
 │   ├── src/app/          ← App Router pages
 │   ├── src/components/   ← UI components (AppShell, AssetCard, etc.)
-│   ├── src/lib/          ← API client, SSE hooks, mock fixtures
+│   ├── src/lib/          ← API client, SSE hooks, mock-api.ts
+│   ├── src/mock/         ← JSON fixtures (event1.json, event2.json)
 │   ├── public/
 │   ├── package.json
 │   └── next.config.ts    ← dev proxy: /api/* → localhost:8000
@@ -498,7 +499,7 @@ pipeline_complete        { event_id }
 
 The `LongRunningFunctionTool` at `request_human_approval` suspends the coordinator runner. The runner holds an open async task; the session state is live in the session service. When the operator POSTs decisions to `/api/approvals/{approval_id}`, `session_bridge.py` calls `apply_approval_decisions` via the existing ADK pattern, which writes the per-item decisions to MongoDB and delivers a `FunctionResponse` back to the suspended runner. The runner resumes the coordinator, which reads the persisted decisions and calls `execute_approved_campaigns`.
 
-With `InMemorySessionService` this is straightforward — session is in process memory. **The demo video runs on localhost; `InMemorySessionService` is sufficient.**
+With `InMemorySessionService` this is straightforward — session is in process memory. **The demo video runs on localhost; `InMemorySessionService` is sufficient.** Batch images are pre-staged at `/tmp/wc-final/` (localhost) and referenced by that path in the operator's kickoff message. On Cloud Run, images must be pre-uploaded to GCS; the operator uses a `gs://` path instead, `ingest_event_batch` enumerates the bucket, and `content_url` stores `gs://` URIs — which Vertex AI (embeddings + Vision) reads natively without any additional auth step.
 
 For Cloud Run: the `LongRunningFunctionTool` suspension is a live async coroutine held inside `runner.run_async()` — it is process-local, not a checkpoint in the session service. `DatabaseSessionService` persists conversation history across restarts but does **not** solve cross-instance HITL resumption (the suspended coroutine cannot be handed to a different process). The pragmatic solution for the hackathon submission is single-instance Cloud Run (`--min-instances=1 --max-instances=1`): one process, always warm, session stays in memory. `DatabaseSessionService` (MongoDB-backed) is still worth wiring for conversation history persistence and honest architecture framing, but it does not change HITL resumption behavior. Tracked in `docs/plans/delivery-roadmap.md` § Track 4.
 

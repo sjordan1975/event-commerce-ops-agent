@@ -11,7 +11,7 @@ All 9 agent capabilities are complete on `main`. This document tracks the five d
 
 **Demo video runs on localhost.** Both servers (Python API port 8000, Next.js port 3000) run locally for the recording. `InMemorySessionService` is sufficient — the session lives for the duration of the recording, no restarts. Cloud Run is required for the Devpost submission (hosted URL), but it is NOT on the critical path for the demo video. This removes the hardest dependency from the recording schedule.
 
-```
+```text
 Demo Corpus ──────────────────────────────────────────────────┐
                                                                ▼
 Approval UI (Next.js, mock-first → wired) ─────────────────► Demo Video

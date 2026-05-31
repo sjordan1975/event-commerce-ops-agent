@@ -26,7 +26,7 @@ Desktop-only. Dark theme throughout — near-black background (`#0A0A0A`), aesth
 
 Two columns, header at top. Left column is **full height**. Right column splits vertically: activity + content pane on top, chat input anchored to the lower-right pane.
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  HEADER — logo · event badge · phase status                             │
 ├──────────────────────────┬──────────────────────────────────────────────┤
@@ -51,6 +51,8 @@ Two columns, header at top. Left column is **full height**. Right column splits 
 **Right column top — activity + content (~65%, upper ~70% of right column):** activity timeline (deterministic capability checklist, spinner → checkmark) at the top. Dynamic content zone below it — transitions between idle / approval batch / evidence / final summary as phases progress.
 
 **Right column bottom — chat input (lower ~30% of right column):** the kickoff message, clarification exchange, and any mid-run commands. Centered within this zone. Rounded border, dark fill, subtle glow on focus. No model selector (coordinator model is server-configured, not operator-chosen). No attach control — the demo images are pre-downloaded to known local paths on the demo machine before recording; the operator references the directory path in the chat message (`"Photos at /tmp/wc-final/"`), the coordinator enumerates the directory and passes the file list to `ingest_event_batch`. No real-time upload through the UI is needed or architecturally coherent with how `ingest_event_batch` works (it takes `list[str]` paths/URLs and stores them as `content_url` — the agent server reads from those paths directly).
+
+**Demo environment: localhost.** The demo video is recorded locally; `/tmp/wc-final/` resolves on the same machine as the agent server. On Cloud Run, images must be pre-staged in GCS and the operator references a `gs://` path instead — `ingest_event_batch` enumerates the bucket and stores `gs://` URIs as `content_url`, which Vertex AI reads natively.
 
 The operator's sent messages appear above the input in the chat zone (conversation history). Coordinator text responses surface here too. Capability events go to the left streaming column — the two surfaces are distinct.
 
@@ -288,7 +290,7 @@ The operator's kickoff message and approval decisions are POST requests; SSE is 
 
 Build the full UI against a JSON fixture. No backend dependency. Capability progression is simulated with `setTimeout` delays (600–1800ms per step — fast enough to feel live, slow enough to read).
 
-**Fixture file:** `src/mock/event1.json`
+**Fixture file:** `ui/src/mock/event1.json`
 
 Fixture must include:
 - Event metadata (name, `outcome_type`, timeliness label)
@@ -299,9 +301,20 @@ Fixture must include:
   - At least 1 pre-marked `edit_requested` to exercise the redraft path
 - Execution evidence: Shopify product stubs (with placeholder URL), social post cards, Atlas collection counts
 
-**Image placeholders:** use 6–8 real Wikimedia Commons soccer photos. Manually grabbed URLs, not dynamically fetched. These will be swapped for real corpus images in Phase B.
+**Image placeholders:** 8 CC-licensed Wikimedia Commons soccer photos confirmed for Phase A. Use these in fixtures; swap for real corpus images in Phase B.
 
-**Event 2 fixture:** `src/mock/event2.json` — thinner queue (5 items total), higher proportion of exploration picks, different reasoning text to show the contrast.
+| URL | Subject | License |
+|-----|---------|---------|
+| `https://upload.wikimedia.org/wikipedia/commons/1/1a/Argentina_vs_France_2018_World_Cup_22.jpg` | Argentina vs France 2018 WC — match action | CC BY 4.0 |
+| `https://upload.wikimedia.org/wikipedia/commons/b/b8/Argentina_vs_France_2018_World_Cup_34.jpg` | Argentina vs France 2018 WC — match action | CC BY 4.0 |
+| `https://upload.wikimedia.org/wikipedia/commons/b/b8/Messi_vs_Nigeria_2018.jpg` | Messi celebrating vs Nigeria 2018 WC | CC BY-SA 3.0 |
+| `https://upload.wikimedia.org/wikipedia/commons/e/e5/Kylian_Mbapp%C3%A9_2018.jpg` | Mbappé, Best Young Player 2018 WC | CC BY-SA 3.0 |
+| `https://upload.wikimedia.org/wikipedia/commons/e/e6/Iran_vs_Portugal_2018_FIFA_World_Cup_%282%29.jpg` | Iran vs Portugal 2018 WC — match action | CC BY-SA 3.0 |
+| `https://upload.wikimedia.org/wikipedia/commons/2/2e/Argentina_3-3_Francia_-_Copa_Mundial_2022_-_Celebraci%C3%B3n_de_victoria.jpg` | Argentina 2022 WC victory celebration | CC BY 3.0 |
+| `https://upload.wikimedia.org/wikipedia/commons/5/56/Mario_G%C3%B6tze_GOL_-_The_2014_FIFA_World_Cup_Final_-_140713-9112-jikatu_%2814463413827%29.jpg` | Mario Götze goal, 2014 WC Final (event2) | CC BY-SA 2.0 |
+| `https://upload.wikimedia.org/wikipedia/commons/7/74/Football_%28Soccer%29.JPG` | Generic soccer match action (event2) | CC BY-SA 4.0 |
+
+**Event 2 fixture:** `ui/src/mock/event2.json` — thinner queue (5 items total), higher proportion of exploration picks, different reasoning text to show the contrast.
 
 **Phase A gate (what "done" means for mock-first):**
 - Full journey from kickoff message through execution evidence is playable end-to-end
