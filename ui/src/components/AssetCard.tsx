@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Check, X, Pencil } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, X, Pencil, ZoomIn } from 'lucide-react'
 import type { ApprovalItem, Decision } from '@/lib/types'
 import { ScoreBar } from './ScoreBar'
 
@@ -33,6 +33,40 @@ function QueueBadge({ type }: { type: string }) {
   )
 }
 
+function Lightbox({ src, filename, onClose }: { src: string; filename: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.92)' }}
+      onClick={onClose}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={filename}
+        className="rounded-lg object-contain animate-fade-in"
+        style={{ maxWidth: '85vw', maxHeight: '85vh' }}
+        onClick={e => e.stopPropagation()}
+      />
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+        <span className="font-mono text-xs text-white/50">{filename}</span>
+      </div>
+      <button
+        className="absolute top-5 right-6 text-white/40 hover:text-white/80 transition-colors"
+        onClick={onClose}
+      >
+        <X size={20} />
+      </button>
+    </div>
+  )
+}
+
 interface Props {
   item: ApprovalItem
   onDecision: (approvalId: string, decision: Decision) => void
@@ -44,6 +78,7 @@ export function AssetCard({ item, onDecision, currentDecision }: Props) {
   const [showEditField, setShowEditField] = useState(
     currentDecision?.decision === 'edit_requested'
   )
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   const dec = currentDecision?.decision
 
@@ -69,126 +104,147 @@ export function AssetCard({ item, onDecision, currentDecision }: Props) {
   }
 
   return (
-    <div
-      className={`border rounded-lg p-4 bg-surface transition-all duration-200 ${borderCls} ${
-        dec === 'rejected' ? 'opacity-55' : ''
-      }`}
-    >
-      {/* Badges */}
-      <div className="flex gap-2 flex-wrap mb-3">
-        <ChannelBadge channel={item.channel} productType={item.productType} />
-        <QueueBadge type={item.queueType} />
-      </div>
-
-      {/* Main content: photo + text */}
-      <div className="flex gap-5 mb-4">
-        {/* Thumbnail — larger so photo content is actually evaluable */}
-        <div className="shrink-0 rounded-md overflow-hidden bg-surface-3 border border-border" style={{ width: 220, height: 220 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={item.photoUrl}
-            alt={item.filename}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        </div>
-
-        {/* Text content */}
-        <div className="flex-1 min-w-0">
-          <p className="font-mono text-xs text-text-muted mb-2 tracking-wide select-none">
-            {item.filename}
-          </p>
-
-          {/* Copy draft */}
-          <div className="mb-3">
-            <p className="font-mono text-xs tracking-widest uppercase text-text-secondary mb-1 select-none">
-              Copy Draft
-            </p>
-            {item.copyDraft.headline && (
-              <p className="text-sm font-semibold text-text-primary leading-snug mb-1">
-                &ldquo;{item.copyDraft.headline}&rdquo;
-              </p>
-            )}
-            <p className="text-sm text-text-secondary leading-relaxed">
-              {item.copyDraft.caption}
-            </p>
-            <p className="font-mono text-xs text-text-muted mt-1 leading-relaxed">
-              {item.copyDraft.hashtags.join(' ')}
-            </p>
-          </div>
-
-          {/* Agent reasoning */}
-          <div>
-            <p className="font-mono text-xs tracking-widest uppercase text-text-secondary mb-1 select-none">
-              Agent Reasoning
-            </p>
-            <p className="text-sm text-text-secondary leading-relaxed">
-              {item.agentReasoning}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Score bars */}
-      <div className="space-y-2 pt-3 border-t border-border mb-4">
-        <ScoreBar label="quality"   value={item.scores.quality}   />
-        <ScoreBar label="emotional" value={item.scores.emotional} />
-        <ScoreBar label="social"    value={item.scores.social}    />
-        <ScoreBar label="merch"     value={item.scores.merch}     />
-        <ScoreBar label="identity"  value={item.scores.identity}  />
-      </div>
-
-      {/* Decision buttons */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => decide('approved')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded border text-xs font-mono transition-all ${
-            dec === 'approved'
-              ? 'border-status-green bg-status-green-dim text-status-green'
-              : 'border-border text-text-secondary hover:border-status-green hover:text-status-green hover:bg-status-green-dim'
-          }`}
-        >
-          <Check size={12} />
-          {dec === 'approved' ? 'Approved' : 'Approve'}
-        </button>
-
-        <button
-          onClick={() => decide('rejected')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded border text-xs font-mono transition-all ${
-            dec === 'rejected'
-              ? 'border-status-red bg-status-red-dim text-status-red'
-              : 'border-border text-text-secondary hover:border-status-red hover:text-status-red hover:bg-status-red-dim'
-          }`}
-        >
-          <X size={12} />
-          {dec === 'rejected' ? 'Rejected' : 'Reject'}
-        </button>
-
-        <button
-          onClick={() => decide('edit_requested')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded border text-xs font-mono transition-all ${
-            dec === 'edit_requested'
-              ? 'border-status-amber bg-status-amber-dim text-status-amber'
-              : 'border-border text-text-secondary hover:border-status-amber hover:text-status-amber hover:bg-status-amber-dim'
-          }`}
-        >
-          <Pencil size={12} />
-          {dec === 'edit_requested' ? 'Edit Requested' : 'Request Edit'}
-        </button>
-      </div>
-
-      {/* Edit note field */}
-      {showEditField && (
-        <div className="mt-3 animate-fade-in">
-          <textarea
-            value={editNote}
-            onChange={(e) => handleEditNoteChange(e.target.value)}
-            placeholder="Describe what to change..."
-            rows={2}
-            className="w-full bg-surface-3 border border-status-amber/30 rounded-md px-3 py-2 text-sm text-text-primary placeholder-text-secondary resize-none font-sans outline-none focus:border-status-amber/60 transition-colors"
-          />
-        </div>
+    <>
+      {lightboxOpen && (
+        <Lightbox
+          src={item.photoUrl}
+          filename={item.filename}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
-    </div>
+
+      <div
+        className={`border rounded-lg p-4 bg-surface transition-all duration-200 ${borderCls} ${
+          dec === 'rejected' ? 'opacity-55' : ''
+        }`}
+      >
+        {/* Badges */}
+        <div className="flex gap-2 flex-wrap mb-3">
+          <ChannelBadge channel={item.channel} productType={item.productType} />
+          <QueueBadge type={item.queueType} />
+        </div>
+
+        {/* Main content: photo + text */}
+        <div className="flex gap-5 mb-4">
+          {/* Thumbnail — click to enlarge */}
+          <div
+            className="shrink-0 rounded-md overflow-hidden bg-surface-3 border border-border relative group cursor-zoom-in"
+            style={{ width: 220, height: 220 }}
+            onClick={() => setLightboxOpen(true)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.photoUrl}
+              alt={item.filename}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+            {/* Hover overlay */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-150 flex items-center justify-center">
+              <ZoomIn
+                size={28}
+                className="text-white/0 group-hover:text-white/80 transition-all duration-150 drop-shadow-lg"
+              />
+            </div>
+          </div>
+
+          {/* Text content */}
+          <div className="flex-1 min-w-0">
+            <p className="font-mono text-xs text-text-muted mb-2 tracking-wide select-none">
+              {item.filename}
+            </p>
+
+            {/* Copy draft */}
+            <div className="mb-3">
+              <p className="font-mono text-xs tracking-widest uppercase text-text-secondary mb-1 select-none">
+                Copy Draft
+              </p>
+              {item.copyDraft.headline && (
+                <p className="text-sm font-semibold text-text-primary leading-snug mb-1">
+                  &ldquo;{item.copyDraft.headline}&rdquo;
+                </p>
+              )}
+              <p className="text-sm text-text-secondary leading-relaxed">
+                {item.copyDraft.caption}
+              </p>
+              <p className="font-mono text-xs text-text-muted mt-1 leading-relaxed">
+                {item.copyDraft.hashtags.join(' ')}
+              </p>
+            </div>
+
+            {/* Agent reasoning */}
+            <div>
+              <p className="font-mono text-xs tracking-widest uppercase text-text-secondary mb-1 select-none">
+                Agent Reasoning
+              </p>
+              <p className="text-sm text-text-secondary leading-relaxed">
+                {item.agentReasoning}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Score bars */}
+        <div className="space-y-2 pt-3 border-t border-border mb-4">
+          <ScoreBar label="quality"   value={item.scores.quality}   />
+          <ScoreBar label="emotional" value={item.scores.emotional} />
+          <ScoreBar label="social"    value={item.scores.social}    />
+          <ScoreBar label="merch"     value={item.scores.merch}     />
+          <ScoreBar label="identity"  value={item.scores.identity}  />
+        </div>
+
+        {/* Decision buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => decide('approved')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded border text-xs font-mono transition-all ${
+              dec === 'approved'
+                ? 'border-status-green bg-status-green-dim text-status-green'
+                : 'border-border text-text-secondary hover:border-status-green hover:text-status-green hover:bg-status-green-dim'
+            }`}
+          >
+            <Check size={12} />
+            {dec === 'approved' ? 'Approved' : 'Approve'}
+          </button>
+
+          <button
+            onClick={() => decide('rejected')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded border text-xs font-mono transition-all ${
+              dec === 'rejected'
+                ? 'border-status-red bg-status-red-dim text-status-red'
+                : 'border-border text-text-secondary hover:border-status-red hover:text-status-red hover:bg-status-red-dim'
+            }`}
+          >
+            <X size={12} />
+            {dec === 'rejected' ? 'Rejected' : 'Reject'}
+          </button>
+
+          <button
+            onClick={() => decide('edit_requested')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded border text-xs font-mono transition-all ${
+              dec === 'edit_requested'
+                ? 'border-status-amber bg-status-amber-dim text-status-amber'
+                : 'border-border text-text-secondary hover:border-status-amber hover:text-status-amber hover:bg-status-amber-dim'
+            }`}
+          >
+            <Pencil size={12} />
+            {dec === 'edit_requested' ? 'Edit Requested' : 'Request Edit'}
+          </button>
+        </div>
+
+        {/* Edit note field */}
+        {showEditField && (
+          <div className="mt-3 animate-fade-in">
+            <textarea
+              value={editNote}
+              onChange={(e) => handleEditNoteChange(e.target.value)}
+              placeholder="Describe what to change..."
+              rows={2}
+              className="w-full bg-surface-3 border border-status-amber/30 rounded-md px-3 py-2 text-sm text-text-primary placeholder-text-secondary resize-none font-sans outline-none focus:border-status-amber/60 transition-colors"
+            />
+          </div>
+        )}
+      </div>
+    </>
   )
 }
