@@ -47,7 +47,7 @@ function Lightbox({ src, filename, onClose }: { src: string; filename: string; o
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.92)' }}
       onClick={onClose}
     >

@@ -1,6 +1,15 @@
 'use client'
 
-import { ExternalLink, Package } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import {
+  Bookmark,
+  ExternalLink,
+  Heart,
+  MessageCircle,
+  MoreHorizontal,
+  Package,
+  Send,
+} from 'lucide-react'
 import type { AtlasState, ExecutionEvidence } from '@/lib/types'
 
 interface Props {
@@ -8,6 +17,89 @@ interface Props {
   atlasState: AtlasState | null
   mockupUrls: Record<string, string>
 }
+
+// ── Instagram-style post mock ─────────────────────────────────────────────────
+
+type SocialPost = ExecutionEvidence['socialPosts'][0]
+
+function SocialPostMock({ post, onClose }: { post: SocialPost; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.88)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl overflow-hidden shadow-2xl animate-fade-in"
+        style={{ width: 390 }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Profile row */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: '#0A0A0A' }}
+          >
+            <span className="font-mono text-xs font-bold" style={{ color: '#CCFF47' }}>F</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-black text-sm font-semibold leading-none">fieldhouse</p>
+            <p className="text-gray-400 text-xs mt-0.5">Sponsored</p>
+          </div>
+          <MoreHorizontal size={18} className="text-gray-400 shrink-0" />
+        </div>
+
+        {/* Photo */}
+        <div style={{ aspectRatio: '1 / 1' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={post.photoUrl}
+            alt="social post preview"
+            className="w-full h-full object-cover"
+          />
+        </div>
+
+        {/* Action row */}
+        <div className="px-4 pt-3 pb-4">
+          <div className="flex items-center gap-4 mb-3">
+            <Heart size={24} className="text-black" strokeWidth={1.5} />
+            <MessageCircle size={24} className="text-black" strokeWidth={1.5} />
+            <Send size={24} className="text-black" strokeWidth={1.5} />
+            <div className="flex-1" />
+            <Bookmark size={24} className="text-black" strokeWidth={1.5} />
+          </div>
+
+          {/* Likes */}
+          <p className="text-black text-sm font-semibold mb-1">1,247 likes</p>
+
+          {/* Caption */}
+          <p className="text-black text-sm leading-relaxed">
+            <span className="font-semibold">fieldhouse</span>{' '}
+            {post.caption}
+          </p>
+
+          {/* Hashtags */}
+          <p className="text-sm mt-1 leading-relaxed" style={{ color: '#0095f6' }}>
+            {post.hashtags.join(' ')}
+          </p>
+
+          {/* Timestamp */}
+          <p className="text-gray-400 text-xs uppercase tracking-wide mt-2">
+            2 minutes ago
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Card components ───────────────────────────────────────────────────────────
 
 function ShopifyCard({
   product,
@@ -19,7 +111,10 @@ function ShopifyCard({
   return (
     <div className="border border-border rounded-lg p-4 bg-surface flex gap-4">
       {/* Mockup thumbnail */}
-      <div className="shrink-0 rounded-md bg-surface-3 border border-border overflow-hidden flex items-center justify-center" style={{ width: 100, height: 100 }}>
+      <div
+        className="shrink-0 rounded-md bg-surface-3 border border-border overflow-hidden flex items-center justify-center"
+        style={{ width: 100, height: 100 }}
+      >
         {mockupUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
@@ -60,36 +155,53 @@ function ShopifyCard({
   )
 }
 
-function SocialPostCard({
-  post,
-}: {
-  post: ExecutionEvidence['socialPosts'][0]
-}) {
+function SocialPostCard({ post }: { post: SocialPost }) {
+  const [mockOpen, setMockOpen] = useState(false)
+
   return (
-    <div className="border border-border rounded-lg p-3 bg-surface flex gap-4">
-      {/* Photo */}
-      <div className="shrink-0 rounded-md overflow-hidden bg-surface-3 border border-border" style={{ width: 100, height: 100 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={post.photoUrl}
-          alt="social post"
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
+    <>
+      {mockOpen && (
+        <SocialPostMock post={post} onClose={() => setMockOpen(false)} />
+      )}
+
+      <div className="border border-border rounded-lg p-3 bg-surface flex gap-4">
+        {/* Photo */}
+        <div
+          className="shrink-0 rounded-md overflow-hidden bg-surface-3 border border-border"
+          style={{ width: 100, height: 100 }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={post.photoUrl}
+            alt="social post"
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-text-secondary leading-relaxed mb-1">
+            {post.caption}
+          </p>
+          <p className="font-mono text-xs text-text-muted leading-relaxed">
+            {post.hashtags.join(' ')}
+          </p>
+          <div className="mt-2 flex flex-col gap-1.5">
+            <span className="inline-flex items-center gap-1 font-mono text-xs tracking-widest uppercase text-status-green/80 border border-status-green/20 rounded px-1.5 py-0.5 bg-status-green-dim self-start">
+              queued in atlas
+            </span>
+            <button
+              onClick={() => setMockOpen(true)}
+              className="inline-flex items-center gap-1 font-mono text-xs text-text-secondary hover:text-accent transition-colors self-start"
+            >
+              <ExternalLink size={10} />
+              View mock
+            </button>
+          </div>
+        </div>
       </div>
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-text-secondary leading-relaxed mb-1">
-          {post.caption}
-        </p>
-        <p className="font-mono text-xs text-text-muted leading-relaxed">
-          {post.hashtags.join(' ')}
-        </p>
-        <span className="inline-flex items-center gap-1 mt-2 font-mono text-xs tracking-widest uppercase text-status-green/80 border border-status-green/20 rounded px-1.5 py-0.5 bg-status-green-dim">
-          queued in atlas
-        </span>
-      </div>
-    </div>
+    </>
   )
 }
 
