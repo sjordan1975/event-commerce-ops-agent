@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, X, Pencil, ZoomIn } from 'lucide-react'
 import type { ApprovalItem, Decision } from '@/lib/types'
 import { ScoreBar } from './ScoreBar'
@@ -45,7 +46,7 @@ function Lightbox({ src, filename, onClose }: { src: string; filename: string; o
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.92)' }}
@@ -68,7 +69,8 @@ function Lightbox({ src, filename, onClose }: { src: string; filename: string; o
       >
         <X size={20} />
       </button>
-    </div>
+    </div>,
+    document.body
   )
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Bookmark,
   ExternalLink,
@@ -29,7 +30,7 @@ function SocialPostMock({ post, onClose }: { post: SocialPost; onClose: () => vo
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.88)' }}
@@ -95,7 +96,8 @@ function SocialPostMock({ post, onClose }: { post: SocialPost; onClose: () => vo
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
