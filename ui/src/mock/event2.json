@@ -18,7 +18,7 @@
     {
       "id": "msg-coord-e2-2",
       "role": "coordinator",
-      "text": "Similarity search found only 2 proven matches above threshold — both moderate confidence. Vision scoring complete. Strong photographic composition in this batch. Exploration picks may outperform. Queue assembled: 5 items, leaning social."
+      "text": "Similarity search found only 2 proven matches above threshold — both moderate confidence. Vision scoring complete. Quality scores solid across the batch. Exploration picks may outperform. Queue assembled: 5 items, leaning social."
     }
   ],
   "capabilities": [
@@ -50,7 +50,7 @@
       "capability": "propose_review_queue",
       "label": "Review queue assembled",
       "result_summary": "5 items staged · 2 proven · 3 discovery",
-      "strategy_summary": "Thinner proven set — draw narrative with moderate timeliness limits historical match confidence. Leaning exploration: 3 novel picks including a standout goalkeeper composition and a mid-game tactical sideline shot. Social-first batch this event.",
+      "strategy_summary": "Thinner proven set — draw narrative with moderate timeliness limits historical match confidence. Leaning exploration: 3 discovery picks with low similarity scores and high emotional or social scores. Social-first batch this event.",
       "delay_ms": 1200
     },
     {
@@ -108,7 +108,7 @@
           "caption": "The save that kept Spain level. Goalkeepers don't get enough credit. 🧤 #WC2026",
           "hashtags": ["#GermanyVsSpain", "#WC2026", "#GK", "#Goalkeeper"]
         },
-        "agent_reasoning": "Discovery pick — outstanding goalkeeper composition, no historical match. Model flagged unusual low-angle: ball mid-save. Goalkeeper content underrepresented in sports commerce; high differentiation potential. Social: 4.1/5.",
+        "agent_reasoning": "Discovery pick — similarity below threshold, no strong historical match. Quality score high (4.3/5), social score 4.1/5. Surfaced for operator review.",
         "scores": { "quality": 4.3, "emotional": 3.8, "social": 4.1, "merch": 2.0, "identity": 2.8 }
       },
       {
@@ -124,7 +124,7 @@
           "caption": "Mid-game. Both managers reading the same script. This tactical draw had a predetermined feel. 📋 #WC2026",
           "hashtags": ["#GermanyVsSpain", "#WC2026", "#Tactics", "#Football"]
         },
-        "agent_reasoning": "Discovery pick — sideline tactical moment. Football analytics accounts respond well to this content type. Predicted engagement: specialist audience, moderate volume, high saves ratio. Social: 3.7/5.",
+        "agent_reasoning": "Discovery pick — similarity below threshold, no strong historical match. Social score 3.7/5. Surfaced for operator review.",
         "scores": { "quality": 3.3, "emotional": 3.1, "social": 3.7, "merch": 1.2, "identity": 1.5 }
       },
       {
