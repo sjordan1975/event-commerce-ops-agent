@@ -22,7 +22,7 @@ export function EventHeader({ phase, activeEventMeta, sessionCount }: Props) {
   const isActive = phase !== 'idle'
 
   return (
-    <header className="h-12 border-b border-border flex items-center px-6 shrink-0 gap-3">
+    <header className="py-3 border-b border-border flex items-center px-6 shrink-0 gap-3">
       {/* Wordmark */}
       <span className="font-mono text-[11px] tracking-[0.25em] text-accent uppercase select-none">
         Fieldhouse
@@ -33,7 +33,7 @@ export function EventHeader({ phase, activeEventMeta, sessionCount }: Props) {
       {/* Event badge or idle state */}
       {eventMeta ? (
         <>
-          <span className="font-sans text-xs font-semibold text-text-primary">
+          <span className="font-sans text-xs font-semibold text-text-primary leading-normal">
             {eventMeta.name}
           </span>
           {eventMeta.final_score && (

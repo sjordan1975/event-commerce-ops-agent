@@ -20,7 +20,7 @@ export function StreamingNotices({ notices }: Props) {
   }, [notices.length])
 
   return (
-    <aside className="w-[35%] border-r border-border bg-surface flex flex-col overflow-hidden shrink-0">
+    <aside className="w-72 border-r border-border bg-surface flex flex-col overflow-hidden shrink-0">
       {/* Column header */}
       <div className="px-4 pt-4 pb-3 border-b border-border shrink-0">
         <span className="font-mono text-[9px] tracking-[0.25em] uppercase text-text-secondary select-none">

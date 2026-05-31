@@ -95,7 +95,7 @@ export function ChatBar({ messages, phase, onSend }: Props) {
                 ? 'Describe an event to begin...'
                 : 'Pipeline running — waiting for completion...'
             }
-            className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-secondary outline-none font-sans disabled:cursor-not-allowed"
+            className="flex-1 bg-transparent text-sm h-8 text-text-primary placeholder-text-secondary outline-none font-sans disabled:cursor-not-allowed"
           />
           <button
             onClick={handleSend}

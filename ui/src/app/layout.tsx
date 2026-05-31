@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Syne, JetBrains_Mono } from "next/font/google";
+import { Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const syne = Syne({
+const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
   variable: "--font-syne",
   weight: ["400", "500", "600", "700", "800"],
@@ -27,9 +27,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${syne.variable} ${jetbrains.variable} h-full antialiased`}
+      className={`${bricolage.variable} ${jetbrains.variable} h-full antialiased`}
     >
-      <body className="h-full bg-bg text-text-primary font-sans overflow-hidden">
+      <body className="h-full bg-bg text-text-primary font-sans">
         {children}
       </body>
     </html>
