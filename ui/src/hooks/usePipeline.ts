@@ -211,8 +211,6 @@ export function usePipeline() {
                 {
                   meta: fixture.event,
                   capabilitySteps: activeStepsRef.current,
-                  evidence: null as unknown as ExecutionEvidence, // filled in next render
-                  atlasState: null as unknown as AtlasState,
                 },
               ])
               // Advance to next fixture
