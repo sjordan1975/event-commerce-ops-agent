@@ -21,6 +21,11 @@ function ChannelBadge({ channel, productType }: { channel: string; productType: 
   )
 }
 
+const QUEUE_LABELS: Record<string, string> = {
+  exploitation: 'Proven',
+  discovery:    'Discovery',
+}
+
 function QueueBadge({ type }: { type: string }) {
   const cls =
     type === 'exploitation'
@@ -28,7 +33,7 @@ function QueueBadge({ type }: { type: string }) {
       : 'text-[#9B59B6] border-[#9B59B6]/30 bg-[#9B59B6]/5'
   return (
     <span className={`font-mono text-xs tracking-widest uppercase border rounded px-1.5 py-0.5 ${cls}`}>
-      {type}
+      {QUEUE_LABELS[type] ?? type}
     </span>
   )
 }

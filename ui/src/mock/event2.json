@@ -13,12 +13,12 @@
     {
       "id": "msg-coord-e2-1",
       "role": "coordinator",
-      "text": "Group stage draw — Germany vs. Spain, 1–1. Timeliness is lower: draw base at 0.40, ~4 hours post-kickoff puts effective score at 0.35. I'll adjust queue balance toward exploration given the weaker exploitation signal."
+      "text": "Group stage draw — Germany vs. Spain, 1–1. Timeliness is lower: draw base at 0.40, ~4 hours post-kickoff puts effective score at 0.35. I'll adjust queue balance toward exploration given the weaker similarity signal."
     },
     {
       "id": "msg-coord-e2-2",
       "role": "coordinator",
-      "text": "Similarity search found only 2 exploitation matches above threshold — both moderate confidence. Vision scoring complete. Strong photographic composition in this batch. Exploration picks may outperform. Queue assembled: 5 items, leaning social."
+      "text": "Similarity search found only 2 proven matches above threshold — both moderate confidence. Vision scoring complete. Strong photographic composition in this batch. Exploration picks may outperform. Queue assembled: 5 items, leaning social."
     }
   ],
   "capabilities": [
@@ -37,7 +37,7 @@
     {
       "capability": "find_similar_assets",
       "label": "Historical matches found",
-      "result_summary": "4 exploitation matches · 2 moderate-confidence",
+      "result_summary": "4 proven matches · 2 moderate-confidence",
       "delay_ms": 1300
     },
     {
@@ -49,8 +49,8 @@
     {
       "capability": "propose_review_queue",
       "label": "Review queue assembled",
-      "result_summary": "5 items staged · 2 exploitation · 3 exploration",
-      "strategy_summary": "Thinner exploitation set — draw narrative with moderate timeliness limits historical match confidence. Leaning exploration: 3 novel picks including a standout goalkeeper composition and a mid-game tactical sideline shot. Social-first batch this event.",
+      "result_summary": "5 items staged · 2 proven · 3 discovery",
+      "strategy_summary": "Thinner proven set — draw narrative with moderate timeliness limits historical match confidence. Leaning exploration: 3 novel picks including a standout goalkeeper composition and a mid-game tactical sideline shot. Social-first batch this event.",
       "delay_ms": 1200
     },
     {
@@ -76,7 +76,7 @@
           "caption": "Not a win. Not a loss. A statement. The draw that said: Germany is back. Limited edition.",
           "hashtags": ["#WorldCup2026", "#GermanyVsSpain", "#DieMannnschaft"]
         },
-        "agent_reasoning": "Exploitation match — #1 similarity to post-draw limited posters from 2022 WC qualifiers. Moderate confidence. Identity: Germany player, medium commercial signal. Quality: 4.0/5. Draw narrative has shorter commercial window — recommend expedited release.",
+        "agent_reasoning": "Proven match — #1 similarity to post-draw limited posters from 2022 WC qualifiers. Moderate confidence. Identity: Germany player, medium commercial signal. Quality: 4.0/5. Draw narrative has shorter commercial window — recommend expedited release.",
         "scores": { "quality": 4.0, "emotional": 3.4, "social": 2.9, "merch": 3.6, "identity": 3.2 }
       },
       {
@@ -92,7 +92,7 @@
           "caption": "One point each. Both teams walk away with something to prove. This group stage just got interesting. ⚽ #WC2026",
           "hashtags": ["#GermanyVsSpain", "#WC2026", "#GroupStage", "#Football"]
         },
-        "agent_reasoning": "Exploitation match — group stage tension narrative. Historical: stakes content outperforms celebration in group phase by 1.8×. Quality: 3.5/5. Social: 3.8/5.",
+        "agent_reasoning": "Proven match — group stage tension narrative. Historical: stakes content outperforms celebration in group phase by 1.8×. Quality: 3.5/5. Social: 3.8/5.",
         "scores": { "quality": 3.5, "emotional": 3.6, "social": 3.8, "merch": 1.6, "identity": 1.8 }
       },
       {
