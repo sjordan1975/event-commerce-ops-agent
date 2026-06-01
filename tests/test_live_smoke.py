@@ -137,3 +137,42 @@ def test_real_documents_validate_against_models(db, collection, model):
     if doc is None:
         pytest.skip(f"{collection} is empty")
     model.model_validate({k: v for k, v in doc.items() if k != "_id"})
+
+
+@pytest.mark.anyio
+async def test_mcp_wrapper_parses_real_find_envelope():
+    """A real MCP `find` through the wrapper must parse — guards the envelope-parse bug.
+
+    The server wraps results in <untrusted-user-data-UUID> tags, but its security preamble
+    references those tags inline, so a non-greedy parser captured "and" and threw. This is
+    the only test that exercises _parse_docs_response against the REAL server (the pymongo
+    tests above bypass it). Boots the vendored MCP binary (no npx) for a reliable cold start.
+    """
+    import os
+    from pathlib import Path
+
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    if not os.environ.get("MONGODB_URI"):
+        pytest.skip("MONGODB_URI not set")
+    bin_path = Path(__file__).resolve().parents[1] / "src/api/node_modules/.bin/mongodb-mcp-server"
+    if not bin_path.exists():
+        pytest.skip("vendored mongodb-mcp-server not installed (npm install in src/api)")
+    os.environ["MONGODB_MCP_COMMAND"] = str(bin_path)
+
+    import src.db as dbmod
+
+    dbmod._client = None  # fresh singleton so it picks up MONGODB_MCP_COMMAND
+    from src.db.assets import get_assets_for_event
+
+    client = dbmod.get_client()
+    await client.warm(timeout=45)
+    try:
+        # 10 full asset docs incl. 3072-dim embeddings — the call that originally threw.
+        assets = await get_assets_for_event("wc2022-final-arg-fra")
+        assert len(assets) == 10, f"expected 10 parsed assets, got {len(assets)}"
+        assert all(a.event_id == "wc2022-final-arg-fra" for a in assets)
+    finally:
+        await client.close()
+        dbmod._client = None
