@@ -234,7 +234,7 @@ This "what it would look like published" preview is the **same preview-before-pu
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Preview mode (no live Shopify/Printful credentials).** The evidence section has two modes, selected by whether `SHOPIFY_*` / `PRINTFUL_*` credentials are configured on the backend — carried as a **net-new** `mode: 'live' | 'preview'` field on `ExecutionEvidence` (in `lib/types.ts` — the field does not exist yet). **Preview is the default a judge sees** (they run the project with a MongoDB URI + Google auth, not an ecommerce store), and it is also the content of the approval gate — "what would be published." Same card structure as live, two differences:
+**Preview mode (no live Shopify/Printful credentials).** *(Build status: NOT YET BUILT — Phase A; the live/text evidence cards already exist in `EvidenceSection.tsx`, this adds the `mode`-gated preview variant.)* The evidence section has two modes, selected by whether `SHOPIFY_*` / `PRINTFUL_*` credentials are configured on the backend — carried as a **net-new** `mode: 'live' | 'preview'` field on `ExecutionEvidence` (in `lib/types.ts` — the field does not exist yet). **Preview is the default a judge sees** (they run the project with a MongoDB URI + Google auth, not an ecommerce store), and it is also the content of the approval gate — "what would be published." Same card structure as live, two differences:
 
 1. A **`PreviewBadge`** on each Shopify/Printful card: `Preview · live Shopify/Printful not configured`. Never present a preview as a real published product (D-032 honesty ethos).
 2. Artifacts are synthesized, not fetched: Shopify gets a plausible `product_id` + product-style URL (non-navigating, or a local preview route); the `ShopifyCard` **mockup thumbnail** (its existing async image slot) shows the asset on a poster/t-shirt template — Phase A a clean labeled placeholder; real compositing is optional polish. Like the social card, a Shopify preview card may also offer a `View mock` expansion — the same card → rich-modal pattern as `SocialPostMock`.
@@ -268,6 +268,8 @@ The chat input is available again. The activity timeline begins a new block belo
 ---
 
 ## MCP connection health (persistent)
+
+> **Build status: NOT YET BUILT (Phase A).** The rest of the operator console exists in `ui/`; this widget and the preview cards below are the only unbuilt pieces. Build mock-first.
 
 Persistent across every phase — pinned to the **bottom of the left column**, below a divider under the streaming notices, visible even on the landing state. This is the visualization of the load-bearing partner integration: the demo's standing proof the agent is talking to a real MongoDB MCP server, not a fake.
 
