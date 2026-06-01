@@ -153,6 +153,30 @@ The four stubs are in `src/capabilities/execution.py` (or equivalent Step 7 exec
 - Confirm Printful API key is in `.env`
 - Printful mockup generation is async (task + poll) — decide whether to poll inline or fire-and-forget for demo purposes
 
+### Preview-before-publish (credential-gated) — what makes "judges can run it" true
+
+**Why:** a judge brings a MongoDB URI + Google auth, not a Shopify Partner store or a Printful key. With no credential-free path, the agent's payoff artifacts (product page, mockup) are invisible to anyone running it themselves. So each channel gets a **real path and a labeled preview path, selected by credential presence** (`SHOPIFY_*` / `PRINTFUL_*` env) — generalizing how social is already simulated (Hard Constraint #6).
+
+**Frame it as a feature, not a fallback:** preview-before-publish is the *content of the HITL approval gate* — the operator reviews the rendered artifacts, then approves. With live keys, approval publishes for real; without, it stays preview. Same artifacts either way.
+
+**Honesty rule (D-032 ethos):** preview artifacts must be labeled "Preview · live Shopify/Printful not configured" — never dressed up as a real published product. Honest, and more impressive for showing you know the difference.
+
+**Per-channel cost:**
+- Shopify preview — cheap: synth `product_id` + `product_url` + title/price (≈ today's stub, dressed up).
+- Printful preview — the only real-cost bit: its value *is* the rendered mockup. Start with a clean labeled placeholder/template frame; compositing the asset onto a poster/tshirt template is optional polish, not required.
+- Social — already simulated.
+
+**Schedule win:** preview decouples the on-camera demo path from live API credentials the same way the UI is decoupled from corpus — the full flow runs end-to-end with zero ecommerce credentials. Live keys become an enhancement, not a blocker.
+
+**MANDATORY — do not repeat the MCP "never tested the real path" trap.** If preview becomes the default demo path, the *real* Shopify/Printful code is at risk of never being exercised — exactly what happened to the MCP read path (mock-only-validated, actually broken against the real server until 2026-05-31). Pick one, deliberately:
+1. Capture at least one **live run** of the real path (à la `scripts/capture_mcp_fixtures.py` / the vendored-bin probe) to prove it works and record the real artifact shapes; **or**
+2. Explicitly accept preview-only for the submission and say so plainly in the demo video.
+The partner integration that *must* be real is **MongoDB MCP** (done) — Shopify/Printful are the agent's *actions*, so a labeled preview is defensible. But the choice must be deliberate, not an accident of having only tested the mock.
+
+**Phase A/B split (pairs with Track 2):**
+- **Phase A (now, `ui/phase-a`):** build the preview *cards* (Shopify product preview, Printful mockup frame) against mock data — same move as the social-post mock. They become the visual contract for the Phase-B preview generators.
+- **Phase B:** the credential-gated real/preview fork at the execution seam; the UI cards consume real-or-preview output with no change.
+
 ---
 
 ## Track 4 — Cloud Run Deploy
