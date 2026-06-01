@@ -60,6 +60,25 @@ MCP session (persistent)
 mongodb-mcp-server (npx, pinned)  ──→  Atlas
 ```
 
+## Health surface in the UI (operator console)
+
+Point 6 isn't only a debugging aid — surfaced in the operator console it becomes the **demo's proof that MongoDB MCP is load-bearing**, not invisible plumbing. A small status widget pinned to the **bottom of the sidebar** shows the live MCP session state: the visible payoff of all the connection-lifecycle work.
+
+**Signals shown** (the four from point 6, plus version):
+- session **connected / reconnecting / unavailable**
+- **last successful tool call** (relative time, e.g. "2s ago")
+- **reconnect attempts**
+- **tool-discovery status** (e.g. "43 tools")
+- pinned server version (`1.11.0`)
+
+**States, honestly degraded:** green dot = connected; amber = reconnecting; red = unavailable. The widget must reflect **true** state — red when the session is actually down — or it is theatre that quietly undoes the "health separate from request handling" principle. A permanently-green indicator is worse than none.
+
+**Compact, expandable:** collapsed = colored dot + "MongoDB MCP" + state; expand (hover/click) for the detail above. Poll `/health` every few seconds — a status light needs no SSE.
+
+**Two-layer, matching the Phase A/B split:**
+- **Phase A (the `ui/phase-a` branch — pure mock):** build the widget against a mock health payload. This lands the layout and **serves as the visual contract for Phase B** — the widget's shape *is* the spec for the `/health` payload it will eventually consume.
+- **Phase B:** make the backend match. Today `/health` returns only `{mcp_ready, mcp_error}`, and `MongoMCPClient` tracks only `_ready` + tool discovery — the manager (points 4/6) must additionally track **last-successful-call timestamp, reconnect attempts, and last-error detail**, and `/health` must return them. The widget then polls the real endpoint — a single swap, no UI change.
+
 ## Launch hardening (why pinned + `--prefer-offline`, and Cloud Run)
 
 `npx -y mongodb-mcp-server@latest` resolves "latest" from the npm registry on every cold start; a bare range (`@1`) likewise resolves the newest matching version. In network-restricted environments that resolve blocks the event loop and hangs *before the server starts* — observed repeatedly in the sandbox; the harness's own server avoids it by running a pinned, cached version. Mitigations, in order of robustness:
