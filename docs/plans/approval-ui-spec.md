@@ -12,9 +12,10 @@ This document defines the operator console: the primary demo artifact and the in
 2. Show the workflow making progress — capability by capability — with operator-legible labels and real-time status
 3. Surface the full approval batch with per-asset reasoning, score profiles, and channel routing at the HITL gate
 4. Accept approve / reject / edit-request decisions per asset and submit them
-5. Show execution evidence: Shopify product, Printful mockup, mocked social post
+5. Show execution evidence: Shopify product, Printful mockup, mocked social post — **real when credentials are configured, labeled preview otherwise**
 6. Handle the redraft loop if any item is edit-requested
 7. Show a final MongoDB state summary after completion
+8. Show live **MongoDB MCP connection health** — the load-bearing partner integration made visible and honest
 
 It must look polished enough to appear in a demo video watched by competition judges. "Clean and functional" is not the bar — the visual quality is a judging criterion (`01-requirements.md` § Judging Criteria: "Design").
 
@@ -42,11 +43,12 @@ Two columns, header at top. Left column is **full height**. Right column splits 
 │  older entries scroll    │      │  Describe an event to begin...   │   │
 │  up and fade             │      │                         Send ▶   │   │
 │                          │      └──────────────────────────────────┘   │
-│                          │                                              │
+│  ──────────────────────  │                                              │
+│  ● MongoDB MCP · 43 tools│                                              │
 └──────────────────────────┴──────────────────────────────────────────────┘
 ```
 
-**Left column — streaming notices (full height, ~35%):** real-time read-only feed of agent events — capability completions, reasoning excerpts, coordinator decisions. Each entry is a compact card: icon + label + one-line summary. No interaction. Older entries scroll up and fade; most recent 6–8 visible.
+**Left column — streaming notices (full height, ~35%):** real-time read-only feed of agent events — capability completions, reasoning excerpts, coordinator decisions. Each entry is a compact card: icon + label + one-line summary. No interaction. Older entries scroll up and fade; most recent 6–8 visible. Pinned to the **bottom** of this column, below a divider, is the persistent **MCP health badge** (`McpHealthBadge`) — full spec in § MCP connection health.
 
 **Right column top — activity + content (~65%, upper ~70% of right column):** activity timeline (deterministic capability checklist, spinner → checkmark) at the top. Dynamic content zone below it — transitions between idle / approval batch / evidence / final summary as phases progress.
 
@@ -186,20 +188,37 @@ Three panels, one per channel type:
 
 When Printful mockup URL resolves, the thumbnail swaps from a spinner to the rendered mockup image. This is a key live artifact for the demo.
 
-**Social panel**
+**Social panel** — per-post cards, each opening a full Instagram-style preview.
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  SOCIAL QUEUE — 4 POSTS                                 │
 │  ┌──────────────────────────────────────────────┐      │
-│  │  [photo]  Argentina's Miracle... #WCFinal    │      │
-│  │           #ArgentinaVsFrance #football       │      │
-│  │           ● queued in Atlas                  │      │
+│  │  [photo]  Argentina's Miracle...             │      │
+│  │           #WCFinal #ArgentinaVsFrance        │      │
+│  │           ● queued in atlas                  │      │
+│  │           ↗ View mock                        │      │
 │  └──────────────────────────────────────────────┘      │
 │  ... (3 more post cards)                               │
 └─────────────────────────────────────────────────────────┘
 ```
 
-Social posts are simulated — Hard Constraint #6. The card renders the full copy, hashtags, and a "queued in Atlas" badge. No live platform API.
+Social posting is simulated (Hard Constraint #6) — but the UI does **not** stop at a text card. Each card carries the "queued in atlas" badge **and a `View mock` button** that opens a full **Instagram-style post preview** (`SocialPostMock` — a modal portaled to `document.body`): profile row (`fieldhouse · Sponsored`), square photo, like / comment / share / bookmark row, a likes count, the caption prefixed with the `fieldhouse` handle, hashtags in Instagram blue, and a relative timestamp.
+
+```
+┌────────────────────────────┐
+│  ● fieldhouse · Sponsored ⋯│
+│  ┌──────────────────────┐  │
+│  │    [ square photo ]  │  │
+│  └──────────────────────┘  │
+│  ♡   ◯   ➤            ⤓    │
+│  1,247 likes               │
+│  fieldhouse  Argentina's…  │
+│  #WCFinal #ArgentinaVsF…   │
+│  2 MINUTES AGO             │
+└────────────────────────────┘
+```
+
+This "what it would look like published" preview is the **same preview-before-publish pattern** the Shopify/Printful cards adopt below (§ Preview mode) — social just happens to always be in preview (no live platform API, ever).
 
 **MongoDB state panel** (after `record_outcomes`)
 ```
@@ -215,6 +234,29 @@ Social posts are simulated — Hard Constraint #6. The card renders the full cop
 └─────────────────────────────────────────────────────────┘
 ```
 
+**Preview mode (no live Shopify/Printful credentials).** The evidence section has two modes, selected by whether `SHOPIFY_*` / `PRINTFUL_*` credentials are configured on the backend — carried as a **net-new** `mode: 'live' | 'preview'` field on `ExecutionEvidence` (in `lib/types.ts` — the field does not exist yet). **Preview is the default a judge sees** (they run the project with a MongoDB URI + Google auth, not an ecommerce store), and it is also the content of the approval gate — "what would be published." Same card structure as live, two differences:
+
+1. A **`PreviewBadge`** on each Shopify/Printful card: `Preview · live Shopify/Printful not configured`. Never present a preview as a real published product (D-032 honesty ethos).
+2. Artifacts are synthesized, not fetched: Shopify gets a plausible `product_id` + product-style URL (non-navigating, or a local preview route); the `ShopifyCard` **mockup thumbnail** (its existing async image slot) shows the asset on a poster/t-shirt template — Phase A a clean labeled placeholder; real compositing is optional polish. Like the social card, a Shopify preview card may also offer a `View mock` expansion — the same card → rich-modal pattern as `SocialPostMock`.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  SHOPIFY PRODUCT · PREVIEW                              │
+│  ⚠ Preview · live Shopify/Printful not configured      │
+│  "Argentina's Miracle — Match-Worn Moment"             │
+│  product ID: preview-#1234567      $34.00              │
+│  ┌───────────────┐                                     │
+│  │  [ poster     │  ← Printful mockup frame            │
+│  │    mockup     │     (asset on a poster template;    │
+│  │    preview ]  │      labeled placeholder Phase A)   │
+│  └───────────────┘                                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+Social is already preview/simulated in both modes (Hard Constraint #6) — no `mode` difference there.
+
+**Phase A (mock):** evidence renders in preview mode (no creds in the fixture); this is the visual contract for the Phase-B preview generators. **Phase B:** the credential-gated real/preview fork lives at the execution seam in `src/api`; the cards consume `mode` + the same `ShopifyProduct` / mockup shapes with no change. **Mandatory (delivery-roadmap Track 3): exercise the real path at least once, or state preview-only in the video — do not ship a real path that was only ever mocked.**
+
 ---
 
 ### Beat 5 — Event 2 transition
@@ -222,6 +264,45 @@ Social posts are simulated — Hard Constraint #6. The card renders the full cop
 After Event 1 completes, a divider appears in the right column: `── Event 2: Germany vs. Spain 1–1 · Group stage draw ──`
 
 The chat input is available again. The activity timeline begins a new block below the divider. The demo shows the contrast: thin exploitation queue, exploration emphasis, different per-item reasoning. Pacing is ~45 seconds (skip-ahead on ingest/score, focus on queue assembly and the approval batch differences).
+
+---
+
+## MCP connection health (persistent)
+
+Persistent across every phase — pinned to the **bottom of the left column**, below a divider under the streaming notices, visible even on the landing state. This is the visualization of the load-bearing partner integration: the demo's standing proof the agent is talking to a real MongoDB MCP server, not a fake.
+
+**Collapsed (default):** one compact row — colored status dot + `MongoDB MCP` + tool count.
+
+```
+● MongoDB MCP · 43 tools
+```
+
+**Expanded (hover or click):** a small popover with the full signal set.
+
+```
+┌──────────────────────────────────┐
+│  ● MongoDB MCP — connected       │
+│  ──────────────────────────────  │
+│  Tools discovered      43        │
+│  Last successful call  2s ago    │
+│  Reconnect attempts    0         │
+│  Server version        1.11.0    │
+└──────────────────────────────────┘
+```
+
+**States (honest degradation — load-bearing, not decoration):**
+
+| State | Dot | Meaning |
+|---|---|---|
+| `connected` | green | session live, tools discovered, recent successful call |
+| `reconnecting` | amber, pulsing | session dropped; background reconnect running; requests degrade |
+| `unavailable` | red | no session / `warm()` failed; the agent cannot reach Atlas |
+
+The widget must reflect **true** state. A permanently-green indicator is theatre that undoes the "health separate from request handling" principle (D-035) — red when the session is actually down is the entire point. On `unavailable`, the expanded view shows the error string from `/health`.
+
+**Data source — a poll, not SSE.** A status light needs no event stream; poll `GET /health` every ~5s (contract in § Real-time data contract). Today `/health` returns only `{mcp_ready, mcp_error}`; the richer payload (`status`, `tools_discovered`, `last_successful_call`, `reconnect_attempts`, `server_version`) is Phase-B connection-manager work — design in `docs/plans/mcp-connection-lifecycle.md` § Health surface in the UI / D-035.
+
+**Phase A (mock):** drive the badge from a mock health object in the fixture, with a scripted state transition during the run (e.g. mostly `connected`, plus an optional brief `reconnecting → connected` blip to prove the degraded state is real). The badge's shape **is** the contract the Phase-B `/health` payload must satisfy. **Phase B:** swap the mock object for the `/health` poll; UI unchanged.
 
 ---
 
@@ -242,47 +323,55 @@ The chat input is available again. The activity timeline begins a new block belo
 | `EditRequestField` | Inside AssetCard | Inline text field, revealed when "Request edit" clicked |
 | `SubmitDecisions` | ContentPane, sticky bottom | Disabled until all decisions made; shows live counts |
 | `EvidenceSection` | ContentPane phase | Shopify + Social + Atlas panels; appears after execution |
-| `ShopifyCard` | Inside EvidenceSection | Product title, URL, mockup thumbnail (resolves async) |
-| `SocialPostCard` | Inside EvidenceSection | Photo, copy, hashtags, queued badge |
-| `AtlasStatePanel` | Inside EvidenceSection | Collection row counts |
+| `ShopifyCard` | Inside EvidenceSection | Product type, title, "View on Shopify" link, `Draft · {productId}`; mockup thumbnail (spinner → image; labeled placeholder in preview mode) |
+| `SocialPostCard` | Inside EvidenceSection | Photo, copy, hashtags, "queued in atlas" badge, **`View mock` button** |
+| `SocialPostMock` | Inside EvidenceSection (modal, portaled to `document.body`) | Instagram-style post preview — profile row, square photo, action row, likes count, caption, hashtags, timestamp |
+| `AtlasStatePanel` | Inside EvidenceSection | Collection row counts — events/assets/campaigns + approvals & performance breakdowns |
 | `EventDivider` | Right column | Visual separator between Event 1 and Event 2 blocks |
 | `ChatBar` | Right column, lower pane | Centered input with conversation history above; rounded dark styling; no model selector, no attach control |
+| `McpHealthBadge` | Left column, pinned bottom | Persistent MCP status — dot + "MongoDB MCP" + tool count; honest 3-state (connected / reconnecting / unavailable) |
+| `McpHealthDetail` | Popover from `McpHealthBadge` | Expanded signals: tools discovered, last successful call, reconnect attempts, server version, error |
+| `PreviewBadge` | Inside `ShopifyCard` | "Preview · live not configured" label when evidence `mode` is `preview` (net-new — not in current `lib/types.ts`) |
 
 ---
 
 ## Real-time data contract (Phase B — wire-up)
 
-The backend emits a Server-Sent Events (SSE) stream. The UI consumes it. Each event has `type` and `payload`.
+> **Shapes live in `ui/src/lib/types.ts` — that is the single source of truth.** This section specifies only the SSE *envelope*: the event types and which `types.ts` payload each carries. It deliberately does **not** restate field shapes — a spec that duplicates the types drifts from them (precisely the snake_case/`event_id`-here vs. camelCase-domain-types-there divergence that prompted this rewrite). When the wire format is built, evolve `types.ts`, never a parallel list here.
 
-**SSE event types:**
+The backend emits a Server-Sent Events (SSE) stream; the UI consumes it. Each event is `{ type, payload }`, payloads referencing `lib/types.ts`:
 
-```typescript
-// Capability started
-{ type: "capability_started", payload: { capability: string, event_id: string } }
+| SSE `type` | Payload (→ `lib/types.ts`) | Notes |
+|---|---|---|
+| `capability_started` | `{ capability: Capability, eventId }` | `ActivityTimeline` row → running |
+| `capability_completed` | `{ capability: Capability, resultSummary, strategyExcerpt? }` | row → complete; `strategyExcerpt` drives the `QueueAssemblyRow` |
+| `coordinator_message` | `ChatMessage` | thread entry (coordinator / operator) |
+| `approval_ready` | `{ approvalId, items: ApprovalItem[] }` | opens `ApprovalBatch` |
+| `execution_evidence` | `ExecutionEvidence` + `mode: 'live' \| 'preview'` *(net-new)* | opens `EvidenceSection` |
+| `mockup_resolved` | `{ assetId, mockupUrl }` | async; merged into the `mockupUrls: Record<assetId,url>` map `EvidenceSection` consumes |
+| `atlas_state` | `AtlasState` | **structured** (approvals/performance breakdowns), not a flat count map |
+| `pipeline_complete` | `{ eventId }` | terminal |
 
-// Capability completed
-{ type: "capability_completed", payload: { capability: string, result_summary: string, event_id: string } }
-
-// Coordinator message (thread entry)
-{ type: "coordinator_message", payload: { text: string, role: "coordinator" | "operator" } }
-
-// HITL gate open — approval batch ready
-{ type: "approval_ready", payload: { approval_id: string, items: ApprovalItem[], event_id: string } }
-
-// Execution evidence available
-{ type: "execution_evidence", payload: { shopify_products: ShopifyProduct[], social_posts: SocialPost[], event_id: string } }
-
-// Printful mockup resolved (async — arrives after execution_evidence)
-{ type: "mockup_resolved", payload: { asset_id: string, mockup_url: string } }
-
-// Atlas state snapshot
-{ type: "atlas_state", payload: { collection_counts: Record<string, number> } }
-
-// Pipeline complete
-{ type: "pipeline_complete", payload: { event_id: string } }
-```
+**Two shape facts the wire format must honor (both already true in the code):** Atlas state is the *structured* `AtlasState`, not `Record<string,number>`; and mockups arrive *after* `execution_evidence` and are merged by `assetId` into the `mockupUrls` map, not embedded in the evidence payload. Fixtures are snake_case (`FixtureShopifyProduct` etc.) and mapped to the camelCase domain types in `mock-api.ts`; the wire format should target the **domain** types, and that mapping layer can absorb whatever casing the backend emits.
 
 The operator's kickoff message and approval decisions are POST requests; SSE is read-only from the UI side.
+
+**Health (polled, not SSE):** the MCP health badge polls `GET /health` every ~5s — a status light needs no stream.
+
+```typescript
+// GET /health — polled ~5s
+{
+  status: "connected" | "reconnecting" | "unavailable",
+  mcp_ready: boolean,
+  tools_discovered: number,             // 43
+  last_successful_call: string | null,  // ISO 8601
+  reconnect_attempts: number,
+  server_version: string,               // "1.11.0"
+  error: string | null,
+}
+```
+
+The current backend returns only `{ mcp_ready, mcp_error }`; the rest is Phase-B connection-manager work (`mcp-connection-lifecycle.md` / D-035).
 
 ---
 
@@ -299,7 +388,8 @@ Fixture must include:
   - 4 Shopify items (mix of `poster` and `tshirt`)
   - 4 social-only items
   - At least 1 pre-marked `edit_requested` to exercise the redraft path
-- Execution evidence: Shopify product stubs (with placeholder URL), social post cards, Atlas collection counts
+- Execution evidence: Shopify product stubs (with placeholder URL), social post cards, Atlas collection counts — rendered in **preview mode** (`mode: "preview"`, `PreviewBadge`, Printful placeholder frame); the fixture carries no credentials
+- Mock **MCP health** object: `status`, `tools_discovered`, `last_successful_call`, `reconnect_attempts`, `server_version` — drives `McpHealthBadge`; optionally script a brief `reconnecting → connected` blip so the degraded state is proven to render
 
 **Image placeholders:** 8 CC-licensed Wikimedia Commons soccer photos confirmed for Phase A. Use these in fixtures; swap for real corpus images in Phase B.
 
@@ -335,6 +425,8 @@ One-afternoon swap once backend + corpus are ready:
 4. Wire approval submit POST to real `FunctionResponse` handler
 5. Wire mockup resolved to `mockup_resolved` SSE event (real async Printful resolution)
 6. Verify Atlas state panel against real collection counts
+7. Poll real `GET /health` for the MCP health badge (richer payload from the Phase-B connection manager)
+8. Switch execution evidence to the credential-gated `mode`; wire real Shopify/Printful when keys are present — and exercise that real path at least once (Track 3 mandate), don't leave it mock-only
 
 ---
 
@@ -354,6 +446,8 @@ These are the bars "polished" means for this project. Each must pass before the 
 | Two-event contrast | Event 2's queue visually reads as "thinner" than Event 1 — fewer cards, different badge composition |
 | Focus management | After submit, focus moves to the first evidence item; not lost |
 | Demo script compatibility | Full Event 1 flow is playable in ≤90s at normal typing speed; Event 2 in ≤45s |
+| MCP health honesty | Badge reflects true state — green connected, amber reconnecting, red unavailable; never permanently green; expanded view surfaces the error on failure |
+| Preview labeling | Preview artifacts carry the `PreviewBadge`; never presented as a real published product |
 
 ---
 
@@ -375,6 +469,7 @@ These are the bars "polished" means for this project. Each must pass before the 
    - Fixture files (event1.json, event2.json)
    - Simulated capability progression (`setTimeout` pipeline)
    - Full component tree through evidence section
+   - MCP health badge (mock health object) + preview-mode evidence cards (`mode: "preview"`, `PreviewBadge`, Printful placeholder frame)
    - Visual polish pass against quality gates above
 
 2. **Phase B — wire-up** (after corpus + backend ready)
@@ -382,4 +477,5 @@ These are the bars "polished" means for this project. Each must pass before the 
    - Real approval POST
    - Image URL swap
    - Mockup async resolution
+   - `/health` poll for the MCP badge; credential-gated `mode` for evidence (and exercise the real Shopify/Printful path at least once — Track 3 mandate)
    - End-to-end smoke test (both events, redraft path)
