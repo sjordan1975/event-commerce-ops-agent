@@ -12,4 +12,4 @@ async def find_players_for_teams(home_team: str, away_team: str) -> list[Player]
         "filter": {"team": {"$in": [home_team, away_team]}},
     })
     docs = _parse_docs_response(envelope)
-    return [Player.model_validate(d) for d in docs]
+    return [Player.model_validate({k: v for k, v in d.items() if k != "_id"}) for d in docs]

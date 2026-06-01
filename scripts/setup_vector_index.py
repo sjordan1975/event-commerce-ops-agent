@@ -64,7 +64,12 @@ def main() -> None:
                     "path": "embedding",
                     "numDimensions": 3072,
                     "similarity": "cosine",
-                }
+                },
+                # event_id is a filter field so find_similar_assets can exclude the
+                # query's own event *inside* $vectorSearch (pre-filter). Without it the
+                # top_k slots get consumed by same-event neighbors that a post-stage
+                # would then discard, returning zero. See vector_search_assets.
+                {"type": "filter", "path": "event_id"},
             ]
         },
         name=INDEX_NAME,

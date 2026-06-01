@@ -25,7 +25,7 @@ async def get_event(event_id: str) -> Event | None:
     docs = _parse_docs_response(envelope)
     if not docs:
         return None
-    return Event.model_validate(docs[0])
+    return Event.model_validate({k: v for k, v in docs[0].items() if k != "_id"})
 
 
 async def find_past_events_by_outcome(
@@ -41,7 +41,7 @@ async def find_past_events_by_outcome(
         },
     })
     docs = _parse_docs_response(envelope)
-    return [Event.model_validate(d) for d in docs]
+    return [Event.model_validate({k: v for k, v in d.items() if k != "_id"}) for d in docs]
 
 
 async def update_event_narrative(event_id: str, narrative: EventNarrative) -> None:

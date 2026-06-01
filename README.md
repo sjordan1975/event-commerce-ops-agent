@@ -59,13 +59,16 @@ PRINTFUL_TOKEN=
 
 Database: **`event_commerce`**
 
-Run the setup script once against a fresh cluster to create all collections and indexes:
+Run the setup scripts once against a fresh cluster. The first creates all collections and
+classic indexes; the second provisions the Atlas Vector Search index on `assets.embedding`
+(`assets_embedding_index`, 3072-dim cosine — the name `src/db/assets.py` queries via `VECTOR_INDEX_NAME`):
 
 ```bash
 MONGODB_URI=<your-uri> python scripts/setup_mongodb.py
+MONGODB_URI=<your-uri> python scripts/setup_vector_index.py
 ```
 
-The script is idempotent — safe to re-run; existing collections and indexes are left untouched.
+Both scripts are idempotent — safe to re-run; existing collections and indexes are left untouched.
 
 | Collection | Purpose | Key indexes |
 |---|---|---|

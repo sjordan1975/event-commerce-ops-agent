@@ -690,6 +690,23 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 ---
 
+### D-034 — DB/Atlas Alignment: Remove Vestigial `assets.scored_at` / `published_at`; Filtered Vector Index (`event_id`)
+**Date:** 2026-05-31
+**Decision:** Drop the `scored_at` and `published_at` fields from the `assets` schema everywhere they exist. Surfaced during a codebase↔Atlas↔scripts audit: both fields were **written only by `seed_mongodb.py`**, defined in **no Pydantic model**, and **read/written by no live code** — the scoring path (`save_asset_scores`) never stamps `scored_at`, and the 7-day performance window was re-homed off the asset's `published_at` onto the campaign's `execution.executed_at` / `window_start` back in D-032. Because `Asset` is `extra="forbid"`, the seeded extras made every seeded asset fail `Asset.model_validate` on live reads (`get_assets_for_event`) — latent until now because the suite mocks the DB boundary and live similarity reads only project a subset.
+
+**Changes:**
+- **Atlas:** `$unset scored_at, published_at` across all 40 `assets` docs (development data; pruned in place, no re-seed).
+- **Seed:** removed the two writes in `scripts/seed_mongodb.py`; reworded the `generate_performance` window comment off `published_at`.
+- **Spec:** dropped both fields from the `assets` schema (`02-architecture.md`); reworded the rolling-7-day-window references in `01-requirements.md` and `02-architecture.md` from `published_at` to "publish time (recorded as `window_start`, anchored on the campaign's `execution.executed_at`)".
+
+**Scope note:** part of the `fix/vector-index-and-db-reads` branch, alongside (non-spec) work: reconciling the Atlas vector index name to the canonical `assets_embedding_index` (`setup_mongodb.py` no longer creates a conflicting `embedding_vector_search`; defers to `setup_vector_index.py`) and adding `_id` strips to the four model-validating read wrappers.
+
+**Vector-search exclusion fix (filtered index):** `assets_embedding_index` now declares **`event_id` as a `filter` field**, and `vector_search_assets` excludes the query's own event *inside* `$vectorSearch` (`filter: {event_id: {$ne: <current>}}`) instead of via a post-`$match`. Root cause: the post-stage ran after `limit`, so same-event neighbors (which dominate the nearest matches) consumed all `top_k` slots and were then discarded — `find_similar_assets` returned zero in the normal case. Latent until the index name was corrected (every query previously hit a non-existent index and returned nothing, masking it). Reverses this decision's own earlier same-day reconciliation to a *filterless* index: the original (pre-audit) index already carried `event_id`/`status` filter fields — the correct design — but the wrapper never used them; the fix keeps the corrected name **and** restores the (single, used) `event_id` filter field. `status` filter field intentionally **not** restored (no consumer). Verified live: 5 cross-event neighbors returned for the production call shape.
+
+**Refines:** D-032 (confirms `window_start`/`execution.executed_at` as the sole window anchor; the asset-level `published_at` it implicitly replaced is now removed); D-025 (Step 3 vector-search configuration — index is filtered, not filterless). **Updates:** `docs/specs/01-requirements.md`, `docs/specs/02-architecture.md`, `scripts/setup_vector_index.py`, `src/db/assets.py`, `tests/test_step_3.py`.
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta

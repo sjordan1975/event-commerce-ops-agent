@@ -59,7 +59,7 @@ Shopify and Printful are always paired for physical products: Shopify owns the s
 
 The `performance` collection records post-execution outcomes. For the MVP:
 
-**Time window:** rolling 7 days from `published_at`. All metrics represent cumulative totals within that window. The `window_days` field is stored on each document for traceability.
+**Time window:** rolling 7 days from publish time (recorded as `window_start`, anchored on the campaign's `execution.executed_at`). All metrics represent cumulative totals within that window. The `window_days` field is stored on each document for traceability.
 
 **Channel breakdown:** metrics are split by channel, not aggregated into a single revenue figure.
 

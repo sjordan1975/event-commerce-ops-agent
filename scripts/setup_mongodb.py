@@ -1,8 +1,10 @@
 """
-Provision the event_commerce database: create collections and indexes.
+Provision the event_commerce database: create collections and classic indexes.
 
 Run once against a fresh Atlas cluster. Safe to re-run — existing
-collections and indexes are left untouched.
+collections and indexes are left untouched. The Atlas Vector Search index on
+assets.embedding is provisioned separately by scripts/setup_vector_index.py
+(single source of truth for the vector index — name + definition).
 
 Usage:
     python scripts/setup_mongodb.py
@@ -11,8 +13,6 @@ Usage:
 import os
 import sys
 from pymongo import MongoClient
-from pymongo.errors import CollectionInvalid
-from pymongo.operations import SearchIndexModel
 
 
 MONGODB_URI = os.environ.get("MONGODB_URI")
@@ -46,28 +46,6 @@ CLASSIC_INDEXES = {
     ],
 }
 
-# Vector search index on assets.embedding
-# 3072 dimensions: gemini-embedding-2 output size
-# cosine similarity: standard for normalized Gemini embeddings
-# pre-filters on event_id and status allow scoped search without a collection scan
-VECTOR_SEARCH_INDEX = SearchIndexModel(
-    definition={
-        "fields": [
-            {
-                "type": "vector",
-                "path": "embedding",
-                "numDimensions": 3072,
-                "similarity": "cosine",
-                "quantization": "none",
-            },
-            {"type": "filter", "path": "event_id"},
-            {"type": "filter", "path": "status"},
-        ]
-    },
-    name="embedding_vector_search",
-    type="vectorSearch",
-)
-
 
 def main() -> None:
     if not MONGODB_URI:
@@ -97,16 +75,7 @@ def main() -> None:
                 col.create_index(list(keys.items()), name=index_name)
                 print(f"  created index: {collection_name}.{index_name}")
 
-    # Vector search index (Atlas only — will fail against local mongod)
-    assets = db["assets"]
-    existing_search = {idx["name"] for idx in assets.list_search_indexes()}
-    if "embedding_vector_search" in existing_search:
-        print("  vector search index exists, skipping: assets.embedding_vector_search")
-    else:
-        assets.create_search_index(VECTOR_SEARCH_INDEX)
-        print("  created vector search index: assets.embedding_vector_search")
-
-    print("\nDone.")
+    print("\nDone. Run scripts/setup_vector_index.py to provision the vector search index.")
     client.close()
 
 

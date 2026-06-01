@@ -136,19 +136,18 @@ async def test_vector_search_assets_pipeline_shape():
     assert call_args[0] == "aggregate"
     pipeline = call_args[1]["pipeline"]
 
-    # Stage 0: $vectorSearch with correct shape
+    # Stage 0: $vectorSearch with correct shape; current event excluded via
+    # an in-query pre-filter (not a post-$match — see vector_search_assets).
     vs = pipeline[0]["$vectorSearch"]
     assert vs["index"] == "assets_embedding_index"
     assert vs["path"] == "embedding"
     assert vs["queryVector"] == emb
     assert vs["numCandidates"] == 50  # 10 * top_k=5
     assert vs["limit"] == 5
+    assert vs["filter"] == {"event_id": {"$ne": "evt-current"}}
 
-    # Stage 1: $match excluding current event
-    assert pipeline[1] == {"$match": {"event_id": {"$ne": "evt-current"}}}
-
-    # Stage 2: $project
-    proj = pipeline[2]["$project"]
+    # Stage 1: $project (no separate $match stage)
+    proj = pipeline[1]["$project"]
     assert proj["asset_id"] == 1
     assert proj["similarity"] == {"$meta": "vectorSearchScore"}
 
@@ -165,10 +164,11 @@ async def test_vector_search_assets_without_exclude():
         await vector_search_assets(emb, top_k=5, exclude_event_id=None)
 
     pipeline = mock_client.call.call_args[0][1]["pipeline"]
-    # Only $vectorSearch and $project — no $match stage
+    # Only $vectorSearch and $project — no $match stage, and no exclusion filter
     stage_keys = [list(s.keys())[0] for s in pipeline]
     assert "$match" not in stage_keys
     assert len(pipeline) == 2
+    assert "filter" not in pipeline[0]["$vectorSearch"]
 
 
 @pytest.mark.anyio

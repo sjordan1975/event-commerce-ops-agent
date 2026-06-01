@@ -650,7 +650,7 @@ def generate_performance(
     poster/tshirt → shopify + printful metrics
     social_only   → social metrics only
     null          → all zeros
-    Window: rolling 7 days from published_at (per MVP assumptions).
+    Window: rolling 7 days from publish time (per MVP assumptions).
     """
     noise = rng.uniform(0.7, 1.3)
     merch_factor = (scores["merch_score"] + scores["quality_score"]) / 2
@@ -798,8 +798,6 @@ def main() -> None:
             "campaign_id": campaign_id,
             "published_urls": {},
             "upload_date": "2023-01-01T00:00:00Z",
-            "scored_at": "2023-01-01T01:00:00Z",
-            "published_at": "2023-01-01T02:00:00Z",
         })
 
         performance_docs.append(

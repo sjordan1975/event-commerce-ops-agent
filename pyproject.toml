@@ -15,6 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "pymongo>=4.0",  # direct Atlas access for ops scripts + live smoke tests
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -22,3 +23,8 @@ packages = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Live tests hit real Atlas and are deselected by default (hermetic CI). Run with: pytest -m live
+addopts = "-m 'not live'"
+markers = [
+    "live: hits the real MongoDB Atlas cluster; deselected by default. Run with -m live (needs MONGODB_URI).",
+]

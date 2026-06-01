@@ -88,9 +88,7 @@ One document per image. Central state document — touched by nearly every capab
       "queued_at": "2026-07-14T22:05:00Z"
     }
   },
-  "upload_date": "...",
-  "scored_at": "...",
-  "published_at": "..."
+  "upload_date": "..."
 }
 ```
 
@@ -168,7 +166,7 @@ Post-execution engagement and conversion data. Written by `record_outcomes`. Fee
 }
 ```
 
-Metrics represent cumulative totals over a rolling 7-day window from `published_at` (stored as `window_days: 7`).
+Metrics represent cumulative totals over a rolling 7-day window from publish time (recorded as `window_start`, anchored on the campaign's `execution.executed_at`; stored as `window_days: 7`).
 Channel population follows `product_route`: poster/tshirt assets populate `shopify` + `printful`; social_only assets populate `social` only.
 
 **MVP write shape (D-032):** `record_outcomes` writes a **provenance record** with `metrics: null` and a `metrics_status: "pending_sync"` discriminator — the zeroed `metrics` object shown above is the **measured** shape the external sync populates later (enterprise path), not what the coda writes. The provenance doc also carries `channels` (awaiting measurement, derived from `product_route`) and `window_start` (publish time). **Consumers must honor the discriminator:** `aggregate_performance_for_events` (the Step-2 baseline reader) excludes `metrics_status == "pending_sync"` so pending rows never dilute the baseline — any future reader of `performance` must do the same.
@@ -208,6 +206,8 @@ One Atlas Vector Search index defined on the `assets` collection. Used by `find_
 | `assets_embedding_index` | `assets` | `embedding` | 3072 | `cosine` | `vectorSearch` |
 
 Dimension matches `gemini-embedding-2` output (D-006). Cosine is the standard for Gemini multimodal embeddings; cosine ≈ dotProduct on L2-normalized outputs. Index name is overridable via the `VECTOR_INDEX_NAME` env var so eval and live deployments can use different indexes if needed.
+
+The index also declares **`event_id` as a `filter` field** (D-034). `find_similar_assets` excludes the query asset's own event *inside* `$vectorSearch` (a pre-filter: `filter: {event_id: {$ne: <current>}}`), so the `top_k` results are drawn from *other* events directly. A post-`$vectorSearch` `$match` cannot do this correctly — it runs after `limit`, so same-event neighbors (which dominate the nearest matches) consume all `top_k` slots and are then discarded, returning zero.
 
 **Provisioning:** one-time idempotent setup via `scripts/setup_vector_index.py`. Atlas index creation is asynchronous (~minutes); not done at runtime. Re-running the script no-ops if the index already exists.
 

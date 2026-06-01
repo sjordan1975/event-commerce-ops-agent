@@ -34,7 +34,7 @@ async def get_assets_for_event(event_id: str, status: str | None = None) -> list
         "filter": filter_dict,
     })
     docs = _parse_docs_response(envelope)
-    return [Asset.model_validate(doc) for doc in docs]
+    return [Asset.model_validate({k: v for k, v in doc.items() if k != "_id"}) for doc in docs]
 
 
 async def vector_search_assets(
@@ -47,17 +47,21 @@ async def vector_search_assets(
     Uses the assets_embedding_index (cosine, 3072-dim). The load-bearing MongoDB
     partner-track integration (D-001, D-006, D-021)."""
     index_name = os.environ.get("VECTOR_INDEX_NAME", "assets_embedding_index")
+    vector_search: dict = {
+        "index": index_name,
+        "path": "embedding",
+        "queryVector": embedding,
+        "numCandidates": NUM_CANDIDATES_MULTIPLIER * top_k,
+        "limit": top_k,
+    }
+    # Exclude the query's own event *inside* $vectorSearch (pre-filter), not as a
+    # post-$match: a post-stage runs after limit, so same-event neighbors fill all
+    # top_k slots and get discarded, yielding zero. Requires event_id as an index
+    # filter field (see scripts/setup_vector_index.py).
+    if exclude_event_id is not None:
+        vector_search["filter"] = {"event_id": {"$ne": exclude_event_id}}
     pipeline = [
-        {
-            "$vectorSearch": {
-                "index": index_name,
-                "path": "embedding",
-                "queryVector": embedding,
-                "numCandidates": NUM_CANDIDATES_MULTIPLIER * top_k,
-                "limit": top_k,
-            }
-        },
-        *([{"$match": {"event_id": {"$ne": exclude_event_id}}}] if exclude_event_id else []),
+        {"$vectorSearch": vector_search},
         {
             "$project": {
                 "_id": 0,
