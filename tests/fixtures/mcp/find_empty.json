@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Query on collection \"assets\" resulted in 0 documents. Returning 0 documents."
+    }
+  ],
+  "isError": false
+}
