@@ -707,6 +707,20 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 ---
 
+### D-035 — MCP Connection Lifecycle: Persistent Session, Not Per-Request
+**Date:** 2026-05-31
+**Decision:** Treat the MongoDB MCP server as a **persistent connection** (database-pool / WebSocket model), not as a per-request REST call. The expensive part of the lifecycle — `npx` process spawn + `create_session` + tool discovery — is paid **once at boot** and the live session is reused for all subsequent operations. Surfaced while investigating an MCP path that "hung": the hang was a fresh connect+handshake on every transaction (test harness re-paying cold start) compounded by `npx ... @latest` doing an npm-registry resolve that blocks the event loop in network-restricted environments. The exact production `McpToolset` path, reused, is fast (~2.9s cold to ready, <1s per call).
+
+**Two layers, kept distinct:**
+1. **Lifecycle (the architecture):** the `src/api` FastAPI backend (D-033) owns an MCP connection manager — connect at `lifespan` startup, keep the session alive, fail fast (`503`) when unavailable instead of hanging, background-reconnect on drop, cache tool discovery, and expose MCP health (`/health`) separately from request handling. Full design: `docs/plans/mcp-connection-lifecycle.md`. **Phase B** (built with `src/api`).
+2. **Launch hardening (tactical, in service of a fast one-time boot connect):** `src/db/client.py` now pins the server version (`MONGODB_MCP_VERSION`, default `1.11.0`) and adds `--prefer-offline` (use npx cache; registry only if missing), replacing `@latest`. Adds a `warm(timeout)` eager-connect hook + a `ready` flag so the cold start moves to boot and unavailability is gateable. For Cloud Run, pre-install the pinned server (no runtime npx/registry). **Landed now** (minimal, demo-safe).
+
+**Known limitation:** `warm(timeout)` bounds only the async init; a subprocess spawn that blocks the loop synchronously isn't interruptible by `asyncio.wait_for` — `--prefer-offline` removes the main cause; the Phase-B manager closes the rest (out-of-band supervised spawn + hard kill + reconnect).
+
+**Refines:** D-019 (the programmatic MCP client gains a lifecycle), D-033 (the UI backend owns the connection manager + health surface). **Updates:** `src/db/client.py`; adds `docs/plans/mcp-connection-lifecycle.md`; noted in `docs/specs/02-architecture.md` § UI Layer.
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta

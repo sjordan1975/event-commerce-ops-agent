@@ -29,6 +29,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# Node (vendored MCP server binary; future Next.js frontend)
+node_modules/
+
 # IDE
 .vscode/
 .idea/

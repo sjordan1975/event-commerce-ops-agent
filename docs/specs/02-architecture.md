@@ -424,6 +424,8 @@ Spike code: `spike/adk_hitl_test.py` (HITL primitive — pre-D-024), `spike/adk_
 
 The operator console is a Next.js frontend backed by a thin FastAPI HTTP layer that wraps the ADK coordinator. Full UI design spec: `docs/plans/approval-ui-spec.md`.
 
+The FastAPI backend also owns the **MCP connection lifecycle** (D-035): the MongoDB MCP session is established once at `lifespan` startup (not lazily per request), kept alive and reused, health-gated (fail fast when unavailable), and exposed via a health endpoint. Treating MCP as a persistent connection (database-pool model) rather than a per-request REST call is what keeps the load-bearing partner integration fast and the boot failures explicit. Design: `docs/plans/mcp-connection-lifecycle.md`.
+
 ### Directory layout
 
 ```

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MCP skeleton</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem; }
+    button { font-size: 1rem; padding: 0.6rem 1rem; cursor: pointer; }
+    #out { margin-top: 1.5rem; font-size: 2.5rem; font-weight: 600; }
+    .meta { color: #666; font-size: 0.85rem; margin-top: 0.5rem; }
+    .err { color: #b00; }
+  </style>
+</head>
+<body>
+  <h1>Event Commerce Ops — MCP skeleton</h1>
+  <p>Browser → REST → persistent MongoDB MCP session → Atlas.</p>
+  <button id="btn">How many assets are in Atlas?</button>
+  <div id="out">—</div>
+  <div class="meta" id="health">checking backend…</div>
+
+  <script>
+    async function refreshHealth() {
+      try {
+        const r = await fetch('/health');
+        const h = await r.json();
+        const el = document.getElementById('health');
+        el.textContent = h.mcp_ready
+          ? 'MCP session: ready'
+          : 'MCP session: NOT ready' + (h.mcp_error ? ' — ' + h.mcp_error : '');
+        el.className = 'meta' + (h.mcp_ready ? '' : ' err');
+      } catch (e) {
+        document.getElementById('health').textContent = 'backend unreachable';
+      }
+    }
+
+    document.getElementById('btn').addEventListener('click', async () => {
+      const out = document.getElementById('out');
+      out.textContent = '…';
+      try {
+        const r = await fetch('/api/asset-count');
+        if (!r.ok) { out.textContent = 'error (' + r.status + ')'; out.className = 'err'; return; }
+        const data = await r.json();
+        out.textContent = data.count;
+        out.className = '';
+      } catch (e) {
+        out.textContent = 'request failed';
+        out.className = 'err';
+      }
+    });
+
+    refreshHealth();
+  </script>
+</body>
+</html>

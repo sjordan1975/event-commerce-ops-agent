@@ -16,6 +16,8 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pymongo>=4.0",  # direct Atlas access for ops scripts + live smoke tests
+    "fastapi>=0.110",  # src/api backend (D-033/D-035)
+    "uvicorn>=0.29",
 ]
 
 [tool.hatch.build.targets.wheel]
