@@ -1,7 +1,7 @@
 # Delivery Roadmap — Back Third
 
 **Deadline: June 11, 2026 @ 2:00 PM PDT**  
-**Today: May 30, 2026 — 12 days.**
+**Today: June 2, 2026 — 9 days.**
 
 All 9 agent capabilities are complete on `main`. This document tracks the five delivery/demo-prep tracks that are not capability steps. None touch `src/` agent code except where explicitly noted.
 
@@ -105,30 +105,28 @@ Wikimedia Commons, CC-licensed. Safe for demo and submission (hackathon requires
 
 **Goal:** a standalone Next.js app that renders the Step 7 HITL approval batch and submits the `approval_id`-keyed decisions list. Buildable 80% to hi-fi on pure mock data; wired to real backend in one swap before demo recording.
 
-### Phase A — mock-first (start now, no corpus dependency)
+### Phase A — COMPLETE (`ui/phase-a`, ~June 2)
 
-| Item | Detail |
-|------|--------|
-| Stack | Next.js (App Router), Tailwind CSS |
-| Data | JSON fixture matching the Step 7 approval batch shape (hardcoded, ~10 assets across 2 channels) |
-| Images | 5–6 placeholder images (Wikimedia grabs or Lorem Picsum) |
-| Interactions | Per-asset: approve / reject / request-edit with note field; submit sends decisions to console or stub endpoint |
-| Contract | `approval_id`-keyed decisions list — shape frozen by Step 7 (`src/db/approvals.py`) |
+Full operator journey is playable end-to-end on mock data. Delivered:
 
-**Key UI beats the demo must show:**
-- Grouped display: assets batched by channel (shopify / social)
-- Per-item AI reasoning text visible inline (the throughline per `00-overview.md`)
-- Approve/reject/edit controls per asset
-- Submit posts the structured decisions list
+- Dark-theme operator console: two-column layout, streaming notices, activity timeline, content pane, chat bar
+- Approval batch: per-asset photo, copy draft, agent reasoning, 5-dimension score bars, approve/reject/edit-request controls, redraft loop
+- Evidence section: Shopify product cards + social post cards + Atlas state panel
+- **MCP health badge** (persistent, left column): boot sequence red→amber→green on mount; mid-pipeline reconnect blip; click-to-expand detail popover; honest 3-state degradation
+- **Preview cards** (`mode: 'live' | 'preview'` on `ExecutionEvidence`): `PreviewBadge` on Shopify cards, source photo thumbnails, "View mock" lightbox — poster = white print frame; t-shirt = AI-generated mockup
+- AI t-shirt mockups pre-generated offline via `spike/gemini_tshirt_mockup.py` (Gemini 3 Pro image), stored as static assets in `ui/public/mockups/`; `photo_url` (thumbnail) and `mockup_url` (lightbox) are separate fields on `ShopifyProduct`
+- Two fixture events: Event 1 (8-item queue, rich exploitation) and Event 2 (5-item queue, exploration-heavy)
 
-### Phase B — wire to real backend (after corpus lands)
+### Phase B — wire to real backend
 
-- Swap fixture for a fetch from the coordinator's approval endpoint
+- Replace SSE simulation with real coordinator SSE stream
 - Point submit POST at the real `FunctionResponse` handler
-- Confirm round-trip: UI decisions → MongoDB `approvals` collection → `execute_approved_campaigns` reads them
+- Replace placeholder image URLs with real Atlas asset URLs
+- Wire `mockup_resolved` to real Printful or Gemini (server-side, `src/api`) — see Track 3 for mockup strategy
+- Poll real `GET /health` for MCP badge; credential-gated `mode` for evidence section
 
 **Open items:**
-- Hosting for the UI during the demo: local (`next dev`) or deploy alongside Cloud Run?
+- Hosting: local (`next dev`) or deploy alongside Cloud Run?
 - Auth / session: none needed for demo (single operator, no multi-user)
 
 ---
@@ -174,8 +172,15 @@ The four stubs are in `src/capabilities/execution.py` (or equivalent Step 7 exec
 The partner integration that *must* be real is **MongoDB MCP** (done) — Shopify/Printful are the agent's *actions*, so a labeled preview is defensible. But the choice must be deliberate, not an accident of having only tested the mock.
 
 **Phase A/B split (pairs with Track 2):**
-- **Phase A (now, `ui/phase-a`):** build the preview *cards* (Shopify product preview, Printful mockup frame) against mock data — same move as the social-post mock. They become the visual contract for the Phase-B preview generators.
-- **Phase B:** the credential-gated real/preview fork at the execution seam; the UI cards consume real-or-preview output with no change.
+- **Phase A (COMPLETE, `ui/phase-a`):** preview cards built against mock data — `PreviewBadge`, source photo thumbnails, poster/t-shirt lightboxes, AI-generated t-shirt mockups pre-baked as static assets. This is the visual contract for Phase-B generators.
+- **Phase B:** the credential-gated real/preview fork at the execution seam in `src/api`; the UI cards consume real-or-preview output with no change.
+
+**Phase B mockup strategy — important nuance:** the demo will likely run the real pipeline in preview mode (no Shopify/Printful credentials). "Printful is deterministic" is irrelevant in this case — Printful won't be called. Phase B therefore needs real-time mockup generation that works in preview mode:
+- Server-side in `src/api`: try Printful if creds exist; fall back to Gemini 3 Pro image otherwise
+- Retry once on Gemini failure (covers most non-determinism)
+- Honest fallback: if both fail, fire `mockup_resolved` with the source photo + a failure label
+- Source image quality matters: player/action shots succeed reliably; wide crowd shots (spectators in matching shirts) confuse the model — the demo corpus should avoid these as t-shirt designs
+- The pre-generated static assets in `ui/public/mockups/` are a demo-day safety net and Phase A baseline, not the Phase B solution
 
 ---
 
@@ -241,13 +246,13 @@ Tracked separately in `docs/project-close-hygiene.md`. Run in parallel — no ha
 
 ## Rough order of operations
 
-| Day | Focus |
-|-----|-------|
-| May 30–31 | Approval UI Phase A (Next.js scaffold, mock fixtures, full interaction flow) |
-| Jun 1–2 | Demo corpus: curate images, `prep_demo_corpus.py`, verify similarity contrast; close hygiene |
-| Jun 3–4 | `src/api/` FastAPI bridge; Approval UI Phase B wire-up; live wiring (Shopify/Printful) |
-| Jun 5–6 | End-to-end smoke test on localhost (both events, redraft path) |
-| Jun 7–8 | Demo dry runs; fix anything broken |
-| Jun 9 | Record demo video (localhost) |
-| Jun 10 | Cloud Run deploy + session service swap; Devpost submission draft |
-| Jun 11 | Submit before 2:00 PM PDT |
+| Day | Focus | Status |
+|-----|-------|--------|
+| May 30–Jun 2 | Approval UI Phase A — full console, MCP badge, preview cards, AI t-shirt mockups | ✓ DONE |
+| Jun 2–3 | Demo corpus: curate images, `prep_demo_corpus.py`, verify similarity contrast; close hygiene | — |
+| Jun 3–5 | `src/api/` FastAPI Phase B wire-up; Approval UI Phase B SSE + real approvals; live wiring (Shopify/Printful); server-side mockup generation | — |
+| Jun 6–7 | End-to-end smoke test on localhost (both events, redraft path, MCP badge live) | — |
+| Jun 8 | Demo dry runs; fix anything broken | — |
+| Jun 9 | Record demo video (localhost) | — |
+| Jun 10 | Cloud Run deploy + session service swap; Devpost submission draft | — |
+| Jun 11 | Submit before 2:00 PM PDT | — |

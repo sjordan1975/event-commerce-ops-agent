@@ -5,8 +5,53 @@ import type {
   EventFixture,
   ExecutionEvidence,
   FixtureItem,
+  FixtureMcpHealthTransition,
+  McpHealth,
 } from './types'
 import { sleep } from './utils'
+
+// Boot sequence: unavailable → reconnecting → connected on app load
+export const DEFAULT_MOCK_HEALTH: McpHealth = {
+  status: 'unavailable',
+  toolsDiscovered: 0,
+  lastSuccessfulCall: null,
+  reconnectAttempts: 0,
+  serverVersion: '1.11.0',
+  error: 'No active session',
+}
+
+const BOOT_SEQUENCE: Array<{ delayMs: number; patch: Partial<McpHealth> }> = [
+  { delayMs: 0,    patch: { status: 'unavailable', toolsDiscovered: 0, reconnectAttempts: 0, error: 'No active session' } },
+  { delayMs: 1400, patch: { status: 'reconnecting', reconnectAttempts: 1, error: null } },
+  { delayMs: 3100, patch: { status: 'connected', toolsDiscovered: 43, reconnectAttempts: 1, error: null } },
+]
+
+export async function runMcpHealthBoot(
+  onHealthChange: (h: McpHealth) => void,
+  signal: AbortSignal
+): Promise<void> {
+  let current: McpHealth = { ...DEFAULT_MOCK_HEALTH }
+  for (const step of BOOT_SEQUENCE) {
+    await sleep(step.delayMs, signal)
+    current = {
+      ...current,
+      ...step.patch,
+      lastSuccessfulCall: step.patch.status === 'connected' ? new Date().toISOString() : current.lastSuccessfulCall,
+    }
+    onHealthChange(current)
+  }
+}
+
+function healthFromTransition(t: FixtureMcpHealthTransition, prev: McpHealth): McpHealth {
+  return {
+    status: t.status,
+    toolsDiscovered: t.tools_discovered,
+    lastSuccessfulCall: t.status === 'connected' ? new Date().toISOString() : prev.lastSuccessfulCall,
+    reconnectAttempts: t.reconnect_attempts,
+    serverVersion: t.server_version,
+    error: t.error,
+  }
+}
 
 function itemFromFixture(fi: FixtureItem): ApprovalItem {
   return {
@@ -33,6 +78,8 @@ export interface PipelineCallbacks {
     strategyExcerpt?: string
   ) => void
   onApprovalReady: (approvalId: string, items: ApprovalItem[]) => void
+  onHealthChange?: (health: McpHealth) => void
+  getCurrentHealth?: () => McpHealth
 }
 
 export interface ExecutionCallbacks {
@@ -51,6 +98,19 @@ export async function simulatePipeline(
   cb: PipelineCallbacks,
   signal: AbortSignal
 ): Promise<void> {
+  // Fire mid-pipeline health transitions concurrently (fire-and-forget)
+  if (cb.onHealthChange && fixture.mcp_health_transitions?.length) {
+    for (const t of fixture.mcp_health_transitions) {
+      const transition = t
+      sleep(transition.delay_ms, signal)
+        .then(() => {
+          const prev = cb.getCurrentHealth?.() ?? DEFAULT_MOCK_HEALTH
+          cb.onHealthChange!(healthFromTransition(transition, prev))
+        })
+        .catch(() => {/* aborted */})
+    }
+  }
+
   // Coordinator messages first (staggered 400ms apart)
   for (const msg of fixture.messages) {
     await sleep(msg.role === 'operator' ? 200 : 400, signal)
@@ -106,12 +166,14 @@ export async function simulateExecution(
 
   // Emit evidence WITHOUT mockup URLs (they resolve async)
   const evidence: ExecutionEvidence = {
+    mode: fixture.execution_evidence.mode ?? 'preview',
     shopifyProducts: fixture.execution_evidence.shopify_products.map((p) => ({
       assetId: p.asset_id,
       productId: p.product_id,
       title: p.title,
       url: p.url,
       productType: p.product_type,
+      photoUrl: p.photo_url,
       // mockupUrl intentionally absent — resolves via onMockupResolved below
     })),
     socialPosts: fixture.execution_evidence.social_posts.map((p) => ({

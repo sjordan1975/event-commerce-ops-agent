@@ -67,6 +67,7 @@ export interface ShopifyProduct {
   title: string
   url: string
   productType: 'poster' | 'tshirt'
+  photoUrl: string
   mockupUrl?: string
 }
 
@@ -95,8 +96,18 @@ export interface AtlasState {
 }
 
 export interface ExecutionEvidence {
+  mode: 'live' | 'preview'
   shopifyProducts: ShopifyProduct[]
   socialPosts: SocialPost[]
+}
+
+export interface McpHealth {
+  status: 'connected' | 'reconnecting' | 'unavailable'
+  toolsDiscovered: number
+  lastSuccessfulCall: string | null
+  reconnectAttempts: number
+  serverVersion: string
+  error: string | null
 }
 
 export type PipelinePhase =
@@ -161,8 +172,18 @@ export interface FixtureShopifyProduct {
   product_id: string
   title: string
   url: string
+  photo_url: string
   mockup_url: string
   product_type: 'poster' | 'tshirt'
+}
+
+export interface FixtureMcpHealthTransition {
+  delay_ms: number
+  status: McpHealth['status']
+  tools_discovered: number
+  reconnect_attempts: number
+  server_version: string
+  error: string | null
 }
 
 export interface EventFixture {
@@ -175,6 +196,7 @@ export interface EventFixture {
   }
   redraft_items: FixtureItem[]
   execution_evidence: {
+    mode?: 'live' | 'preview'
     shopify_products: FixtureShopifyProduct[]
     social_posts: Array<{
       asset_id: string
@@ -184,4 +206,5 @@ export interface EventFixture {
     }>
     atlas_state: AtlasState
   }
+  mcp_health_transitions?: FixtureMcpHealthTransition[]
 }

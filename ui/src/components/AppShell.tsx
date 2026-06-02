@@ -21,6 +21,7 @@ export function AppShell() {
     atlasState,
     mockupUrls,
     isRedraftRound,
+    mcpHealth,
     sendMessage,
     submitDecisions,
   } = usePipeline()
@@ -35,7 +36,7 @@ export function AppShell() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left: streaming notices */}
-        <StreamingNotices notices={notices} />
+        <StreamingNotices notices={notices} mcpHealth={mcpHealth} />
 
         {/* Right: timeline + content + chat */}
         <div className="flex-1 flex flex-col overflow-hidden">

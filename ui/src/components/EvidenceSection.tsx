@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   Package,
   Send,
+  X,
 } from 'lucide-react'
 import type { AtlasState, ExecutionEvidence } from '@/lib/types'
 
@@ -101,59 +102,193 @@ function SocialPostMock({ post, onClose }: { post: SocialPost; onClose: () => vo
   )
 }
 
+// ── Preview badge ─────────────────────────────────────────────────────────────
+
+function PreviewBadge() {
+  return (
+    <div className="inline-flex items-center gap-1.5 font-mono text-[9px] tracking-wide uppercase px-2 py-0.5 rounded bg-status-amber-dim border border-status-amber/20 text-status-amber self-start mb-2">
+      <span>⚠</span>
+      <span>Preview · live Shopify/Printful not configured</span>
+    </div>
+  )
+}
+
+// ── Shopify product mock lightbox ─────────────────────────────────────────────
+
+type ShopifyProduct = ExecutionEvidence['shopifyProducts'][0]
+
+function ShopifyProductMock({
+  product,
+  photoUrl,
+  onClose,
+}: {
+  product: ShopifyProduct
+  photoUrl: string
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const isPoster = product.productType === 'poster'
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.92)' }}
+      onClick={onClose}
+    >
+      {isPoster ? (
+        /* ── Poster: white print frame ──────────────────────────────────── */
+        <div
+          className="animate-fade-in"
+          style={{ background: 'white', padding: '3%', boxShadow: '0 24px 80px rgba(0,0,0,0.7)', width: 'min(80vw, 520px)', maxHeight: '90vh', overflow: 'hidden' }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photoUrl}
+            alt={product.title}
+            style={{ width: '100%', display: 'block', aspectRatio: '3/4', objectFit: 'cover' }}
+          />
+          <div style={{ paddingTop: '4%', paddingBottom: '3%', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'var(--font-jetbrains, monospace)', fontSize: 12, color: '#111', marginBottom: 5, lineHeight: 1.4 }}>
+              {product.title}
+            </p>
+            <p style={{ fontFamily: 'var(--font-jetbrains, monospace)', fontSize: 9, color: '#bbb', textTransform: 'uppercase', letterSpacing: '0.25em' }}>
+              fieldhouse
+            </p>
+          </div>
+        </div>
+      ) : (
+        /* ── T-shirt: AI-generated mockup image displayed directly ──── */
+        <div
+          className="animate-fade-in"
+          style={{ maxWidth: 'min(75vw, 480px)', maxHeight: '85vh' }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photoUrl}
+            alt={product.title}
+            style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', display: 'block' }}
+          />
+        </div>
+      )}
+
+      {/* Label — bottom-center, same pattern as AssetCard lightbox */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
+        <span className="font-mono text-xs text-white/50 uppercase tracking-[0.2em]">
+          {product.productType} · preview
+        </span>
+        <span className="font-mono text-xs text-white/30">
+          preview-#{product.productId.split('/').pop()}
+        </span>
+      </div>
+
+      {/* Close button — absolute top-right, same pattern as AssetCard lightbox */}
+      <button
+        className="absolute top-5 right-6 text-white/40 hover:text-white/80 transition-colors"
+        onClick={onClose}
+        aria-label="Close"
+      >
+        <X size={20} />
+      </button>
+    </div>,
+    document.body
+  )
+}
+
 // ── Card components ───────────────────────────────────────────────────────────
 
 function ShopifyCard({
   product,
   mockupUrl,
+  mode,
 }: {
-  product: ExecutionEvidence['shopifyProducts'][0]
+  product: ShopifyProduct
   mockupUrl?: string
+  mode: 'live' | 'preview'
 }) {
-  return (
-    <div className="border border-border rounded-lg p-4 bg-surface flex gap-4">
-      {/* Mockup thumbnail */}
-      <div
-        className="shrink-0 rounded-md bg-surface-3 border border-border overflow-hidden flex items-center justify-center"
-        style={{ width: 100, height: 100 }}
-      >
-        {mockupUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={mockupUrl}
-            alt={product.title}
-            className="w-full h-full object-cover animate-fade-in"
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-1.5">
-            <div className="w-5 h-5 border-2 border-border border-t-accent rounded-full animate-spin-slow" />
-            <span className="font-mono text-xs text-text-muted">rendering</span>
-          </div>
-        )}
-      </div>
+  const [mockOpen, setMockOpen] = useState(false)
+  const isResolved = !!mockupUrl
 
-      {/* Product info */}
-      <div className="flex-1 min-w-0">
-        <span className="font-mono text-xs tracking-widest uppercase text-accent/70 block mb-1.5">
-          {product.productType}
-        </span>
-        <p className="text-sm font-semibold text-text-primary leading-snug mb-2">
-          {product.title}
-        </p>
-        <a
-          href={product.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 font-mono text-xs text-text-secondary hover:text-accent transition-colors"
+  return (
+    <>
+      {mockOpen && mockupUrl && (
+        <ShopifyProductMock
+          product={product}
+          photoUrl={mockupUrl}
+          onClose={() => setMockOpen(false)}
+        />
+      )}
+
+      <div className="border border-border rounded-lg p-4 bg-surface flex gap-4">
+        {/* Mockup thumbnail — spinner until resolved, then real image in both modes */}
+        <div
+          className="shrink-0 rounded-md bg-surface-3 border border-border overflow-hidden flex items-center justify-center"
+          style={{ width: 100, height: 100 }}
         >
-          <ExternalLink size={11} />
-          View on Shopify
-        </a>
-        <p className="font-mono text-xs text-text-muted mt-1">
-          Draft · {product.productId.split('/').pop()}
-        </p>
+          {!isResolved ? (
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="w-5 h-5 border-2 border-border border-t-accent rounded-full animate-spin-slow" />
+              <span className="font-mono text-xs text-text-muted">rendering</span>
+            </div>
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={product.photoUrl}
+              alt={product.title}
+              className="w-full h-full object-cover animate-fade-in"
+            />
+          )}
+        </div>
+
+        {/* Product info */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <span className="font-mono text-xs tracking-widest uppercase text-accent/70 block mb-1">
+            {product.productType}{mode === 'preview' ? ' · preview' : ''}
+          </span>
+          {mode === 'preview' && <PreviewBadge />}
+          <p className="text-sm font-semibold text-text-primary leading-snug mb-2">
+            {product.title}
+          </p>
+          {mode === 'live' ? (
+            <>
+              <a
+                href={product.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 font-mono text-xs text-text-secondary hover:text-accent transition-colors"
+              >
+                <ExternalLink size={11} />
+                View on Shopify
+              </a>
+              <p className="font-mono text-xs text-text-muted mt-1">
+                Draft · {product.productId.split('/').pop()}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-mono text-xs text-text-muted mb-1.5">
+                preview-#{product.productId.split('/').pop()}
+              </p>
+              {isResolved && (
+                <button
+                  onClick={() => setMockOpen(true)}
+                  className="inline-flex items-center gap-1 font-mono text-xs text-text-secondary hover:text-accent transition-colors self-start"
+                >
+                  <ExternalLink size={10} />
+                  View mock
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -262,6 +397,8 @@ function AtlasStatePanel({ state }: { state: AtlasState }) {
 }
 
 export function EvidenceSection({ evidence, atlasState, mockupUrls }: Props) {
+  const { mode } = evidence
+
   return (
     <div className="px-6 pt-5 pb-6 flex flex-col gap-6 animate-fade-in">
       {/* Shopify products */}
@@ -270,7 +407,7 @@ export function EvidenceSection({ evidence, atlasState, mockupUrls }: Props) {
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px flex-1 bg-border" />
             <span className="font-mono text-xs tracking-[0.2em] uppercase text-text-secondary select-none">
-              Shopify Products Created
+              {mode === 'preview' ? 'Shopify Products · Preview' : 'Shopify Products Created'}
             </span>
             <div className="h-px flex-1 bg-border" />
           </div>
@@ -280,6 +417,7 @@ export function EvidenceSection({ evidence, atlasState, mockupUrls }: Props) {
                 key={p.assetId}
                 product={p}
                 mockupUrl={mockupUrls[p.assetId]}
+                mode={mode}
               />
             ))}
           </div>

@@ -221,13 +221,33 @@
       "scores": { "quality": 3.7, "emotional": 4.3, "social": 4.1, "merch": 3.4, "identity": 2.5 }
     }
   ],
+  "mcp_health_transitions": [
+    {
+      "delay_ms": 4800,
+      "status": "reconnecting",
+      "tools_discovered": 43,
+      "reconnect_attempts": 2,
+      "server_version": "1.11.0",
+      "error": "Session heartbeat timeout — reconnecting"
+    },
+    {
+      "delay_ms": 6600,
+      "status": "connected",
+      "tools_discovered": 43,
+      "reconnect_attempts": 2,
+      "server_version": "1.11.0",
+      "error": null
+    }
+  ],
   "execution_evidence": {
+    "mode": "preview",
     "shopify_products": [
       {
         "asset_id": "asset-001",
         "product_id": "gid://shopify/Product/8842301001",
         "title": "The Miracle on the Pitch — Argentina vs. France Poster",
         "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-poster-arg-fra-001",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Messi_vs_Nigeria_2018.jpg",
         "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Messi_vs_Nigeria_2018.jpg",
         "product_type": "poster"
       },
@@ -236,7 +256,8 @@
         "product_id": "gid://shopify/Product/8842301002",
         "title": "Argentina 3 · France 2 — Match Day Tee",
         "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-tshirt-arg-fra-002",
-        "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Argentina_vs_France_2018_World_Cup_22.jpg",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Argentina_vs_France_2018_World_Cup_22.jpg",
+        "mockup_url": "/mockups/tshirt-asset-002.jpg",
         "product_type": "tshirt"
       },
       {
@@ -244,6 +265,7 @@
         "product_id": "gid://shopify/Product/8842301003",
         "title": "The 26-Man Story — Squad Tribute Poster",
         "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-poster-arg-fra-003",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Argentina_3-3_Francia_-_Copa_Mundial_2022_-_Celebraci%C3%B3n_de_victoria.jpg",
         "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Argentina_3-3_Francia_-_Copa_Mundial_2022_-_Celebraci%C3%B3n_de_victoria.jpg",
         "product_type": "poster"
       },
@@ -252,7 +274,8 @@
         "product_id": "gid://shopify/Product/8842301004",
         "title": "Di María · The Architect — Heritage Print Tee",
         "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-tshirt-arg-fra-004",
-        "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Argentina_vs_France_2018_World_Cup_34.jpg",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Argentina_vs_France_2018_World_Cup_34.jpg",
+        "mockup_url": "/mockups/tshirt-asset-004.jpg",
         "product_type": "tshirt"
       }
     ],

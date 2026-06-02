@@ -1,14 +1,16 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import type { Notice } from '@/lib/types'
+import type { McpHealth, Notice } from '@/lib/types'
+import { McpHealthBadge } from './McpHealthBadge'
 import { NoticeCard } from './NoticeCard'
 
 interface Props {
   notices: Notice[]
+  mcpHealth: McpHealth
 }
 
-export function StreamingNotices({ notices }: Props) {
+export function StreamingNotices({ notices, mcpHealth }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const prevLen = useRef(0)
 
@@ -52,6 +54,11 @@ export function StreamingNotices({ notices }: Props) {
           ))
         )}
         <div ref={bottomRef} />
+      </div>
+
+      {/* MCP health badge — pinned to bottom */}
+      <div className="shrink-0 border-t border-border">
+        <McpHealthBadge health={mcpHealth} />
       </div>
     </aside>
   )

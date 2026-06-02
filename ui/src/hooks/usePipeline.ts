@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
-import { simulateExecution, simulatePipeline, simulateRedraft } from '@/lib/mock-api'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { DEFAULT_MOCK_HEALTH, runMcpHealthBoot, simulateExecution, simulatePipeline, simulateRedraft } from '@/lib/mock-api'
 import type {
   ApprovalItem,
   AtlasState,
@@ -11,6 +11,7 @@ import type {
   EventMeta,
   EventSession,
   ExecutionEvidence,
+  McpHealth,
   Notice,
   PipelinePhase,
 } from '@/lib/types'
@@ -35,6 +36,7 @@ export interface PipelineState {
   atlasState: AtlasState | null
   mockupUrls: Record<string, string>
   isRedraftRound: boolean
+  mcpHealth: McpHealth
 }
 
 export function usePipeline() {
@@ -51,10 +53,26 @@ export function usePipeline() {
   const [mockupUrls, setMockupUrls] = useState<Record<string, string>>({})
   const [isRedraftRound, setIsRedraftRound] = useState(false)
 
+  const [mcpHealth, setMcpHealth] = useState<McpHealth>(DEFAULT_MOCK_HEALTH)
+  const mcpHealthRef = useRef<McpHealth>(DEFAULT_MOCK_HEALTH)
+  const setMcpHealthTracked = useCallback((h: McpHealth) => {
+    mcpHealthRef.current = h
+    setMcpHealth(h)
+  }, [])
+
   const abortRef = useRef<AbortController | null>(null)
+  const bootAbortRef = useRef<AbortController | null>(null)
   const eventIndexRef = useRef(0)
   // Store steps for the current active run so we can push to session on complete
   const activeStepsRef = useRef<CapabilityStep[]>([])
+
+  // Boot sequence: unavailable → reconnecting → connected on mount
+  useEffect(() => {
+    const ctrl = new AbortController()
+    bootAbortRef.current = ctrl
+    runMcpHealthBoot(setMcpHealthTracked, ctrl.signal).catch(() => {/* aborted */})
+    return () => ctrl.abort()
+  }, [setMcpHealthTracked])
 
   function addNotice(capability: Parameters<Notice['capability'] extends infer T ? (t: T) => void : never>[0], text: string) {
     setNotices((prev) => [
@@ -128,6 +146,8 @@ export function usePipeline() {
               setApprovalItems(items)
               setPhase('awaiting_approval')
             },
+            onHealthChange: setMcpHealthTracked,
+            getCurrentHealth: () => mcpHealthRef.current,
           },
           ctrl.signal
         )
@@ -246,6 +266,7 @@ export function usePipeline() {
     atlasState,
     mockupUrls,
     isRedraftRound,
+    mcpHealth,
     sendMessage,
     submitDecisions,
   }

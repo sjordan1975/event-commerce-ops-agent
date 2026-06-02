@@ -146,13 +146,16 @@
     ]
   },
   "redraft_items": [],
+  "mcp_health_transitions": [],
   "execution_evidence": {
+    "mode": "preview",
     "shopify_products": [
       {
         "asset_id": "asset-e2-001",
         "product_id": "gid://shopify/Product/8842302001",
         "title": "Der Punkt · Germany vs. Spain Draw Poster",
         "url": "https://fieldhouse-demo.myshopify.com/products/wc2026-poster-ger-esp-001",
+        "photo_url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Mario_G%C3%B6tze_GOL_-_The_2014_FIFA_World_Cup_Final_-_140713-9112-jikatu_%2814463413827%29.jpg",
         "mockup_url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Mario_G%C3%B6tze_GOL_-_The_2014_FIFA_World_Cup_Final_-_140713-9112-jikatu_%2814463413827%29.jpg",
         "product_type": "poster"
       }

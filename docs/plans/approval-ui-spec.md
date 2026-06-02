@@ -234,7 +234,7 @@ This "what it would look like published" preview is the **same preview-before-pu
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Preview mode (no live Shopify/Printful credentials).** *(Build status: NOT YET BUILT — Phase A; the live/text evidence cards already exist in `EvidenceSection.tsx`, this adds the `mode`-gated preview variant.)* The evidence section has two modes, selected by whether `SHOPIFY_*` / `PRINTFUL_*` credentials are configured on the backend — carried as a **net-new** `mode: 'live' | 'preview'` field on `ExecutionEvidence` (in `lib/types.ts` — the field does not exist yet). **Preview is the default a judge sees** (they run the project with a MongoDB URI + Google auth, not an ecommerce store), and it is also the content of the approval gate — "what would be published." Same card structure as live, two differences:
+**Preview mode (no live Shopify/Printful credentials).** *(Build status: COMPLETE — Phase A, `ui/phase-a`.)* The evidence section has two modes, selected by whether `SHOPIFY_*` / `PRINTFUL_*` credentials are configured on the backend — carried as `mode: 'live' | 'preview'` on `ExecutionEvidence` (in `lib/types.ts`). **Preview is the default a judge sees** (they run the project with a MongoDB URI + Google auth, not an ecommerce store), and it is also the content of the approval gate — "what would be published." Same card structure as live, two differences:
 
 1. A **`PreviewBadge`** on each Shopify/Printful card: `Preview · live Shopify/Printful not configured`. Never present a preview as a real published product (D-032 honesty ethos).
 2. Artifacts are synthesized, not fetched: Shopify gets a plausible `product_id` + product-style URL (non-navigating, or a local preview route); the `ShopifyCard` **mockup thumbnail** (its existing async image slot) shows the asset on a poster/t-shirt template — Phase A a clean labeled placeholder; real compositing is optional polish. Like the social card, a Shopify preview card may also offer a `View mock` expansion — the same card → rich-modal pattern as `SocialPostMock`.
@@ -255,7 +255,9 @@ This "what it would look like published" preview is the **same preview-before-pu
 
 Social is already preview/simulated in both modes (Hard Constraint #6) — no `mode` difference there.
 
-**Phase A (mock):** evidence renders in preview mode (no creds in the fixture); this is the visual contract for the Phase-B preview generators. **Phase B:** the credential-gated real/preview fork lives at the execution seam in `src/api`; the cards consume `mode` + the same `ShopifyProduct` / mockup shapes with no change. **Mandatory (delivery-roadmap Track 3): exercise the real path at least once, or state preview-only in the video — do not ship a real path that was only ever mocked.**
+**Phase A (delivered):** evidence renders in preview mode (`mode: "preview"` in fixture). `ShopifyProduct` carries a `photoUrl` (source photo, shown in the 100×100 thumbnail) separate from `mockupUrl` (the product mock, opened via "View mock"). T-shirt mockups are AI-generated offline via `spike/gemini_tshirt_mockup.py` (Gemini 3 Pro image) and stored as static assets in `ui/public/mockups/`. Poster mockups use the source photo rendered in a white print frame.
+
+**Phase B:** the credential-gated real/preview fork lives at the execution seam in `src/api`; the cards consume `mode` + the same shapes with no change. **Phase B mockup generation:** even in preview mode (no Printful creds), the real pipeline needs real-time mockup generation — this must live server-side in `src/api` with retry logic. Pre-generated statics are a demo-day safety net only; Phase B generates live from approved assets. See delivery-roadmap Track 3 for the full strategy. **Mandatory: exercise the real Shopify/Printful path at least once, or state preview-only in the video.**
 
 ---
 
@@ -269,7 +271,7 @@ The chat input is available again. The activity timeline begins a new block belo
 
 ## MCP connection health (persistent)
 
-> **Build status: NOT YET BUILT (Phase A).** The rest of the operator console exists in `ui/`; this widget and the preview cards below are the only unbuilt pieces. Build mock-first.
+> **Build status: COMPLETE (Phase A, `ui/phase-a`).** `McpHealthBadge` and `McpHealthDetail` (popover) are live in `ui/src/components/McpHealthBadge.tsx`. Driven by mock health state; Phase B swaps to `/health` poll.
 
 Persistent across every phase — pinned to the **bottom of the left column**, below a divider under the streaming notices, visible even on the landing state. This is the visualization of the load-bearing partner integration: the demo's standing proof the agent is talking to a real MongoDB MCP server, not a fake.
 
@@ -304,7 +306,7 @@ The widget must reflect **true** state. A permanently-green indicator is theatre
 
 **Data source — a poll, not SSE.** A status light needs no event stream; poll `GET /health` every ~5s (contract in § Real-time data contract). Today `/health` returns only `{mcp_ready, mcp_error}`; the richer payload (`status`, `tools_discovered`, `last_successful_call`, `reconnect_attempts`, `server_version`) is Phase-B connection-manager work — design in `docs/plans/mcp-connection-lifecycle.md` § Health surface in the UI / D-035.
 
-**Phase A (mock):** drive the badge from a mock health object in the fixture, with a scripted state transition during the run (e.g. mostly `connected`, plus an optional brief `reconnecting → connected` blip to prove the degraded state is real). The badge's shape **is** the contract the Phase-B `/health` payload must satisfy. **Phase B:** swap the mock object for the `/health` poll; UI unchanged.
+**Phase A (delivered):** boot sequence runs on mount: `unavailable` (red) → `reconnecting` (amber, pulsing) at ~1.4s → `connected` (green, 43 tools) at ~3.1s. Event1 fixture scripts a mid-pipeline `reconnecting → connected` blip (~4.8s into the run) proving all three states render live. Event2 has no blip. Health transitions are defined in `mcp_health_transitions` arrays in the fixture files. **Phase B:** swap the mock object for the `/health` poll; UI unchanged — the shape is the contract.
 
 ---
 
@@ -408,12 +410,15 @@ Fixture must include:
 
 **Event 2 fixture:** `ui/src/mock/event2.json` — thinner queue (5 items total), higher proportion of exploration picks, different reasoning text to show the contrast.
 
-**Phase A gate (what "done" means for mock-first):**
-- Full journey from kickoff message through execution evidence is playable end-to-end
-- Redraft loop exercises correctly (edit-requested item flows through re-approval)
-- Both events are navigable
-- No layout breaks with 4-item vs. 8-item queues
-- Printful mockup "resolution" (spinner → image) is simulated with a 2s delayed swap
+**Phase A gate — COMPLETE (`ui/phase-a`):**
+- ✓ Full journey from kickoff message through execution evidence is playable end-to-end
+- ✓ Redraft loop exercises correctly (edit-requested item flows through re-approval)
+- ✓ Both events are navigable
+- ✓ No layout breaks with 4-item vs. 8-item queues
+- ✓ Printful mockup "resolution" (spinner → image) simulated with 2s delayed swap
+- ✓ MCP health badge visible from landing state; boot sequence red→amber→green; mid-pipeline blip in Event 1
+- ✓ Preview cards: `PreviewBadge`, source photo thumbnails, "View mock" lightbox (poster frame + AI t-shirt)
+- ✓ AI t-shirt mockups pre-generated (`spike/gemini_tshirt_mockup.py`, Gemini 3 Pro image, stored in `ui/public/mockups/`)
 
 ---
 
