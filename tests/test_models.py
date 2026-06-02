@@ -495,16 +495,18 @@ def test_asset_scores():
     with pytest.raises(ValidationError):
         AssetScores(quality_score=0.5, merch_score=0.5, emotional_score=0.5, social_score=0.5)
 
-    # Extra dimension raises (extra="forbid")
-    with pytest.raises(ValidationError):
-        AssetScores(
-            quality_score=0.5,
-            merch_score=0.5,
-            emotional_score=0.5,
-            social_score=0.5,
-            identity_score=0.5,
-            timeliness_score=0.5,
-        )
+    # Extra dimensions are silently ignored (extra="forbid" removed — AssetScores is
+    # nested inside VisionScoringOutput which is used as a Gemini response_schema;
+    # Gemini rejects additionalProperties:false in nested schemas).
+    extra_ok = AssetScores(
+        quality_score=0.5,
+        merch_score=0.5,
+        emotional_score=0.5,
+        social_score=0.5,
+        identity_score=0.5,
+        timeliness_score=0.5,  # extra field; ignored, not raised
+    )
+    assert extra_ok.quality_score == 0.5
 
 
 def test_vision_scoring_output():

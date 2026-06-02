@@ -23,7 +23,9 @@ class ReviewQueue(BaseModel):
 
 
 class AssetScores(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # No extra="forbid": AssetScores is nested inside VisionScoringOutput, which is
+    # passed as response_schema to Gemini. Gemini rejects additionalProperties:false
+    # in nested schemas (verified in live run — mirrors constraint on VisionScoringOutput).
 
     quality_score: float = Field(..., ge=0.0, le=1.0)
     merch_score: float = Field(..., ge=0.0, le=1.0)

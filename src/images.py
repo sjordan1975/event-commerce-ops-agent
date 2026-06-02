@@ -5,12 +5,18 @@ of images goes through this module. Adding a new storage backend means
 editing one file.
 """
 
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
 from google.genai import types as genai_types
 
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+# Retry config for HTTP image fetches (handles Wikimedia 429 rate limits)
+_FETCH_MAX_RETRIES = 4
+_FETCH_RETRY_BASE_S = 2.0
 
 
 def _mime_type(url: str) -> str:
@@ -22,12 +28,30 @@ def _mime_type(url: str) -> str:
     }.get(ext, "image/jpeg")
 
 
+def _fetch_with_retry(url: str) -> bytes:
+    """Fetch image bytes with exponential backoff on 429/503."""
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    last_exc: Exception = RuntimeError("unreachable")
+    for attempt in range(_FETCH_MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as exc:
+            if exc.code in (429, 503):
+                wait = _FETCH_RETRY_BASE_S * (2 ** attempt)
+                time.sleep(wait)
+                last_exc = exc
+            else:
+                raise
+    raise last_exc
+
+
 def image_as_part(url: str) -> genai_types.Part:
     """Return a genai Part for any image source.
 
     Supports:
       - gs://bucket/path  → Part.from_uri (Vertex AI reads natively, no local download)
-      - https?://...      → fetched via urllib, returned as Part.from_bytes
+      - https?://...      → fetched via urllib with retry, returned as Part.from_bytes
       - /local/path       → read from disk, returned as Part.from_bytes
     """
     mime = _mime_type(url)
@@ -36,9 +60,7 @@ def image_as_part(url: str) -> genai_types.Part:
         return genai_types.Part.from_uri(file_uri=url, mime_type=mime)
 
     if url.startswith("http://") or url.startswith("https://"):
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req) as resp:
-            data = resp.read()
+        data = _fetch_with_retry(url)
         return genai_types.Part.from_bytes(data=data, mime_type=mime)
 
     with open(url, "rb") as f:
