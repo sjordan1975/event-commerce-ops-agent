@@ -49,6 +49,9 @@ async function* readSseStream(
         if (!raw) continue
         try {
           yield JSON.parse(raw) as { type: string; payload: unknown }
+          // Yield to the event loop so React can flush state updates between frames
+          // when all events arrive in a single SSE chunk (the typical live-backend case).
+          await new Promise((r) => setTimeout(r, 0))
         } catch {
           // malformed frame — skip
         }
@@ -107,6 +110,12 @@ export async function runPipelineLive(
           p.resultSummary,
           p.strategyExcerpt,
         )
+        if (p.resultSummary) {
+          callbacks.onNotice(
+            p.capability as Parameters<typeof callbacks.onNotice>[0],
+            p.resultSummary,
+          )
+        }
         break
       }
       case 'coordinator_message': {
@@ -173,6 +182,12 @@ export async function submitDecisionsLive(
           p.capability as Parameters<typeof callbacks.onCapabilityComplete>[0],
           p.resultSummary,
         )
+        if (p.resultSummary) {
+          callbacks.onNotice(
+            p.capability as Parameters<typeof callbacks.onNotice>[0],
+            p.resultSummary,
+          )
+        }
         break
       }
       case 'coordinator_message':

@@ -293,6 +293,7 @@ def _build_approval_item_payload(item: dict, asset: Any, queue_type: str) -> dic
         "queueType": resolved_queue_type,
         "photoUrl": content_url,
         "filename": filename,
+        "scores": scores,
         "copyDraft": {
             "headline": item.get("headline"),
             "caption": item.get("caption", ""),
