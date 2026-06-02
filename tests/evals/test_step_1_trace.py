@@ -1,18 +1,25 @@
-"""Coordinator end-to-end smoke eval (the project's one e2e tier).
+"""Coordinator end-to-end probe — **Tier 2 (live), per D-020.**
 
 This is the ONLY eval that exercises the coordinator: it drives the real
 coordinator LLM with a natural-language operator prompt, which dispatches
-`run_event_pipeline` → the full 9-node workflow graph. Every other capability
-eval (Steps 5–8) dispatches the workflow directly, bypassing the coordinator.
-So this file owns the "NL in → pipeline ran end-to-end" smoke; per-capability
-agentic behavior is owned by the direct-dispatch evals, and ingest's
-deterministic writes are owned by tests/test_step_1.py.
+`run_event_pipeline` → the full 9-node workflow graph. Because the coordinator
+*is* a live LLM (NL field extraction → dispatch → present → HITL gate), this
+eval **cannot be deterministic** — so it is a **Tier-2 live probe, NOT the
+offline CI merge gate** (D-020: "no live model in the CI gate"). It requires
+`GOOGLE_API_KEY`, is run deliberately, and follows the Tier-2 posture: a
+pass-rate gate (`EVAL_REPEAT=20`, ≥95%) with **transient API errors (503 /
+rate-limit) retried-then-excluded** via `run_with_transient_retry`, so the rate
+measures coordinator judgment, not Gemini uptime. A single run is a smoke, not
+authoritative — only the pass rate is.
+
+Ingest's deterministic coverage lives elsewhere: `tests/test_step_1.py` (unit)
++ every other step's Tier-1 pipeline eval, which runs ingest as node 1 offline.
 
 Because it runs the whole graph, the seed must satisfy every node's reads
-(_seed_mock_for_full_pipeline) — that's the maintenance contract, enforced by
-the completion assertion: if a node aborts the pipeline, the eval fails and
-names the aborting node + exception rather than silently passing on a partial
-trace. See `_assert_pipeline_completed`.
+(`_seed_mock_for_full_pipeline`). A seed gap raises a (non-transient)
+`PreconditionError` that propagates and names the aborting node; the completion
+assertion (`_assert_pipeline_completed`) backstops the no-exception case where
+the coordinator simply never dispatched.
 
 The agent must:
   (a) call run_event_pipeline exactly once
@@ -20,18 +27,17 @@ The agent must:
   (c) drive two MongoDB insert-many calls (events + assets) — smoke end-state
   (d) produce a non-null timeliness float in [0, 1] on the event document
   (e) emit reasoning text before the tool call (CoT directive from coordinator_system prompt)
-  (f) emit non-empty terminal text after the tool returns
+  (f) emit non-empty text after the pipeline returns (coordinator presented results)
   (g) the pipeline ran to completion (run_event_pipeline returned)
 """
 
+import contextlib
 import math
 import os
 from unittest.mock import patch
 
 import pytest
 from google.genai import types
-
-import contextlib
 
 from tests.conftest import build_valid_event_narrative, build_valid_generated_copy
 from tests.evals.conftest import (
@@ -41,6 +47,7 @@ from tests.evals.conftest import (
     dump_trace,
     extract_tool_calls,
     patch_draft_copy_for_asset,
+    run_with_transient_retry,
     step5_fixture_response,
 )
 
@@ -166,43 +173,50 @@ def _seed_mock_for_full_pipeline(mock_client) -> None:
     mock_client.register_vector_search("assets", [])
 
 
-async def _run_agent(runner, prompt: str = OPERATOR_PROMPT) -> tuple[list, Exception | None]:
-    """Run the agent with the given prompt; return (events, run_error).
+async def _run_agent(runner, prompt: str = OPERATOR_PROMPT) -> list:
+    """Run the agent with the given prompt; return all events.
 
-    Partial traces stay useful for a–f, but we no longer swallow the exception:
-    the completion assertion surfaces it (named) so a pipeline abort can't pass
-    silently. run_error is None on a clean run.
+    Exceptions **propagate** (D-020 Tier-2 posture): `run_with_transient_retry`
+    classifies them — transient API errors (503 / rate-limit) are retried then
+    excluded from the pass-rate denominator; non-transient errors (e.g. a seed-gap
+    PreconditionError) re-raise and fail loud, naming the aborting node.
     """
     session = await runner.session_service.create_session(
         app_name=APP_NAME, user_id="eval_user"
     )
-    msg = types.Content(
-        role="user",
-        parts=[types.Part(text=prompt)],
-    )
+    msg = types.Content(role="user", parts=[types.Part(text=prompt)])
     events: list = []
-    run_error: Exception | None = None
-    try:
-        async for event in runner.run_async(
-            user_id="eval_user",
-            session_id=session.id,
-            new_message=msg,
-        ):
-            events.append(event)
-    except Exception as exc:
-        run_error = exc  # surfaced by _assert_pipeline_completed, not swallowed
-    return events, run_error
+    async for event in runner.run_async(
+        user_id="eval_user",
+        session_id=session.id,
+        new_message=msg,
+    ):
+        events.append(event)
+    return events
 
 
-def _assert_pipeline_completed(
-    all_parts: list[dict], run_error: Exception | None, trace_path: str
-) -> list[str]:
-    """Forcing function: the smoke ran the whole graph to completion.
+def _attempt(runner, mock_client, prompt: str = OPERATOR_PROMPT):
+    """Coro factory for run_with_transient_retry.
 
-    A missing run_event_pipeline tool_response means the pipeline aborted (a node
-    raised — almost always an unseeded read). We surface the captured exception so
-    a future node added without extending _seed_mock_for_full_pipeline fails loudly
-    and names itself, instead of passing on a partial trace.
+    Clears `mock_client.calls` at the start of each attempt: a transient retry
+    re-runs the whole agent (and thus the pipeline), so without this a 503 on the
+    coordinator's terminal call would double-count the events/assets insert-many
+    and break assertions (c)/(d). Only the final successful attempt's calls remain.
+    """
+    async def _run() -> list:
+        mock_client.calls.clear()
+        return await _run_agent(runner, prompt)
+
+    return _run
+
+
+def _assert_pipeline_completed(all_parts: list[dict], trace_path: str) -> list[str]:
+    """Backstop forcing function: run_event_pipeline returned.
+
+    Reached only on a clean run (a seed gap raises a PreconditionError that
+    propagates and names the aborting node before we get here). So a missing
+    run_event_pipeline tool_response here means the coordinator never dispatched
+    the pipeline — a coordinator behavior failure, not a seed gap.
     """
     pipeline_responses = [
         p for p in all_parts
@@ -210,18 +224,13 @@ def _assert_pipeline_completed(
     ]
     if pipeline_responses:
         return []
-    msg = "(g) run_event_pipeline never returned — pipeline aborted before completion."
-    if run_error is not None:
-        msg += (
-            f" Aborted with {type(run_error).__name__}: {run_error}. "
-            f"A node read state no handler seeds — extend _seed_mock_for_full_pipeline."
-        )
-    return [f"{msg} Trace: {trace_path}"]
+    return [
+        f"(g) run_event_pipeline never returned — coordinator did not dispatch the "
+        f"pipeline (clean run, no exception). Trace: {trace_path}"
+    ]
 
 
-def _assert_single_run(
-    events: list, mock_client, trace_label: str, run_error: Exception | None = None
-) -> list[str]:
+def _assert_single_run(events: list, mock_client, trace_label: str) -> list[str]:
     """Run all assertions. Returns list of failure messages (empty = pass)."""
     failures: list[str] = []
     trace_path = dump_trace(events, trace_label)
@@ -338,47 +347,69 @@ def _assert_single_run(
             f"the pipeline result. Trace: {trace_path}"
         )
 
-    # (g) the pipeline ran end-to-end (forcing function against seed rot)
-    failures.extend(_assert_pipeline_completed(all_parts, run_error, trace_path))
+    # (g) the pipeline ran end-to-end (backstop: coordinator actually dispatched)
+    failures.extend(_assert_pipeline_completed(all_parts, trace_path))
 
     return failures
 
 
 @pytest.mark.anyio
 async def test_step_1_single_run():
-    """Single-run coordinator e2e smoke: NL → run_event_pipeline → full graph."""
+    """Single live smoke (not authoritative — see test_step_1_pass_rate for the gate).
+
+    Tier-2 live: NL → run_event_pipeline → full graph. Transient API errors are
+    retried then skip the run (a single 503 is not a coordinator failure).
+    """
     with build_runner_with_step6_mock() as (runner, mock_client):
         _seed_mock_for_full_pipeline(mock_client)
         with _stub_internal_llms(mock_client):
-            events, run_error = await _run_agent(runner)
+            events, excluded = await run_with_transient_retry(_attempt(runner, mock_client))
 
-    failures = _assert_single_run(events, mock_client, "step_1_single_run", run_error)
+    if excluded:
+        pytest.skip("Tier-2 live smoke: attempts hit transient API errors (503 / rate-limit).")
+
+    failures = _assert_single_run(events, mock_client, "step_1_single_run")
     assert not failures, "\n".join(failures)
 
 
 @pytest.mark.anyio
 async def test_step_1_pass_rate():
-    """Pass-rate eval: ≥95% of N runs must satisfy all assertions (D-020)."""
+    """Tier-2 pass-rate gate: ≥95% of N live runs satisfy all assertions (D-020).
+
+    Run deliberately: EVAL_REPEAT=20 .venv/bin/python -m pytest \
+        tests/evals/test_step_1_trace.py::test_step_1_pass_rate -v
+    Requires GOOGLE_API_KEY. Transient API errors (503 / rate-limit) are excluded
+    from the denominator so the rate measures coordinator judgment, not API uptime.
+    """
     n = int(os.environ.get("EVAL_REPEAT", "5"))
     passes = 0
+    excluded = 0
     run_failures: list[tuple[int, list[str]]] = []
 
     for i in range(n):
         with build_runner_with_step6_mock() as (runner, mock_client):
             _seed_mock_for_full_pipeline(mock_client)
             with _stub_internal_llms(mock_client):
-                events, run_error = await _run_agent(runner)
-        failures = _assert_single_run(events, mock_client, f"step_1_pass_rate_run_{i}", run_error)
+                events, is_excluded = await run_with_transient_retry(_attempt(runner, mock_client))
+        if is_excluded:
+            excluded += 1
+            continue
+        failures = _assert_single_run(events, mock_client, f"step_1_pass_rate_run_{i}")
         if not failures:
             passes += 1
         else:
             run_failures.append((i, failures))
 
-    required = math.ceil(n * 0.95)
+    effective_n = n - excluded
+    if effective_n == 0:
+        pytest.skip(f"All {n} runs were excluded due to transient API errors.")
+
+    required = math.ceil(effective_n * 0.95)
     if passes < required:
         report_lines = [
-            f"Pass rate {passes}/{n} ({100 * passes / n:.0f}%) is below the 95% threshold "
-            f"({required}/{n} required).",
+            f"Pass rate {passes}/{effective_n} ({100 * passes / effective_n:.0f}%) is below "
+            f"the 95% threshold ({required}/{effective_n} required). "
+            f"({excluded} runs excluded for transient API errors.)",
             "",
             "Failed runs:",
         ]
@@ -396,9 +427,7 @@ async def test_step_1_pass_rate():
 # ---------------------------------------------------------------------------
 
 
-def _assert_dir_path_run(
-    events: list, mock_client, trace_label: str, run_error: Exception | None = None
-) -> list[str]:
+def _assert_dir_path_run(events: list, mock_client, trace_label: str) -> list[str]:
     """Assertions for the directory-path ingest sequence. Returns failure messages."""
     failures: list[str] = []
     trace_path = dump_trace(events, trace_label)
@@ -470,8 +499,8 @@ def _assert_dir_path_run(
     if not text_before_tool:
         failures.append(f"(f) No reasoning text before first tool call. Trace: {trace_path}")
 
-    # (g) the pipeline ran end-to-end (forcing function against seed rot)
-    failures.extend(_assert_pipeline_completed(all_parts, run_error, trace_path))
+    # (g) the pipeline ran end-to-end (backstop: coordinator actually dispatched)
+    failures.extend(_assert_pipeline_completed(all_parts, trace_path))
 
     return failures
 
@@ -488,7 +517,12 @@ async def test_step_1_dir_path_single_run():
         _seed_mock_for_full_pipeline(mock_client)
         with patch("src.agent._list_images_impl", return_value=_FAKE_LIST_IMAGES_RESULT), \
                 _stub_internal_llms(mock_client):
-            events, run_error = await _run_agent(runner, DIR_PATH_OPERATOR_PROMPT)
+            events, excluded = await run_with_transient_retry(
+                _attempt(runner, mock_client, DIR_PATH_OPERATOR_PROMPT)
+            )
 
-    failures = _assert_dir_path_run(events, mock_client, "step_1_dir_path_single_run", run_error)
+    if excluded:
+        pytest.skip("Tier-2 live smoke: attempts hit transient API errors (503 / rate-limit).")
+
+    failures = _assert_dir_path_run(events, mock_client, "step_1_dir_path_single_run")
     assert not failures, "\n".join(failures)
