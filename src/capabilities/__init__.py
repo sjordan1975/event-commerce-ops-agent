@@ -30,52 +30,80 @@ from src.capabilities.queue import (
 )
 from src.capabilities.scoring import score_assets_with_vision as _score_assets_with_vision
 from src.capabilities.similarity import find_similar_assets as _find_similar_assets
+from src.models import ReviewQueue
+from src.sse import get_queue
 
 WORKFLOW_NAME = "event_pipeline"
+
+
+def _sse_emit(ctx: Any, event_type: str, payload: dict) -> None:
+    """Fire-and-forget SSE event from a workflow node.
+
+    Reads _sse_session_id from ctx.state. No-ops if the key is absent (unit
+    tests, evals, any non-SSE invocation path).
+    """
+    sid = ctx.state.get("_sse_session_id")
+    if not sid:
+        return
+    q = get_queue(sid)
+    if q is not None:
+        q.put_nowait({"type": event_type, "payload": payload})
 
 
 async def _node_ingest_event_batch(
     ctx: Any, images: list[str], event_metadata: dict
 ) -> dict:
-    """Workflow adapter: calls ingest_event_batch and writes outputs to state.
-
-    Reads `images` and `event_metadata` from session state (pre-populated by the
-    coordinator's run_event_pipeline shim). Writes `event_id` and `asset_ids`
-    back to state for downstream nodes.
-    """
+    """Workflow adapter: calls ingest_event_batch and writes outputs to state."""
+    _sse_emit(ctx, "capability_started", {"capability": "ingest_event_batch"})
     result = await _ingest_event_batch(images=images, event_metadata=event_metadata)
     ctx.state["event_id"] = result["event_id"]
     ctx.state["asset_ids"] = result["asset_ids"]
+    count = len(result.get("asset_ids") or [])
+    _sse_emit(ctx, "capability_completed", {
+        "capability": "ingest_event_batch",
+        "resultSummary": f"{count} asset{'s' if count != 1 else ''} ingested",
+    })
     return result
 
 
 async def _node_build_event_context(ctx: Any, event_id: str) -> dict:
-    """Workflow adapter: calls build_event_context and writes the narrative to state.
-
-    Reads `event_id` from state (written by the upstream ingest node).
-    """
+    """Workflow adapter: calls build_event_context and writes the narrative to state."""
+    _sse_emit(ctx, "capability_started", {"capability": "build_event_context"})
     result = await _build_event_context(event_id)
     ctx.state["event_narrative"] = result
+    narrative = result if isinstance(result, dict) else {}
+    angle = narrative.get("narrative_angle", "")
+    summary = f"Narrative built · {angle[:60]}" if angle else "Event narrative built"
+    _sse_emit(ctx, "capability_completed", {
+        "capability": "build_event_context",
+        "resultSummary": summary,
+    })
     return result
 
 
 async def _node_find_similar_assets(ctx: Any, event_id: str) -> dict:
-    """Workflow adapter: calls find_similar_assets and writes similarity_results to state.
-
-    Reads `event_id` from state (written by the upstream ingest node).
-    """
+    """Workflow adapter: calls find_similar_assets and writes similarity_results to state."""
+    _sse_emit(ctx, "capability_started", {"capability": "find_similar_assets"})
     result = await _find_similar_assets(event_id)
     ctx.state["similarity_results"] = result["similar"]
+    count = len(result.get("similar") or [])
+    _sse_emit(ctx, "capability_completed", {
+        "capability": "find_similar_assets",
+        "resultSummary": f"{count} similar asset{'s' if count != 1 else ''} found",
+    })
     return result
 
 
 async def _node_score_assets_with_vision(ctx: Any, event_id: str) -> dict:
-    """Workflow adapter: calls score_assets_with_vision and writes scored_assets to state.
-
-    Reads `event_id` from state (written by the upstream ingest node).
-    """
+    """Workflow adapter: calls score_assets_with_vision and writes scored_assets to state."""
+    _sse_emit(ctx, "capability_started", {"capability": "score_assets_with_vision"})
     result = await _score_assets_with_vision(event_id)
     ctx.state["scored_assets"] = result["scored"]
+    count = len(result.get("scored") or [])
+    _sse_emit(ctx, "capability_completed", {
+        "capability": "score_assets_with_vision",
+        "resultSummary": f"Vision analysis complete · {count} asset{'s' if count != 1 else ''}",
+    })
     return result
 
 
@@ -110,11 +138,8 @@ score_assets_with_vision_node = FunctionNode(
 
 
 async def _node_prepare_queue_candidates(ctx: Any) -> dict:
-    """Workflow adapter: joins similarity + scored assets, splits by cutoff into candidate pools.
-
-    Reads similarity_results, scored_assets, event_narrative from state.
-    Writes queue_candidates = {"exploitation": [...], "discovery": [...]} to state.
-    """
+    """Workflow adapter: joins similarity + scored assets, splits by cutoff into candidate pools."""
+    _sse_emit(ctx, "capability_started", {"capability": "prepare_queue_candidates"})
     cutoff = float(os.environ.get("QUEUE_EXPLOITATION_SIMILARITY_CUTOFF", "0.75"))
     candidates = prepare_queue_candidates(
         similarity_results=ctx.state.get("similarity_results", []),
@@ -123,18 +148,46 @@ async def _node_prepare_queue_candidates(ctx: Any) -> dict:
         cutoff=cutoff,
     )
     ctx.state["queue_candidates"] = candidates
+    n_exploit = len(candidates.get("exploitation", []))
+    n_disc = len(candidates.get("discovery", []))
+    _sse_emit(ctx, "capability_completed", {
+        "capability": "prepare_queue_candidates",
+        "resultSummary": f"{n_exploit} exploitation · {n_disc} discovery candidates",
+    })
+    # Anticipatory: the LlmAgent propose_review_queue node runs next — no hook point there.
+    _sse_emit(ctx, "capability_started", {"capability": "propose_review_queue"})
     return candidates
 
 
 async def _node_persist_review_queue(ctx: Any) -> dict:
-    """Workflow adapter: persists per-asset queue assignments from the LLM's ReviewQueue.
+    """Workflow adapter: persists per-asset queue assignments from the LLM's ReviewQueue."""
+    # Retrospective: propose_review_queue (LlmAgent) just ran — emit its completion now.
+    raw = ctx.state.get("review_queue")
+    strategy_excerpt = ""
+    queue_summary = "Queue assembled"
+    if raw:
+        try:
+            q_obj = ReviewQueue.model_validate(raw) if isinstance(raw, dict) else ReviewQueue.model_validate_json(raw)
+            total = len(q_obj.exploitation) + len(q_obj.discovery)
+            queue_summary = f"{total} items staged · {len(q_obj.exploitation)} proven · {len(q_obj.discovery)} discovery"
+            strategy_excerpt = q_obj.strategy_summary
+        except Exception:
+            pass
+    _sse_emit(ctx, "capability_completed", {
+        "capability": "propose_review_queue",
+        "resultSummary": queue_summary,
+        "strategyExcerpt": strategy_excerpt,
+    })
 
-    Reads review_queue and queue_candidates from state (written by upstream nodes).
-    Writes review_queue and membership_violations back to state.
-    """
+    _sse_emit(ctx, "capability_started", {"capability": "persist_review_queue"})
     result = await persist_review_queue(ctx)
     ctx.state["review_queue"] = result["review_queue"]
     ctx.state["membership_violations"] = result["membership_violations"]
+    n = len(result.get("review_queue") or [])
+    _sse_emit(ctx, "capability_completed", {
+        "capability": "persist_review_queue",
+        "resultSummary": f"{n} queue assignment{'s' if n != 1 else ''} persisted to Atlas",
+    })
     return result
 
 
@@ -157,16 +210,19 @@ persist_review_queue_node = FunctionNode(
 
 
 async def _node_draft_campaigns_for_queue(ctx: Any) -> dict:
-    """Workflow adapter: calls draft_campaigns_for_queue and writes outputs to state.
-
-    Reads event_id from state (written by the upstream ingest node).
-    Writes campaign_ids, approval_ids, and drafts back to state.
-    """
+    """Workflow adapter: calls draft_campaigns_for_queue and writes outputs to state."""
+    _sse_emit(ctx, "capability_started", {"capability": "draft_campaigns_for_queue"})
     event_id = ctx.state["event_id"]
     result = await draft_campaigns_for_queue(event_id)
     ctx.state["campaign_ids"] = result["campaign_ids"]
     ctx.state["approval_ids"] = result["approval_ids"]
     ctx.state["drafts"] = result["drafts"]
+    n_campaigns = len(result.get("campaign_ids") or [])
+    n_approvals = len(result.get("approval_ids") or [])
+    _sse_emit(ctx, "capability_completed", {
+        "capability": "draft_campaigns_for_queue",
+        "resultSummary": f"{n_campaigns} draft{'s' if n_campaigns != 1 else ''} created · {n_approvals} pending approval",
+    })
     return result
 
 

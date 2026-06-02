@@ -19,6 +19,7 @@ programmatically via `src/db/client.py` by the capability functions.
 """
 
 import os
+from os.path import basename
 from typing import Any
 
 from dotenv import load_dotenv
@@ -38,8 +39,10 @@ from src.capabilities.outcomes import record_outcomes
 from src.db.approvals import get_pending_approvals, record_approval_decision
 from src.db.assets import get_assets_by_ids
 from src.db.campaigns import get_campaigns_by_ids
+from src.db.events import get_event
 from src.models import ApprovalDecision
 from src.prompt_loader import load_prompt
+from src.sse import get_queue
 
 load_dotenv()
 
@@ -101,10 +104,16 @@ async def run_event_pipeline(
 
     workflow = build_workflow()
     sub_session_service = InMemorySessionService()
+    # Propagate SSE session ID into sub-session so FunctionNodes can emit events.
+    sse_session_id = tool_context.state.get("_sse_session_id")
     sub_session = await sub_session_service.create_session(
         app_name=WORKFLOW_NAME,
         user_id="coordinator",
-        state={"images": images, "event_metadata": event_metadata},
+        state={
+            "images": images,
+            "event_metadata": event_metadata,
+            "_sse_session_id": sse_session_id,
+        },
     )
     sub_runner = Runner(
         app_name=WORKFLOW_NAME,
@@ -212,7 +221,85 @@ async def request_human_approval(
         "exploration": exploration,
     }
 
+    # Emit approval_ready SSE event with full ApprovalItem-shaped payload.
+    sse_session_id = tool_context.state.get("_sse_session_id")
+    if sse_session_id:
+        q = get_queue(sse_session_id)
+        if q is not None:
+            items = [
+                _build_approval_item_payload(item, asset_by_id.get(item["asset_id"]), qt)
+                for qt, bucket in (("exploitation", exploitation), ("discovery", exploration))
+                for item in bucket
+            ]
+            # Fetch event metadata so the UI can populate EventHeader in live mode.
+            event_obj = await get_event(event_id)
+            event_meta = None
+            if event_obj:
+                event_meta = {
+                    "event_id": event_obj.event_id,
+                    "name": event_obj.name,
+                    "home_team": event_obj.home_team,
+                    "away_team": event_obj.away_team,
+                    "outcome_type": event_obj.outcome_type,
+                    "final_score": event_obj.final_score,
+                    "timeliness": event_obj.timeliness,
+                    "timeliness_label": _timeliness_label(event_obj.timeliness),
+                }
+            q.put_nowait({
+                "type": "approval_ready",
+                "payload": {"approvalId": event_id, "items": items, "eventMeta": event_meta},
+            })
+
     return None  # suspend; FunctionResponse delivers decisions to the coordinator LLM
+
+
+def _timeliness_label(timeliness: float) -> str:
+    if timeliness >= 0.85:
+        return "Peak window"
+    if timeliness >= 0.6:
+        return "Good window"
+    return "Fading window"
+
+
+def _build_approval_item_payload(item: dict, asset: Any, queue_type: str) -> dict:
+    """Map a pending-batch item + Asset model to the frontend ApprovalItem shape."""
+    product_route = item.get("product_route") or (asset.product_route if asset else None)
+    channel = "shopify" if product_route in ("poster", "tshirt") else "social"
+    product_type = product_route if product_route in ("poster", "tshirt") else None
+
+    content_url = item.get("content_url") or (asset.content_url if asset else "")
+    filename = basename(content_url.rstrip("/")) if content_url else ""
+
+    # Scores: backend 0.0–1.0 → frontend 0–5 scale
+    scores = {"quality": 0.0, "emotional": 0.0, "social": 0.0, "merch": 0.0, "identity": 0.0}
+    if asset and asset.scores:
+        s = asset.scores
+        scores = {
+            "quality": round(s.quality_score * 5, 1),
+            "emotional": round(s.emotional_score * 5, 1),
+            "social": round(s.social_score * 5, 1),
+            "merch": round(s.merch_score * 5, 1),
+            "identity": round(s.identity_score * 5, 1),
+        }
+
+    # queue_type from asset (authoritative) rather than exploitation/discovery bucket label
+    resolved_queue_type = (asset.queue_type if asset and asset.queue_type else queue_type) or "discovery"
+
+    return {
+        "assetId": item["asset_id"],
+        "approvalId": item["approval_id"],
+        "channel": channel,
+        "productType": product_type,
+        "queueType": resolved_queue_type,
+        "photoUrl": content_url,
+        "filename": filename,
+        "copyDraft": {
+            "headline": item.get("headline"),
+            "caption": item.get("caption", ""),
+            "hashtags": item.get("hashtags", []),
+        },
+        "agentReasoning": item.get("queue_rationale") or (asset.queue_rationale if asset else "") or "",
+    }
 
 
 async def apply_approval_decisions(decisions: list[dict], tool_context: ToolContext) -> dict:

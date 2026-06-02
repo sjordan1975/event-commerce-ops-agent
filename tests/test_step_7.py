@@ -798,11 +798,14 @@ async def test_execute_approved_campaigns_poster_route():
     )
 
     tool_context = MagicMock()
+    tool_context.state = {}
     tool_context.actions = MagicMock()
 
     with (
         patch("src.capabilities.execution.get_approved_campaigns", new_callable=AsyncMock, return_value=[ac]),
+        patch("src.capabilities.execution.get_assets_by_ids", new_callable=AsyncMock, return_value=[]),
         patch("src.capabilities.execution.mark_asset_executing", new_callable=AsyncMock),
+        patch("src.capabilities.execution._has_printful_creds", return_value=True),
         patch("src.capabilities.execution._shopify_create_product", return_value={"product_id": "gid://1", "product_url": "https://demo.myshopify.com/p/1"}),
         patch("src.capabilities.execution._printful_create_mockup", return_value={"task_id": "t-1"}),
         patch("src.capabilities.execution._printful_poll_mockup", return_value={"status": "completed", "mockup_url": "https://printful.com/m/t-1.jpg"}),
@@ -834,10 +837,12 @@ async def test_execute_approved_campaigns_social_route():
     )
 
     tool_context = MagicMock()
+    tool_context.state = {}
     tool_context.actions = MagicMock()
 
     with (
         patch("src.capabilities.execution.get_approved_campaigns", new_callable=AsyncMock, return_value=[ac]),
+        patch("src.capabilities.execution.get_assets_by_ids", new_callable=AsyncMock, return_value=[]),
         patch("src.capabilities.execution.mark_asset_executing", new_callable=AsyncMock),
         patch("src.capabilities.execution.record_execution_result", new_callable=AsyncMock) as mock_record,
         patch("src.capabilities.execution.record_execution_failure", new_callable=AsyncMock),
@@ -865,11 +870,14 @@ async def test_execute_approved_campaigns_helper_exception_calls_record_failure(
     )
 
     tool_context = MagicMock()
+    tool_context.state = {}
     tool_context.actions = MagicMock()
 
     with (
         patch("src.capabilities.execution.get_approved_campaigns", new_callable=AsyncMock, return_value=[ac]),
+        patch("src.capabilities.execution.get_assets_by_ids", new_callable=AsyncMock, return_value=[]),
         patch("src.capabilities.execution.mark_asset_executing", new_callable=AsyncMock),
+        patch("src.capabilities.execution._has_printful_creds", return_value=True),
         patch("src.capabilities.execution._shopify_create_product", side_effect=Exception("rate limit exceeded")),
         patch("src.capabilities.execution.record_execution_result", new_callable=AsyncMock),
         patch("src.capabilities.execution.record_execution_failure", new_callable=AsyncMock) as mock_failure,
@@ -904,11 +912,14 @@ async def test_execute_approved_campaigns_mark_executing_before_calls():
         return {"product_id": "gid://1", "product_url": "https://demo.myshopify.com/p/1"}
 
     tool_context = MagicMock()
+    tool_context.state = {}
     tool_context.actions = MagicMock()
 
     with (
         patch("src.capabilities.execution.get_approved_campaigns", new_callable=AsyncMock, return_value=[ac]),
+        patch("src.capabilities.execution.get_assets_by_ids", new_callable=AsyncMock, return_value=[]),
         patch("src.capabilities.execution.mark_asset_executing", side_effect=track_executing),
+        patch("src.capabilities.execution._has_printful_creds", return_value=True),
         patch("src.capabilities.execution._shopify_create_product", side_effect=track_shopify),
         patch("src.capabilities.execution._printful_create_mockup", return_value={"task_id": "t-1"}),
         patch("src.capabilities.execution._printful_poll_mockup", return_value={"status": "completed", "mockup_url": "https://printful.com/m/t-1.jpg"}),

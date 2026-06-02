@@ -3,8 +3,18 @@
 from google.adk.tools.tool_context import ToolContext
 
 from src.db.assets import get_assets_for_event
+from src.db.atlas_state import get_atlas_state
 from src.db.campaigns import get_campaigns_by_ids
 from src.db.performance import channels_for_route, record_performance
+from src.sse import get_queue
+
+
+def _emit(sse_session_id: "str | None", event_type: str, payload: dict) -> None:
+    if not sse_session_id:
+        return
+    q = get_queue(sse_session_id)
+    if q is not None:
+        q.put_nowait({"type": event_type, "payload": payload})
 
 
 async def record_outcomes(event_id: str, tool_context: ToolContext) -> dict:
@@ -17,9 +27,17 @@ async def record_outcomes(event_id: str, tool_context: ToolContext) -> dict:
     published for the event, it records nothing and reports so. Makes no external
     API call. After this returns, report to the operator and stop.
     """
+    sse_session_id = tool_context.state.get("_sse_session_id")
+    _emit(sse_session_id, "capability_started", {"capability": "record_outcomes"})
+
     published = await get_assets_for_event(event_id, status="published")
 
     if not published:
+        _emit(sse_session_id, "capability_completed", {
+            "capability": "record_outcomes",
+            "resultSummary": "Nothing to record — no published assets",
+        })
+        await _emit_terminal(sse_session_id, event_id)
         return {"status": "nothing_to_record", "event_id": event_id}
 
     campaign_ids = [a.campaign_id for a in published if a.campaign_id]
@@ -47,10 +65,34 @@ async def record_outcomes(event_id: str, tool_context: ToolContext) -> dict:
             "channels": channels_for_route(asset.product_route),
         })
 
+    n = len(recorded)
+    _emit(sse_session_id, "capability_completed", {
+        "capability": "record_outcomes",
+        "resultSummary": f"Provenance logged · {n} asset{'s' if n != 1 else ''} · 7-day measurement window open",
+    })
+    await _emit_terminal(sse_session_id, event_id)
+
     return {
         "status": "recorded",
         "event_id": event_id,
-        "count": len(recorded),
+        "count": n,
         "pending_sync": True,
         "records": recorded,
     }
+
+
+async def _emit_terminal(sse_session_id: "str | None", event_id: str) -> None:
+    """Emit atlas_state then pipeline_complete — terminal sequence for every code path.
+
+    Awaited so that both events are enqueued before record_outcomes returns, which
+    guarantees they arrive before the coordinator turn ends and the sentinel is put.
+    """
+    if not sse_session_id:
+        return  # no live SSE session — skip DB work (tests, evals)
+
+    try:
+        atlas = await get_atlas_state()
+        _emit(sse_session_id, "atlas_state", atlas)
+    except Exception:  # noqa: BLE001
+        pass
+    _emit(sse_session_id, "pipeline_complete", {"eventId": event_id})
