@@ -9,6 +9,7 @@ test and by spike/adk_mcp_programmatic.py.
 
 import asyncio
 import os
+from datetime import datetime, timezone
 
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
@@ -50,11 +51,33 @@ class MongoMCPClient:
         )
         self._tools_by_name: dict[str, object] | None = None
         self._ready = False
+        self._last_successful_call: datetime | None = None
+        self._reconnect_attempts: int = 0
 
     @property
     def ready(self) -> bool:
         """True once the MCP session is established and tool discovery is cached."""
         return self._ready
+
+    @property
+    def status(self) -> str:
+        return "connected" if self._ready else "unavailable"
+
+    @property
+    def tools_discovered(self) -> int:
+        return len(self._tools_by_name) if self._tools_by_name else 0
+
+    @property
+    def server_version(self) -> str:
+        return os.environ.get("MONGODB_MCP_VERSION", "1.11.0")
+
+    @property
+    def last_successful_call_iso(self) -> str | None:
+        return self._last_successful_call.isoformat() if self._last_successful_call else None
+
+    @property
+    def reconnect_attempts(self) -> int:
+        return self._reconnect_attempts
 
     async def warm(self, timeout: float = 30.0) -> None:
         """Eagerly establish the MCP session + cache tool discovery at startup.
@@ -87,7 +110,9 @@ class MongoMCPClient:
                 f"Known tools: {sorted(self._tools_by_name)[:10]}..."
             )
         tool = self._tools_by_name[tool_name]
-        return await tool.run_async(args=args, tool_context=None)  # type: ignore[attr-defined]
+        result = await tool.run_async(args=args, tool_context=None)  # type: ignore[attr-defined]
+        self._last_successful_call = datetime.now(timezone.utc)
+        return result
 
     async def close(self) -> None:
         await self._toolset.close()

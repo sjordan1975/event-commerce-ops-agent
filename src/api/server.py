@@ -47,8 +47,17 @@ app = FastAPI(title="Event Commerce Ops — MCP skeleton", lifespan=lifespan)
 
 @app.get("/health")
 async def health() -> dict:
-    """MCP lifecycle health, separate from request handling."""
-    return {"mcp_ready": get_client().ready, "mcp_error": app.state.mcp_error}
+    """MCP lifecycle health — full signal set consumed by the UI McpHealthBadge."""
+    client = get_client()
+    return {
+        "status":               client.status,
+        "mcp_ready":            client.ready,
+        "tools_discovered":     client.tools_discovered,
+        "last_successful_call": client.last_successful_call_iso,
+        "reconnect_attempts":   client.reconnect_attempts,
+        "server_version":       client.server_version,
+        "error":                app.state.mcp_error,
+    }
 
 
 @app.get("/api/asset-count")

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_MOCK_HEALTH, runMcpHealthBoot, simulateExecution, simulatePipeline, simulateRedraft } from '@/lib/mock-api'
+import { pollMcpHealth } from '@/lib/health-api'
 import type {
   ApprovalItem,
   AtlasState,
@@ -66,11 +67,16 @@ export function usePipeline() {
   // Store steps for the current active run so we can push to session on complete
   const activeStepsRef = useRef<CapabilityStep[]>([])
 
-  // Boot sequence: unavailable → reconnecting → connected on mount
+  // Health source: real poll when API URL is configured, mock boot sequence otherwise
   useEffect(() => {
     const ctrl = new AbortController()
     bootAbortRef.current = ctrl
-    runMcpHealthBoot(setMcpHealthTracked, ctrl.signal).catch(() => {/* aborted */})
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    if (apiUrl) {
+      pollMcpHealth(apiUrl, setMcpHealthTracked, ctrl.signal)
+    } else {
+      runMcpHealthBoot(setMcpHealthTracked, ctrl.signal).catch(() => {/* aborted */})
+    }
     return () => ctrl.abort()
   }, [setMcpHealthTracked])
 
