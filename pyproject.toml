@@ -8,6 +8,7 @@ version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
     "google-adk==2.1.0",
+    "google-cloud-storage>=2.0",
     "pydantic==2.13.4",
     "python-dotenv==1.2.2",
 ]

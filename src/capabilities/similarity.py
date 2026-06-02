@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-import urllib.request
 
 from google import genai
 from google.genai import types as genai_types
@@ -14,30 +13,19 @@ from src.db.assets import (
     vector_search_assets,
 )
 from src.errors import PreconditionError
+from src.images import image_as_part
 from src.models import SimilarAsset
 
 DEFAULT_TOP_K = 5
 
 
 def _compute_image_embedding(image_url: str) -> list[float]:
-    """Fetch image bytes from a local path or HTTP URL, then embed via gemini-embedding-2.
-
-    Uses Part.from_bytes(data=..., mime_type="image/jpeg") — the only supported
-    image input form for gemini-embedding-2 (task_type not supported by this model).
-    """
+    """Embed an image via gemini-embedding-2. Supports local paths, HTTPS, and gs://."""
     api_key = os.environ["GOOGLE_API_KEY"]
     model = os.environ.get("GEMINI_EMBEDDING_MODEL", "gemini-embedding-2")
 
-    if image_url.startswith("http://") or image_url.startswith("https://"):
-        with urllib.request.urlopen(image_url) as resp:
-            image_bytes = resp.read()
-    else:
-        with open(image_url, "rb") as f:
-            image_bytes = f.read()
-
     client = genai.Client(api_key=api_key)
-    # Part.from_bytes is the supported image input form for gemini-embedding-2
-    part = genai_types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+    part = image_as_part(image_url)
     response = client.models.embed_content(
         model=model,
         contents=[part],

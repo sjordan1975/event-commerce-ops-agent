@@ -31,6 +31,7 @@ from google.adk.workflow import Workflow
 from google.genai import types
 
 from src.capabilities import WORKFLOW_NAME, build_pipeline_graph
+from src.images import list_images as _list_images_impl
 from src.capabilities.drafts import draft_campaigns_for_queue
 from src.capabilities.execution import execute_approved_campaigns
 from src.capabilities.outcomes import record_outcomes
@@ -283,9 +284,21 @@ async def redraft_campaigns(event_id: str, tool_context: ToolContext) -> dict:
     return await draft_campaigns_for_queue(event_id)
 
 
+def list_images(path: str) -> dict:
+    """List image files available for batch ingestion.
+
+    Accepts a local directory path (e.g. /tmp/wc-final/) or a GCS URI
+    (e.g. gs://fieldhouse-demo/wc-final/). Returns {"files": [...], "count": N}
+    on success, or {"error": "...", "files": [], "count": 0} if the path is
+    inaccessible. Call this before run_event_pipeline to enumerate the batch.
+    """
+    return _list_images_impl(path)
+
+
 def build_coordinator(extra_tools: list[Any] | None = None) -> LlmAgent:
     """Builds the chat-mode coordinator with workflow dispatch, clarification, and HITL."""
     tools: list[Any] = [
+        FunctionTool(list_images),
         FunctionTool(run_event_pipeline),
         LongRunningFunctionTool(func=request_human_approval),
         FunctionTool(apply_approval_decisions),

@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-import urllib.request
 
 from google import genai
 from google.genai import types as genai_types
@@ -10,6 +9,7 @@ from google.genai import types as genai_types
 from src.db.assets import get_assets_for_event, save_asset_scores
 from src.db.events import get_event
 from src.errors import PreconditionError
+from src.images import image_as_part
 from src.models import VisionScoringOutput
 from src.prompt_loader import load_prompt
 
@@ -19,15 +19,8 @@ def _score_asset_with_vision(image_url: str, event_context: dict) -> VisionScori
     api_key = os.environ["GOOGLE_API_KEY"]
     model = os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash")
 
-    if image_url.startswith("http://") or image_url.startswith("https://"):
-        with urllib.request.urlopen(image_url) as resp:
-            image_bytes = resp.read()
-    else:
-        with open(image_url, "rb") as f:
-            image_bytes = f.read()
-
     client = genai.Client(api_key=api_key)
-    image_part = genai_types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+    image_part = image_as_part(image_url)
     prompt = load_prompt("score_asset_with_vision").format(**event_context)
 
     response = client.models.generate_content(
