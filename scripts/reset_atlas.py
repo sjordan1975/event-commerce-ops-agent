@@ -4,7 +4,7 @@ Reset event_commerce to seeded-but-pre-run state.
 Deletes all pipeline-created documents (campaigns, approvals, and any events /
 assets / performance rows created by a pipeline run) while leaving the seed
 corpus intact: 4 historical events, 40 seed assets, 40 baseline performance
-records, and 17 player_context bios.
+records, and 16 player_context bios.
 
 Safe to run between demo runs. Idempotent — running it on an already-clean
 database is a no-op (deletes 0 rows, reports correct counts).
@@ -64,7 +64,7 @@ def reset(db) -> None:
 
     # player_context — never touched by the pipeline; report count only
     n = db.player_context.count_documents({})
-    print(f"  player_context: untouched              →  {n} remaining (expected 17)")
+    print(f"  player_context: untouched              →  {n} remaining (expected 16)")
 
     print("\nDone.")
 
