@@ -798,20 +798,14 @@ def mixed_decisions_with_edit(
 
 @contextmanager
 def patch_execution_helpers():
-    """Patch Shopify/Printful helpers to canned payloads; let _simulate_social_post write through."""
-    with (
-        patch(
-            "src.capabilities.execution._shopify_create_product",
-            return_value={"product_id": "gid://shopify/Product/1", "product_url": "https://demo.myshopify.com/products/x"},
-        ),
-        patch(
-            "src.capabilities.execution._printful_create_mockup",
-            return_value={"task_id": "t-1"},
-        ),
-        patch(
-            "src.capabilities.execution._printful_poll_mockup",
-            return_value={"status": "completed", "mockup_url": "https://printful.com/mockups/x.jpg"},
-        ),
+    """Patch Shopify helper to canned payload; let _simulate_social_post write through."""
+    with patch(
+        "src.capabilities.execution._shopify_create_product",
+        return_value={
+            "product_id": "gid://shopify/Product/1",
+            "product_url": "https://demo.myshopify.com/products/x",
+            "mockup_url": "https://shopify.com/mockup.jpg",
+        },
     ):
         yield
 

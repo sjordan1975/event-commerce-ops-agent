@@ -330,14 +330,11 @@ performance.updateMany    → UPSERT one provenance row per published asset (key
 - **Operations:** Create product, create draft order, update product status
 - **Auth:** Admin API access token from Partners dashboard
 
-### Printful (REST API)
-- **Account:** Free; register at developers.printful.com
-- **Auth:** Bearer token (Private Token for personal use)
-- **Mockup flow (async):**
-  1. `GET /products/variant/{id}/printfiles` — get print file specs for variant
-  2. `POST /mockups` — submit image + variant → returns `task_id`
-  3. `GET /mockups/{task_id}` — poll until `status: "completed"`; returns mockup URLs
-- **ADK note:** Mockup polling maps to an ADK retry loop via `LongRunningFunctionTool`
+### Mockup + Shopify publish (D-036)
+- Printful is not in the execution path.
+- **Mockup generation:** Gemini image gen for t-shirts (blank shirt + design photo); source photo used directly for posters.
+- **Shopify publish:** `stagedUploadsCreate` → multipart upload to GCS → `productCreate` → `productCreateMedia`. Product created as DRAFT with mockup as product image.
+- **Preview mode:** no Shopify creds → mockup bytes stored in `src/mockup_store`, served at `GET /api/mockup/{asset_id}`.
 
 ### Social (Simulated)
 - No live API. Agent writes a complete post package to MongoDB:

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Branch `ui/phase-b` (cut from `ui/phase-a`, not yet merged). All 9 capabilities complete; in demo prep. 206 unit tests green.**
 
-**Immediate next:** live Shopify/Printful wiring — swap the execution stubs in Step 7 with real API calls. Then: Cloud Run deploy, demo video. Demo reset between runs = `reset_atlas.py` (sufficient). Pre-demo close tasks in `docs/project-close-hygiene.md`. Deadline: June 11, 2026 @ 2:00 PM PDT.
+**Immediate next:** demo corpus prep (`prep_demo_corpus.py`), UI Phase B SSE wire-up, Cloud Run deploy, demo video. Demo reset between runs = `reset_atlas.py` (sufficient). Pre-demo close tasks in `docs/project-close-hygiene.md`. Deadline: June 11, 2026 @ 2:00 PM PDT.
 
 **OPERATIONAL GOTCHA — MCP launch:** use the vendored binary (`MONGODB_MCP_COMMAND` → `src/api/node_modules/.bin/mongodb-mcp-server`), not `npx ...@latest` — npm-registry resolve blocks the event loop and hangs at `create_session`. Not interruptible by `asyncio.wait_for`. See D-035.
 
@@ -29,7 +29,7 @@ Deadline: June 11, 2026 @ 2:00 PM PDT.
 | MCP integration | `McpToolset` (built into ADK) |
 | Database / state | MongoDB Atlas |
 | Ecommerce | Shopify GraphQL Admin API (Partners dev store) |
-| Print-on-demand | Printful REST API |
+| Mockup + publish | Gemini image gen → Shopify staged upload (D-036) |
 | Social | Simulated — no live platform API |
 | Hosting | Cloud Run |
 | Credentials | GCP Secret Manager |

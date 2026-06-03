@@ -721,6 +721,23 @@ Subsequent steps extend the graph: Step 3 adds `find_similar_assets`, Step 4 add
 
 ---
 
+### D-036 — Execution: Gemini Mockup → Shopify Staged Upload (Printful removed)
+**Date:** 2026-06-03
+**Decision:** Replace the Printful mockup generator + separate Shopify product create stubs with a single unified flow: Gemini generates mockup bytes (t-shirt via image gen, poster via source photo), which are uploaded to Shopify via `stagedUploadsCreate` and attached as the product image via `productCreateMedia`. Printful is removed from the execution path entirely.
+
+**Why:** Printful's mockup generator API produces temporary S3 URLs that don't appear in admin and are no worse than Gemini preview quality. The correct Printful integration would be the Store Products API (sync product → Shopify listing), which requires an async store sync and additional catalog configuration. Gemini + Shopify staged upload produces the same demo artifact (product listing with mockup image) in fewer moving parts, synchronously, with no external dependency beyond Shopify credentials. Investigated live: Shopify staged upload confirmed working (`scripts/smoke_shopify.py --with-image`), real product with image visible at admin URL.
+
+**What changed:**
+- `src/capabilities/execution.py`: `_shopify_create_product` extended to include mockup generation + staged upload + `productCreateMedia`. All Printful helpers removed. `mockup_resolved` SSE fires inline per item (no deferred post-loop).
+- `scripts/smoke_shopify.py` (renamed from `smoke_shopify_printful.py`): Printful sections removed; two focused tests (`--basic`, `--with-image`).
+- `.env.template`: Printful vars removed; Shopify vars updated to `CLIENT_ID`/`CLIENT_SECRET` (client credentials grant).
+- `docs/specs/02-architecture.md`: Printful section replaced with Gemini+Shopify description.
+- 205 unit tests green.
+
+**Credential gate:** `SHOPIFY_CLIENT_ID` + `SHOPIFY_CLIENT_SECRET` → live path. Absent → preview mode (bytes stored in `src/mockup_store`, served at `/api/mockup/{asset_id}`).
+
+---
+
 ## Planning Document Index
 
 ### Specs and meta

@@ -805,10 +805,7 @@ async def test_execute_approved_campaigns_poster_route():
         patch("src.capabilities.execution.get_approved_campaigns", new_callable=AsyncMock, return_value=[ac]),
         patch("src.capabilities.execution.get_assets_by_ids", new_callable=AsyncMock, return_value=[]),
         patch("src.capabilities.execution.mark_asset_executing", new_callable=AsyncMock),
-        patch("src.capabilities.execution._has_printful_creds", return_value=True),
-        patch("src.capabilities.execution._shopify_create_product", return_value={"product_id": "gid://1", "product_url": "https://demo.myshopify.com/p/1"}),
-        patch("src.capabilities.execution._printful_create_mockup", return_value={"task_id": "t-1"}),
-        patch("src.capabilities.execution._printful_poll_mockup", return_value={"status": "completed", "mockup_url": "https://printful.com/m/t-1.jpg"}),
+        patch("src.capabilities.execution._shopify_create_product", return_value={"product_id": "gid://1", "product_url": "https://demo.myshopify.com/p/1", "mockup_url": "https://shopify.com/mockup.jpg"}),
         patch("src.capabilities.execution.record_execution_result", new_callable=AsyncMock) as mock_record,
         patch("src.capabilities.execution.record_execution_failure", new_callable=AsyncMock),
     ):
@@ -818,7 +815,6 @@ async def test_execute_approved_campaigns_poster_route():
     assert len(result["failed"]) == 0
     executed_item = result["executed"][0]
     assert "shopify" in executed_item["channels"]
-    assert "printful" in executed_item["channels"]
     assert "social" not in executed_item["channels"]
     mock_record.assert_called_once()
 
@@ -877,7 +873,6 @@ async def test_execute_approved_campaigns_helper_exception_calls_record_failure(
         patch("src.capabilities.execution.get_approved_campaigns", new_callable=AsyncMock, return_value=[ac]),
         patch("src.capabilities.execution.get_assets_by_ids", new_callable=AsyncMock, return_value=[]),
         patch("src.capabilities.execution.mark_asset_executing", new_callable=AsyncMock),
-        patch("src.capabilities.execution._has_printful_creds", return_value=True),
         patch("src.capabilities.execution._shopify_create_product", side_effect=Exception("rate limit exceeded")),
         patch("src.capabilities.execution.record_execution_result", new_callable=AsyncMock),
         patch("src.capabilities.execution.record_execution_failure", new_callable=AsyncMock) as mock_failure,
@@ -909,7 +904,7 @@ async def test_execute_approved_campaigns_mark_executing_before_calls():
 
     def track_shopify(*args, **kwargs):
         call_order.append("shopify")
-        return {"product_id": "gid://1", "product_url": "https://demo.myshopify.com/p/1"}
+        return {"product_id": "gid://1", "product_url": "https://demo.myshopify.com/p/1", "mockup_url": ""}
 
     tool_context = MagicMock()
     tool_context.state = {}
@@ -919,10 +914,7 @@ async def test_execute_approved_campaigns_mark_executing_before_calls():
         patch("src.capabilities.execution.get_approved_campaigns", new_callable=AsyncMock, return_value=[ac]),
         patch("src.capabilities.execution.get_assets_by_ids", new_callable=AsyncMock, return_value=[]),
         patch("src.capabilities.execution.mark_asset_executing", side_effect=track_executing),
-        patch("src.capabilities.execution._has_printful_creds", return_value=True),
         patch("src.capabilities.execution._shopify_create_product", side_effect=track_shopify),
-        patch("src.capabilities.execution._printful_create_mockup", return_value={"task_id": "t-1"}),
-        patch("src.capabilities.execution._printful_poll_mockup", return_value={"status": "completed", "mockup_url": "https://printful.com/m/t-1.jpg"}),
         patch("src.capabilities.execution.record_execution_result", new_callable=AsyncMock),
         patch("src.capabilities.execution.record_execution_failure", new_callable=AsyncMock),
     ):
@@ -930,17 +922,6 @@ async def test_execute_approved_campaigns_mark_executing_before_calls():
 
     assert call_order.index("mark_executing") < call_order.index("shopify")
 
-
-@pytest.mark.anyio
-async def test_printful_poll_loop_terminates():
-    """Printful poll loop completes when status=completed is returned."""
-    from src.capabilities.execution import _printful_poll_with_retry
-
-    with patch("src.capabilities.execution._printful_poll_mockup", return_value={"status": "completed", "mockup_url": "https://printful.com/m/x.jpg"}):
-        result = await _printful_poll_with_retry("t-1")
-
-    assert result["status"] == "completed"
-    assert "mockup_url" in result
 
 
 @pytest.mark.anyio
