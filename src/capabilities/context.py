@@ -1,8 +1,12 @@
 """build_event_context — agent-facing capability for Step 2."""
 
 import asyncio
+import logging
 import os
+import time
 import types
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel
 
@@ -21,6 +25,8 @@ def _run_narrative_llm(prompt: str, schema: type[BaseModel]) -> BaseModel:
     """Single-call Gemini generate_content with structured output. Internal."""
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     model = os.environ.get("GEMINI_NARRATIVE_MODEL", "gemini-2.5-flash-lite")
+    logger.info("narrative_llm start  model=%s schema=%s", model, schema.__name__)
+    t0 = time.perf_counter()
     response = client.models.generate_content(
         model=model,
         contents=prompt,
@@ -29,7 +35,10 @@ def _run_narrative_llm(prompt: str, schema: type[BaseModel]) -> BaseModel:
             response_schema=schema,
         ),
     )
-    return schema.model_validate_json(response.text)
+    result = schema.model_validate_json(response.text)
+    logger.info("narrative_llm done   schema=%s chars=%d latency=%.1fs",
+                schema.__name__, len(response.text), time.perf_counter() - t0)
+    return result
 
 
 def _build_cohort_summary(past_events: list, outcome_type: str) -> str:

@@ -6,9 +6,13 @@ documents. Reuses GEMINI_MODEL (flash-lite) — no new env var.
 """
 
 import asyncio
+import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 from google import genai
 from google.genai.types import GenerateContentConfig
@@ -51,7 +55,11 @@ def _draft_copy_for_asset(narrative_context: dict, item_context: dict) -> Genera
 
     This function is the Tier-1 eval-mock seam (analogous to _score_asset_with_vision).
     """
+    asset_id = item_context.get("asset_id", "?")[:8]
+    route = item_context.get("product_route") or "social"
     model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    logger.info("draft_copy start  asset=%s route=%s model=%s", asset_id, route, model)
+    t0 = time.perf_counter()
     prompt = load_prompt("draft_campaign_copy").format(
         narrative_angle=narrative_context.get("narrative_angle", ""),
         key_figures=narrative_context.get("key_figures", ""),
@@ -70,7 +78,10 @@ def _draft_copy_for_asset(narrative_context: dict, item_context: dict) -> Genera
             max_output_tokens=_MAX_COPY_TOKENS,
         ),
     )
-    return GeneratedCopy.model_validate_json(response.text)
+    result = GeneratedCopy.model_validate_json(response.text)
+    logger.info("draft_copy done   asset=%s headline=%r latency=%.1fs",
+                asset_id, result.headline[:60] if result.headline else "", time.perf_counter() - t0)
+    return result
 
 
 async def draft_campaigns_for_queue(event_id: str, operator_notes: dict | None = None) -> dict:

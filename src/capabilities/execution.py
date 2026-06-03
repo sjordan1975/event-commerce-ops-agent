@@ -11,9 +11,13 @@ GET /api/mockup/{asset_id}.
 """
 
 import asyncio
+import logging
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from google.adk.tools.tool_context import ToolContext
 
@@ -130,6 +134,9 @@ def _gemini_tshirt_mockup(design_url: str) -> bytes:
     if not _SHIRT_BASE.exists():
         raise FileNotFoundError(f"blank shirt not found: {_SHIRT_BASE}")
 
+    label = Path(design_url.split("?")[0]).name
+    logger.info("tshirt_mockup start  design=%s", label)
+    t0 = time.perf_counter()
     client = genai.Client(api_key=api_key)
     shirt_bytes = _SHIRT_BASE.read_bytes()
     design_bytes = _fetch_image_bytes(design_url)
@@ -148,7 +155,10 @@ def _gemini_tshirt_mockup(design_url: str) -> bytes:
 
     for part in response.candidates[0].content.parts:
         if hasattr(part, "inline_data") and part.inline_data:
-            return part.inline_data.data
+            data = part.inline_data.data
+            logger.info("tshirt_mockup done   design=%s bytes=%d latency=%.1fs",
+                        label, len(data), time.perf_counter() - t0)
+            return data
 
     raise RuntimeError("Gemini returned no image data")
 

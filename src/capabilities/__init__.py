@@ -15,8 +15,11 @@ node (propose_review_queue) needs no adapter — it reads/writes state via the
 instruction provider + output_key.
 """
 
+import logging
 import os
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from google.adk.workflow import FunctionNode, START
 
@@ -155,6 +158,7 @@ async def _node_prepare_queue_candidates(ctx: Any) -> dict:
         "resultSummary": f"{n_exploit} exploitation · {n_disc} discovery candidates",
     })
     # Anticipatory: the LlmAgent propose_review_queue node runs next — no hook point there.
+    logger.info("propose_review_queue start  exploit=%d discovery=%d", n_exploit, n_disc)
     _sse_emit(ctx, "capability_started", {"capability": "propose_review_queue"})
     return candidates
 
@@ -173,6 +177,7 @@ async def _node_persist_review_queue(ctx: Any) -> dict:
             strategy_excerpt = q_obj.strategy_summary
         except Exception:
             pass
+    logger.info("propose_review_queue done   %s", queue_summary)
     _sse_emit(ctx, "capability_completed", {
         "capability": "propose_review_queue",
         "resultSummary": queue_summary,

@@ -13,11 +13,15 @@ Run from the repo root:
 
 import asyncio
 import json
+import logging
 import os
 import re
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -26,6 +30,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel
 
 load_dotenv()
+
+# Pipeline logging: off by default, opt-in via LOG_PIPELINE=1 in .env
+_pipeline_level = logging.INFO if os.environ.get("LOG_PIPELINE") else logging.WARNING
+for _log_name in ("src.capabilities", "src.api.server"):
+    logging.getLogger(_log_name).setLevel(_pipeline_level)
 
 # Default to the vendored MCP server binary (direct exec, no npx/registry) unless the
 # environment overrides it. Set before importing get_client so the singleton picks it up.
@@ -175,6 +184,9 @@ async def _run_coordinator_turn(
     q: "asyncio.Queue[dict | None]",
 ) -> None:
     """Background task: drive one coordinator turn and put the sentinel when done."""
+    preview = message[:120].replace("\n", " ")
+    logger.info("coordinator_turn start  session=%s msg=%r", session_id[:8], preview)
+    t0 = time.perf_counter()
     trigger = genai_types.Content(role="user", parts=[genai_types.Part(text=message)])
     try:
         async for event in runner.run_async(
@@ -193,6 +205,7 @@ async def _run_coordinator_turn(
                         "type": "coordinator_message",
                         "payload": {"role": "coordinator", "text": text.strip()},
                     })
+        logger.info("coordinator_turn done   session=%s latency=%.1fs", session_id[:8], time.perf_counter() - t0)
     finally:
         await q.put(None)
 

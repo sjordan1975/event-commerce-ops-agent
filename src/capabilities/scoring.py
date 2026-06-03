@@ -1,7 +1,11 @@
 """score_assets_with_vision — Step 4 capability: Gemini Vision 5-dimensional scoring."""
 
 import asyncio
+import logging
 import os
+import time
+
+logger = logging.getLogger(__name__)
 
 from google import genai
 from google.genai import types as genai_types
@@ -16,9 +20,13 @@ from src.prompt_loader import load_prompt
 
 def _score_asset_with_vision(image_url: str, event_context: dict) -> VisionScoringOutput:
     """Single Gemini Vision call with structured output. Sync — callers wrap in asyncio.to_thread."""
+    from pathlib import Path
+    label = Path(image_url.split("?")[0]).name
     api_key = os.environ["GOOGLE_API_KEY"]
     model = os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash")
 
+    logger.info("vision_score start  asset=%s model=%s", label, model)
+    t0 = time.perf_counter()
     client = genai.Client(api_key=api_key)
     image_part = image_as_part(image_url)
     prompt = load_prompt("score_asset_with_vision").format(**event_context)
@@ -31,7 +39,14 @@ def _score_asset_with_vision(image_url: str, event_context: dict) -> VisionScori
             response_schema=VisionScoringOutput,
         ),
     )
-    return VisionScoringOutput.model_validate_json(response.text)
+    result = VisionScoringOutput.model_validate_json(response.text)
+    s = result.scores
+    logger.info(
+        "vision_score done   asset=%s quality=%.2f emotional=%.2f social=%.2f merch=%.2f identity=%.2f latency=%.1fs",
+        label, s.quality_score, s.emotional_score, s.social_score, s.merch_score, s.identity_score,
+        time.perf_counter() - t0,
+    )
+    return result
 
 
 async def _build_event_context_payload(event_id: str) -> dict:
