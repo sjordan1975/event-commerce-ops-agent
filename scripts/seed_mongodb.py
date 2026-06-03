@@ -531,6 +531,72 @@ def vector_only(db, genai_client: genai.Client) -> None:
     print(f"Done. Embedded {len(assets)} assets.")
 
 
+def add_images(db, genai_client: genai.Client) -> None:
+    """Insert SEED_IMAGES entries not yet present in the assets collection.
+
+    Idempotency: skips any URL already in assets.content_url.
+    Uses per-asset RNG seeded from asset_id (matches patch_routes pattern).
+    """
+    existing_urls = {
+        doc["content_url"]
+        for doc in db.assets.find(
+            {"event_id": {"$in": [e["event_id"] for e in SEED_EVENTS]}},
+            {"content_url": 1, "_id": 0},
+        )
+    }
+
+    new_images = [img for img in SEED_IMAGES if img["url"] not in existing_urls]
+
+    if not new_images:
+        print("All seed images already present — nothing to do.")
+        return
+
+    already = len(SEED_IMAGES) - len(new_images)
+    print(f"Found {len(new_images)} new image(s) to insert ({already} already present, skipped).")
+
+    performance_docs = []
+    for i, image in enumerate(new_images):
+        print(f"  [{i + 1}/{len(new_images)}] embedding: {image['description']}")
+        asset_id = str(uuid.uuid4())
+        try:
+            embedding = embed_image(genai_client, image["url"])
+        except Exception as exc:
+            print(
+                f"ERROR: failed to embed content_url={image['url']!r}: {exc}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        rng = random.Random(asset_id)
+        scores = generate_scores(image["tags"], rng)
+        product_route = image["product_route"]
+        campaign_id = str(uuid.uuid4())
+
+        db.assets.insert_one({
+            "asset_id": asset_id,
+            "event_id": image["event_id"],
+            "content_url": image["url"],
+            "status": "published",
+            "product_route": product_route,
+            "embedding": embedding,
+            "scores": scores,
+            "similar_assets": [],
+            "campaign_id": campaign_id,
+            "published_urls": {},
+            "upload_date": "2023-01-01T00:00:00Z",
+        })
+
+        performance_docs.append(
+            generate_performance(asset_id, campaign_id, image["event_id"], product_route, scores, rng)
+        )
+
+    db.performance.insert_many(performance_docs)
+
+    print(f"\n  {len(new_images)} assets inserted")
+    print(f"  {len(performance_docs)} performance records inserted")
+    print("Done.")
+
+
 def main() -> None:
     import argparse
 
@@ -544,6 +610,11 @@ def main() -> None:
         "--patch-routes",
         action="store_true",
         help="Update product_route on existing seed assets to match the curated fixture. No re-embedding.",
+    )
+    parser.add_argument(
+        "--add-images",
+        action="store_true",
+        help="Insert SEED_IMAGES entries not yet in Atlas (by content_url). Idempotent.",
     )
     args = parser.parse_args()
 
@@ -564,6 +635,11 @@ def main() -> None:
         sys.exit(1)
 
     genai_client = genai.Client(api_key=GOOGLE_API_KEY)
+
+    if args.add_images:
+        add_images(db, genai_client)
+        client.close()
+        return
 
     if args.vector_only:
         vector_only(db, genai_client)
