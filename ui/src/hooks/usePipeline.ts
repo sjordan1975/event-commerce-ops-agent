@@ -54,6 +54,7 @@ export function usePipeline() {
   const [atlasState, setAtlasState] = useState<AtlasState | null>(null)
   const [mockupUrls, setMockupUrls] = useState<Record<string, string>>({})
   const [isRedraftRound, setIsRedraftRound] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const [mcpHealth, setMcpHealth] = useState<McpHealth>(DEFAULT_MOCK_HEALTH)
   const mcpHealthRef = useRef<McpHealth>(DEFAULT_MOCK_HEALTH)
@@ -66,6 +67,7 @@ export function usePipeline() {
   const bootAbortRef = useRef<AbortController | null>(null)
   const eventIndexRef = useRef(0)
   const sessionIdRef = useRef<string | null>(null)
+  const lastMessageRef = useRef<string>('')
   // Store steps for the current active run so we can push to session on complete
   const activeStepsRef = useRef<CapabilityStep[]>([])
 
@@ -118,7 +120,9 @@ export function usePipeline() {
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (phase !== 'idle' && phase !== 'complete') return
+      if (phase !== 'idle' && phase !== 'complete' && phase !== 'error') return
+
+      lastMessageRef.current = text
 
       // Cancel any previous run
       abortRef.current?.abort()
@@ -135,6 +139,7 @@ export function usePipeline() {
       setAtlasState(null)
       setMockupUrls({})
       setIsRedraftRound(false)
+      setErrorMessage(null)
       sessionIdRef.current = null
       setActiveEventMeta(apiUrl ? null : fixture.event)
       setPhase('running')
@@ -169,11 +174,17 @@ export function usePipeline() {
           await simulatePipeline(fixture, pipelineCallbacks, ctrl.signal)
         }
       } catch (e) {
-        if ((e as Error).name !== 'AbortError') throw e
+        if ((e as Error).name === 'AbortError') return
+        setErrorMessage((e as Error).message || 'Something went wrong')
+        setPhase('error')
       }
     },
     [phase]
   )
+
+  const retryLast = useCallback(() => {
+    sendMessage(lastMessageRef.current)
+  }, [sendMessage])
 
   const submitDecisions = useCallback(
     async (decisions: Record<string, Decision>) => {
@@ -259,7 +270,9 @@ export function usePipeline() {
           await simulateExecution(fixture, approvedCount, executionCallbacks, ctrl.signal)
         }
       } catch (e) {
-        if ((e as Error).name !== 'AbortError') throw e
+        if ((e as Error).name === 'AbortError') return
+        setErrorMessage((e as Error).message || 'Something went wrong')
+        setPhase('error')
       }
     },
     [isRedraftRound]
@@ -279,7 +292,9 @@ export function usePipeline() {
     mockupUrls,
     isRedraftRound,
     mcpHealth,
+    errorMessage,
     sendMessage,
     submitDecisions,
+    retryLast,
   }
 }

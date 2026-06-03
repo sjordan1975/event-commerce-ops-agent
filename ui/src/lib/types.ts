@@ -117,6 +117,7 @@ export type PipelinePhase =
   | 'redrafting'
   | 'executing'
   | 'complete'
+  | 'error'
 
 export interface EventMeta {
   event_id: string

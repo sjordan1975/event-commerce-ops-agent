@@ -111,6 +111,8 @@ async def _generate_preview_mockup(asset_id: str, content_url: str, product_type
 
 
 def _fetch_image_bytes(url: str) -> bytes:
+    if not url.startswith(("http://", "https://")):
+        return Path(url).read_bytes()
     import urllib.request
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=15) as resp:

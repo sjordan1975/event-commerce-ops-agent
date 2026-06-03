@@ -22,8 +22,10 @@ export function AppShell() {
     mockupUrls,
     isRedraftRound,
     mcpHealth,
+    errorMessage,
     sendMessage,
     submitDecisions,
+    retryLast,
   } = usePipeline()
 
   return (
@@ -51,7 +53,9 @@ export function AppShell() {
               evidence={evidence}
               atlasState={atlasState}
               mockupUrls={mockupUrls}
+              errorMessage={errorMessage}
               onSubmitDecisions={submitDecisions}
+              onRetry={retryLast}
             />
           </div>
 

@@ -18,7 +18,9 @@ interface Props {
   evidence: ExecutionEvidence | null
   atlasState: AtlasState | null
   mockupUrls: Record<string, string>
+  errorMessage: string | null
   onSubmitDecisions: (decisions: Record<string, Decision>) => void
+  onRetry: () => void
 }
 
 export function ContentPane({
@@ -29,7 +31,9 @@ export function ContentPane({
   evidence,
   atlasState,
   mockupUrls,
+  errorMessage,
   onSubmitDecisions,
+  onRetry,
 }: Props) {
   // Idle
   if (phase === 'idle') {
@@ -66,6 +70,34 @@ export function ContentPane({
           </div>
           <p className="font-mono text-[10px] tracking-widest text-text-muted uppercase">
             Pipeline running
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error — pipeline failed or timed out
+  if (phase === 'error') {
+    return (
+      <div className="flex-1 flex items-center justify-center px-6 py-8">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-5 h-5 border-2 border-status-red/40 rounded-full mx-auto" />
+          <p className="font-mono text-[10px] tracking-widest text-status-red uppercase">
+            Pipeline error
+          </p>
+          {errorMessage && (
+            <p className="text-sm text-text-secondary leading-relaxed font-mono">
+              {errorMessage}
+            </p>
+          )}
+          <button
+            onClick={onRetry}
+            className="mt-2 px-4 py-2 rounded border border-border text-xs font-mono text-text-secondary hover:border-accent hover:text-accent transition-colors"
+          >
+            Try again
+          </button>
+          <p className="font-mono text-[10px] tracking-widest text-text-muted uppercase">
+            or type a new prompt below
           </p>
         </div>
       </div>

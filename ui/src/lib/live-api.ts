@@ -13,6 +13,15 @@
 import type { ApprovalItem, AtlasState, Decision, EventMeta, ExecutionEvidence } from './types'
 import type { ExecutionCallbacks, PipelineCallbacks } from './mock-api'
 
+// Rewrite a local filesystem path to go through the backend image proxy.
+// HTTP/HTTPS and data: URLs are returned unchanged.
+function rewritePhotoUrl(url: string, apiUrl: string): string {
+  if (!url || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url
+  }
+  return `${apiUrl}/api/image?path=${encodeURIComponent(url)}`
+}
+
 // ---------------------------------------------------------------------------
 // SSE stream reader
 // ---------------------------------------------------------------------------
@@ -128,13 +137,16 @@ export async function runPipelineLive(
         if (p.eventMeta && callbacks.onEventMeta) {
           callbacks.onEventMeta(p.eventMeta)
         }
-        callbacks.onApprovalReady(p.approvalId, p.items)
+        const items = p.items.map((item) => ({
+          ...item,
+          photoUrl: rewritePhotoUrl(item.photoUrl, apiUrl),
+        }))
+        callbacks.onApprovalReady(p.approvalId, items)
         break
       }
       case 'error': {
         const p = event.payload as { message: string }
-        console.error('[live-api] SSE error:', p.message)
-        break
+        throw new Error(p.message || 'Pipeline error')
       }
     }
   }
@@ -195,7 +207,18 @@ export async function submitDecisionsLive(
         break
       case 'execution_evidence': {
         const p = event.payload as ExecutionEvidence
-        callbacks.onExecutionEvidence(p)
+        const evidence: ExecutionEvidence = {
+          ...p,
+          shopifyProducts: p.shopifyProducts.map((sp) => ({
+            ...sp,
+            photoUrl: rewritePhotoUrl(sp.photoUrl, apiUrl),
+          })),
+          socialPosts: p.socialPosts.map((post) => ({
+            ...post,
+            photoUrl: rewritePhotoUrl(post.photoUrl, apiUrl),
+          })),
+        }
+        callbacks.onExecutionEvidence(evidence)
         break
       }
       case 'mockup_resolved': {
@@ -214,8 +237,7 @@ export async function submitDecisionsLive(
       }
       case 'error': {
         const p = event.payload as { message: string }
-        console.error('[live-api] SSE error:', p.message)
-        break
+        throw new Error(p.message || 'Pipeline error')
       }
     }
   }

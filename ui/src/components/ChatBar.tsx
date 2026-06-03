@@ -15,7 +15,7 @@ export function ChatBar({ messages, phase, onSend }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const canSend = phase === 'idle' || phase === 'complete'
+  const canSend = phase === 'idle' || phase === 'complete' || phase === 'error'
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })

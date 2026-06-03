@@ -121,6 +121,27 @@ async def serve_mockup(asset_id: str) -> Response:
     return Response(content=img_bytes, media_type="image/png")
 
 
+@app.get("/api/image")
+async def serve_local_image(path: str) -> Response:
+    """Proxy a local filesystem image so the browser can display it.
+
+    Only used when content_url is a local path (e.g. /tmp/wc-final/img.jpg).
+    HTTPS and gs:// assets are fetched directly by the browser / Vertex AI.
+    """
+    p = Path(path)
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="image not found")
+    suffix = p.suffix.lower()
+    mime = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    }.get(suffix, "image/jpeg")
+    return Response(content=p.read_bytes(), media_type=mime)
+
+
 # ---------------------------------------------------------------------------
 # SSE helpers
 # ---------------------------------------------------------------------------
