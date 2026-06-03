@@ -119,6 +119,17 @@ The right exploration strategy is a configuration decision, not a fixed design. 
 
 **Framing for judges:** *"Exploration is where the agent earns its keep. Without a similarity signal to lean on, the agent has to reason: which images are worth the operator's time despite not matching past winners? That reasoning is on screen, per-item, throughout the demo. The right exploration strategy is a customer decision — we ship agent-driven novelty as the demo default; random remains a valid fallback."*
 
+### Routing mechanics (precise)
+
+**Exploitation path — mechanically locked, LLM cannot override:**
+`find_similar_assets` embeds each incoming image and runs Atlas vector search against the historical seed corpus. The top-k neighbors each carry a curated `product_route`. `_infer_route_from_neighbors` computes a similarity-weighted plurality vote over those routes — the winner becomes `inferred_route`. `persist_review_queue` writes that value directly to the asset; the LLM's output is ignored for this field. The seed corpus is the only thing that matters here: if seed routes are wrong, exploitation routes are wrong.
+
+**Discovery path — LLM judgment, seed corpus irrelevant:**
+Images that fall below the similarity cutoff have no neighbor signal. The LLM (`propose_review_queue` node) receives each discovery candidate's Step 4 vision scores (`quality`, `merch`, `identity`, `social`, `emotional`) plus `detected_subjects` (identifiable players/people from the vision model) and the event narrative. It decides whether to surface the asset at all, and if so, assigns a `product_route` (poster / tshirt / social_only). The seed corpus has zero bearing on this decision — only the live vision scores of the images currently being processed matter.
+
+**Calibration gap (known limitation):**
+The exploitation path is grounded — routing is only as good as the seed corpus, which is now human-curated. The discovery path is uncalibrated LLM judgment. A rigorous eval would require a human-scored reference set (images scored on all 5 dimensions with human-assigned routes) to measure how well the LLM's routing decisions match human judgment. Without this, discovery routing is a reasonable heuristic but not a validated signal. This is an enterprise-path concern; the demo demonstrates the mechanism, not calibrated accuracy.
+
 ---
 
 ## Non-Goals
