@@ -189,7 +189,27 @@ Pool composition verification is a separate step (run the agent, inspect similar
 
 ---
 
-## Verification gate (before committing the URL list)
+## Similarity findings (empirical — do not re-derive)
+
+Full probe results saved at `/tmp/similarity_probe.jsonl` (39 images × top-1 cosine score).
+
+| Batch | min | max | mean | spread |
+|-------|-----|-----|------|--------|
+| Batch 1 (France/Croatia 2018 WC Final) | 0.8327 | 0.9539 | 0.8957 | 0.1212 |
+| Batch 2 (USA/Wales 2022 WC Group B) | 0.8736 | 0.9108 | 0.8896 | 0.0372 |
+
+**Key insight:** `gemini-embedding-2` clusters all World Cup soccer images tightly (0.83–0.95). The default 0.75 cutoff puts everything in exploitation. The calibrated cutoff is **0.90**, which produces:
+
+| Batch | Exploitation (≥0.90) | Discovery (<0.90) |
+|-------|---------------------|-------------------|
+| Batch 1 | 7 (trophy shots, Mbappé 0.9539, Griezmann portraits 0.92+) | 12 |
+| Batch 2 | 3 (three specific action shots) | 17 |
+
+Set `QUEUE_EXPLOITATION_SIMILARITY_CUTOFF=0.90` in `.env` before demo recording (already set; also documented in `.env.template`).
+
+---
+
+## Verification gate (before demo recording)
 
 Do this **after** downloading both batches, **before** writing the kickoff messages or finalizing the script:
 
