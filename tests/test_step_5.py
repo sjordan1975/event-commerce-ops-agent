@@ -560,3 +560,37 @@ async def test_node_adapter_persist_writes_state():
         result = await _node_persist_review_queue(ctx)
 
     assert "review_queue" in ctx.state
+
+
+@pytest.mark.anyio
+async def test_node_persist_caps_pools_at_max_per_pool():
+    """Functional reranker: pools are trimmed to QUEUE_MAX_PER_POOL, preserving rank order."""
+    from src.capabilities import _node_persist_review_queue
+
+    def _item(pool: str, i: int) -> dict:
+        return {"asset_id": f"{pool[0]}{i}", "queue_type": pool, "rank": i,
+                "product_route": "poster", "rationale": f"item {i}"}
+
+    ctx = MagicMock()
+    ctx.state = {
+        "review_queue": {
+            "event_id": "evt-cap-test",
+            "exploitation": [_item("exploitation", i) for i in range(1, 9)],  # 8 items
+            "discovery":    [_item("discovery",    i) for i in range(1, 7)],  # 6 items
+            "strategy_summary": "test",
+        },
+        "queue_candidates": {
+            "exploitation": [{"asset_id": f"e{i}", "inferred_route": "poster"} for i in range(1, 9)],
+            "discovery":    [{"asset_id": f"d{i}"} for i in range(1, 7)],
+        },
+    }
+
+    with patch.dict("os.environ", {"QUEUE_MAX_PER_POOL": "3"}):
+        with patch("src.capabilities.queue.save_queue_assignment", new_callable=AsyncMock):
+            await _node_persist_review_queue(ctx)
+
+    capped = ctx.state["review_queue"]
+    assert len(capped["exploitation"]) == 3
+    assert len(capped["discovery"]) == 3
+    assert [i["rank"] for i in capped["exploitation"]] == [1, 2, 3]
+    assert [i["rank"] for i in capped["discovery"]] == [1, 2, 3]

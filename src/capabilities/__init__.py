@@ -172,6 +172,18 @@ async def _node_persist_review_queue(ctx: Any) -> dict:
     if raw:
         try:
             q_obj = ReviewQueue.model_validate(raw) if isinstance(raw, dict) else ReviewQueue.model_validate_json(raw)
+
+            # Functional reranker: cap each pool at QUEUE_MAX_PER_POOL, preserving LLM rank order.
+            # The LLM already ranked and selected; we slice deterministically — no LLM needed.
+            max_per_pool = int(os.environ.get("QUEUE_MAX_PER_POOL", "5"))
+            q_obj = ReviewQueue(
+                event_id=q_obj.event_id,
+                exploitation=q_obj.exploitation[:max_per_pool],
+                discovery=q_obj.discovery[:max_per_pool],
+                strategy_summary=q_obj.strategy_summary,
+            )
+            ctx.state["review_queue"] = q_obj.model_dump(mode="json")
+
             total = len(q_obj.exploitation) + len(q_obj.discovery)
             queue_summary = f"{total} items staged · {len(q_obj.exploitation)} proven · {len(q_obj.discovery)} discovery"
             strategy_excerpt = q_obj.strategy_summary
