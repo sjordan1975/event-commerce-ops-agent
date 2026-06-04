@@ -39,7 +39,7 @@ Close Hygiene (dep audit, .env, clone-and-run) ──► parallel, no hard deps
 `scripts/seed_mongodb.py` seeds the **historical performance corpus** — the proxy for years of past campaign data that a production system would have accumulated:
 
 - 4 past events, one per `outcome_type`
-- 40 assets with **real `gemini-embedding-2` embeddings** (fetched from Wikimedia URLs at seed time) — the vector search works against these
+- 64 assets with **real `gemini-embedding-2` embeddings** (fetched from Wikimedia URLs at seed time) — the vector search works against these
 - Scores are **synthetic** (tag-correlated, not live Gemini Vision — that's correct; the seed represents already-scored historical assets)
 - Performance metrics are **synthetic** (correlated to scores — also correct; these are past campaign outcomes)
 
@@ -90,6 +90,7 @@ The target contrast: Event 1 produces ~6–8 exploitation candidates; Event 2 pr
    - `/tmp/wc-final/` — Event 1 images (20–30 files)
    - `/tmp/wc-draw/` — Event 2 images (20–30 files)
    - Write `scripts/prep_demo_corpus.py` with the curated URL list so this is reproducible before any demo run
+   - **No duplicates of seed images** — `prep_demo_corpus.py` must assert that none of its URLs appear in `scripts/seed_images.py:SEED_IMAGES` (mechanical guard, not just memory)
 
 3. **Verify pool composition**: run `find_similar_assets` against both batches against the live seeded Atlas corpus. Confirm Event 1 produces ~6–8 exploitation candidates and Event 2 produces ~2–3. Swap images if the contrast isn't there — the seeded corpus is fixed, only the demo batch changes.
 
