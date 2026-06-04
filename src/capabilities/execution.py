@@ -167,7 +167,7 @@ def _gemini_tshirt_mockup(design_url: str) -> bytes:
     design_bytes = _fetch_image_bytes(design_url)
 
     response = client.models.generate_content(
-        model="gemini-3-pro-image",
+        model=os.environ.get("GEMINI_IMAGE_MODEL", "gemini-3-pro-image"),
         contents=[
             types.Part.from_bytes(data=shirt_bytes, mime_type="image/jpeg"),
             types.Part.from_bytes(data=design_bytes, mime_type="image/jpeg"),
