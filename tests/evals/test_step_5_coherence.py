@@ -30,11 +30,13 @@ Fixture shape (deliberately unambiguous — the lever for hitting 95%):
 import math
 import os
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 import pytest
 from google.genai import types
 
-from src.models import ReviewQueue
+from src.models import AssetScores, ReviewQueue
+from tests.conftest import build_valid_vision_scoring_output
 from tests.evals.conftest import (
     _MockMCPClient,
     _collect_parts,
@@ -47,6 +49,7 @@ from tests.evals.conftest import (
     STEP5_DISCOVERY_IDS,
     _make_step5_assets_find_handler,
     _make_step5_vector_search_handler,
+    _step5_vision_provider,
 )
 
 APP_NAME = "event_commerce_ops_agent"
@@ -366,3 +369,184 @@ async def test_step_5_strategy_coherence():
             for msg in msgs:
                 report_lines.append(f"    - {msg}")
         assert False, "\n".join(report_lines)
+
+
+# ---------------------------------------------------------------------------
+# T-5.15: Quality gate probe (live, single run)
+#
+# Fixture: 3 assets, all strong similarity → all exploitation candidates.
+#   ast-0:   quality=0.90 / merch=0.85, Messi identity match → should be kept
+#   ast-1:   quality=0.80 / merch=0.85, no identity          → should be kept
+#   ast-low: quality=0.10 / merch=0.10, no identity          → quality gate must fire
+#
+# The prompt instructs: "demote or drop [low quality/merch assets], say so in rationale."
+# Assert: ast-low absent from queue OR ranked last with quality-related rationale.
+#
+# Requires GOOGLE_API_KEY. Run deliberately — NOT in offline CI.
+# ---------------------------------------------------------------------------
+
+_QG_QUALITY_KEYWORDS = ("quality", "unfit", "blurr", "sharp", "technical", "print", "poor", "merch")
+
+
+def _quality_gate_vision_provider(image_url: str, event_context: dict):
+    """ast-low (img03) gets very low quality/merch; others use standard step5 fixture."""
+    if "img03" in image_url:
+        return build_valid_vision_scoring_output(
+            scores=AssetScores(
+                quality_score=0.1, merch_score=0.1,
+                emotional_score=0.5, social_score=0.4, identity_score=0.2,
+            ),
+            detected_subjects=[],
+        )
+    return _step5_vision_provider(image_url, event_context)
+
+
+def _make_quality_gate_vs_handler():
+    """All 3 assets → exploitation pool via strong similarity."""
+    call_count: dict[str, int] = {"n": 0}
+
+    def handler(args: dict) -> list:
+        n = call_count["n"]
+        call_count["n"] += 1
+        if n == 0:
+            return [{"asset_id": "past-0", "event_id": "evt-past-1",
+                     "similarity": 0.91, "product_route": "poster", "scores": None}]
+        elif n == 1:
+            return [{"asset_id": "past-1", "event_id": "evt-past-1",
+                     "similarity": 0.82, "product_route": "tshirt", "scores": None}]
+        else:
+            # ast-low: strong similarity despite low quality — quality gate should fire
+            return [{"asset_id": "past-2", "event_id": "evt-past-1",
+                     "similarity": 0.88, "product_route": "poster", "scores": None}]
+    return handler
+
+
+def _make_quality_gate_assets_handler():
+    """3-asset handler: status=None returns ingested, status=scored returns with low scores on ast-low."""
+    _scores_good_identity = {
+        "quality_score": 0.9, "merch_score": 0.85, "emotional_score": 0.7,
+        "social_score": 0.8, "identity_score": 0.95,
+    }
+    _scores_good = {
+        "quality_score": 0.8, "merch_score": 0.85, "emotional_score": 0.6,
+        "social_score": 0.7, "identity_score": 0.3,
+    }
+    _scores_low = {
+        "quality_score": 0.1, "merch_score": 0.1, "emotional_score": 0.5,
+        "social_score": 0.4, "identity_score": 0.2,
+    }
+
+    def handler(args: dict) -> list:
+        f = args.get("filter", {})
+        event_id = f.get("event_id", "evt-demo-1")
+        status = f.get("status")
+        base = [
+            ("ast-0", "/tmp/wc-final/img01.jpg", _scores_good_identity, ["Lionel Messi"]),
+            ("ast-1", "/tmp/wc-final/img02.jpg", _scores_good, []),
+            ("ast-low", "/tmp/wc-final/img03.jpg", _scores_low, []),
+        ]
+        if status == "scored":
+            return [
+                {
+                    "asset_id": aid, "event_id": event_id, "content_url": url,
+                    "status": "scored", "upload_date": datetime.now(timezone.utc).isoformat(),
+                    "product_route": None, "queue_type": None, "queue_rank": None,
+                    "queue_rationale": None, "embedding": None, "similar_assets": None,
+                    "campaign_id": None, "scores": scores, "detected_subjects": subjects,
+                }
+                for aid, url, scores, subjects in base
+            ]
+        return [
+            {
+                "asset_id": aid, "event_id": event_id, "content_url": url,
+                "status": "ingested", "upload_date": datetime.now(timezone.utc).isoformat(),
+                "product_route": None, "queue_type": None, "queue_rank": None,
+                "queue_rationale": None, "embedding": None, "similar_assets": None,
+                "campaign_id": None, "scores": None, "detected_subjects": None,
+            }
+            for aid, url, _, _ in base
+        ]
+    return handler
+
+
+def _seed_mock_quality_gate(mock_client: _MockMCPClient) -> None:
+    mock_client.register("find", "events", _make_events_find_handler())
+    mock_client.register("find", "player_context", _PLAYERS)
+    mock_client.register("aggregate", "performance", _PERF_AGG_DOCS)
+    mock_client.register("find", "assets", _make_quality_gate_assets_handler())
+    mock_client.register_vector_search("assets", _make_quality_gate_vs_handler())
+
+
+@pytest.mark.anyio
+async def test_step_5_quality_gate():
+    """Quality gate: exploitation candidate with quality=0.1 / merch=0.1 is demoted or dropped.
+
+    Requires GOOGLE_API_KEY. Run deliberately — NOT in offline CI.
+    """
+    with build_runner_with_step5_mock(_SEEDED_NARRATIVE) as (runner, mock_client):
+        with patch(
+            "src.capabilities.scoring._score_asset_with_vision",
+            side_effect=_quality_gate_vision_provider,
+        ):
+            _seed_mock_quality_gate(mock_client)
+
+            _runner_ref = runner
+
+            async def _run():
+                return await _run_agent(_runner_ref)
+
+            events, excluded = await run_with_transient_retry(_run)
+
+    if excluded:
+        pytest.skip("Tier-2: transient API errors on quality gate run.")
+
+    tool_responses = extract_tool_responses(events)
+    pipeline_responses = [r for r in tool_responses if r.get("name") == "run_event_pipeline"]
+
+    if not pipeline_responses:
+        dump_trace(events, "step_5_quality_gate_no_pipeline")
+        assert False, "run_event_pipeline never returned"
+
+    resp = pipeline_responses[-1].get("response", {})
+    result = resp.get("result", resp)
+    review_queue_raw = result.get("review_queue")
+
+    if review_queue_raw is None:
+        dump_trace(events, "step_5_quality_gate_no_queue")
+        assert False, "review_queue not in pipeline response"
+
+    q = (
+        ReviewQueue.model_validate_json(review_queue_raw)
+        if isinstance(review_queue_raw, str)
+        else ReviewQueue.model_validate(review_queue_raw)
+    )
+
+    expl_ids = [item.asset_id for item in q.exploitation]
+    failures: list[str] = []
+    trace_path = dump_trace(events, "step_5_quality_gate")
+
+    # Good candidates must still be surfaced
+    for expected_id in ("ast-0", "ast-1"):
+        if expected_id not in expl_ids:
+            failures.append(
+                f"(quality-a) {expected_id} (high quality) absent from exploitation. "
+                f"Trace: {trace_path}"
+            )
+
+    # ast-low: quality gate must fire — absent OR ranked last with quality rationale
+    if "ast-low" in expl_ids:
+        idx = expl_ids.index("ast-low")
+        if idx != len(expl_ids) - 1:
+            failures.append(
+                f"(quality-b) ast-low ranked {idx + 1}/{len(expl_ids)} in exploitation; "
+                f"quality gate must demote to last. Trace: {trace_path}"
+            )
+        ast_low_item = next(item for item in q.exploitation if item.asset_id == "ast-low")
+        rationale_lower = ast_low_item.rationale.lower()
+        if not any(kw in rationale_lower for kw in _QG_QUALITY_KEYWORDS):
+            failures.append(
+                f"(quality-b) ast-low present but rationale has no quality keyword: "
+                f"{ast_low_item.rationale!r}. Trace: {trace_path}"
+            )
+
+    assert not failures, "\n".join(failures)

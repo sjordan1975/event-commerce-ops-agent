@@ -13,9 +13,10 @@ If copy is generic or the guard fails, climb the remediation ladder per
 docs/evaluation-strategy.md: prompt language first, then model swap (GEMINI_DRAFT_MODEL).
 """
 
+import asyncio
 import os
-from unittest.mock import patch
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 import pytest
 from google.adk.runners import Runner
@@ -174,3 +175,35 @@ async def test_step_6_grounding_probe():
         dump_trace(events, "step_6_grounding_failure")
 
     assert not failures, "\n".join(failures)
+
+
+@pytest.mark.anyio
+async def test_step_6_redraft_fidelity():
+    """Redraft: copy incorporates a specific operator revision direction.
+
+    Uses a revision token ("underdog") absent from all baseline inputs
+    (narrative_angle, queue_rationale, detected_subjects) so its presence in
+    the output is attributable to the operator_revision, not baseline grounding.
+
+    Requires GOOGLE_API_KEY (module-level pytestmark). Run deliberately.
+    """
+    from src.capabilities.drafts import _draft_copy_for_asset
+
+    narrative_context = {
+        "narrative_angle": "Messi crowns legendary career as Argentina defeats France on penalties",
+        "key_figures": "Lionel Messi, Kylian Mbappé",
+    }
+    item_context = {
+        "asset_id": "ast-redraft-test",
+        "product_route": "poster",
+        "queue_rationale": "Identity match: Messi in frame leads exploitation queue",
+        "detected_subjects": ["Lionel Messi"],
+        "operator_revision": "work the word 'underdog' into the headline",
+    }
+
+    result = await asyncio.to_thread(_draft_copy_for_asset, narrative_context, item_context)
+
+    assert "underdog" in result.headline.lower(), (
+        f"Redraft did not incorporate operator revision ('underdog' in headline). "
+        f"Headline: {result.headline!r}. Caption: {result.caption!r}"
+    )

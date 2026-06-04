@@ -505,6 +505,87 @@ def _assert_dir_path_run(events: list, mock_client, trace_label: str) -> list[st
     return failures
 
 
+# ---------------------------------------------------------------------------
+# Outcome-type extraction probes — ambiguous / colloquial inputs (Tier-2 live)
+#
+# Each probe uses a prompt whose outcome_type is unambiguous to a sports-fluent
+# reader but requires inference (not just keyword matching). The assertion handles
+# the clarification path: if the coordinator calls clarify_event_metadata instead
+# of dispatching the pipeline, pass/skip — the question is what outcome_type the
+# coordinator extracts, not whether it does so without clarification.
+# ---------------------------------------------------------------------------
+
+def _extract_outcome_type(events: list) -> str | None:
+    """Return outcome_type from the first run_event_pipeline call, or None."""
+    tool_calls = extract_tool_calls(events)
+    pipeline_calls = [c for c in tool_calls if c["name"] == "run_event_pipeline"]
+    if not pipeline_calls:
+        return None
+    return pipeline_calls[0]["args"].get("event_metadata", {}).get("outcome_type")
+
+
+@pytest.mark.anyio
+async def test_step_1_outcome_type_extra_time():
+    """Coordinator extracts extra_time_win when France (favorites) win on penalties.
+
+    Prompt uses colloquial language ("went the distance", "penalties") with no
+    explicit outcome_type token. France winning is not an upset, ruling out
+    upset_victory — only extra_time_win fits.
+    """
+    prompt = (
+        "Went the full distance — France got through on penalties after it finished 2-2 after extra time. "
+        "The favorites got there in the end. "
+        "Match name: France vs Argentina. Start: 2026-06-01T19:00:00Z. "
+        "Photos: /tmp/wc-final/img01.jpg. Process this batch."
+    )
+    with build_runner_with_step6_mock() as (runner, mock_client):
+        _seed_mock_for_full_pipeline(mock_client)
+        with _stub_internal_llms(mock_client):
+            events, excluded = await run_with_transient_retry(_attempt(runner, mock_client, prompt))
+
+    if excluded:
+        pytest.skip("Tier-2: transient API errors.")
+
+    outcome_type = _extract_outcome_type(events)
+    if outcome_type is None:
+        pytest.skip("Coordinator called clarification instead of dispatching pipeline — acceptable.")
+
+    assert outcome_type == "extra_time_win", (
+        f"Expected 'extra_time_win', got {outcome_type!r}. "
+        f"Trace: {dump_trace(events, 'step_1_outcome_type_extra_time')}"
+    )
+
+
+@pytest.mark.anyio
+async def test_step_1_outcome_type_expected_win():
+    """Coordinator extracts expected_win from a comfortable, dominant-victory description.
+
+    No penalty/extra-time cues; no upset framing. Only expected_win fits.
+    """
+    prompt = (
+        "Dominant from start to finish — Argentina cruised past France 3-0, "
+        "no drama, exactly what everyone predicted. "
+        "Match name: Argentina vs France. Start: 2026-06-01T19:00:00Z. "
+        "Photos: /tmp/wc-final/img01.jpg. Process this batch."
+    )
+    with build_runner_with_step6_mock() as (runner, mock_client):
+        _seed_mock_for_full_pipeline(mock_client)
+        with _stub_internal_llms(mock_client):
+            events, excluded = await run_with_transient_retry(_attempt(runner, mock_client, prompt))
+
+    if excluded:
+        pytest.skip("Tier-2: transient API errors.")
+
+    outcome_type = _extract_outcome_type(events)
+    if outcome_type is None:
+        pytest.skip("Coordinator called clarification instead of dispatching pipeline — acceptable.")
+
+    assert outcome_type == "expected_win", (
+        f"Expected 'expected_win', got {outcome_type!r}. "
+        f"Trace: {dump_trace(events, 'step_1_outcome_type_expected_win')}"
+    )
+
+
 @pytest.mark.anyio
 async def test_step_1_dir_path_single_run():
     """Coordinator calls list_images when given a directory path, then run_event_pipeline.

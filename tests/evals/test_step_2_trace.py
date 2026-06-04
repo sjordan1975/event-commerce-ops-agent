@@ -1,6 +1,6 @@
 """Trace evals for the build_event_context capability.
 
-T-2.15: Single-run outcome-shaped eval (8 assertions).
+T-2.15: Single-run outcome-shaped eval (9 assertions).
 T-2.16: Pass-rate eval (≥95% over N runs, N defaults to 5 in CI, 20 for gate).
 
 Scenario: Argentina vs France, event_id="evt-demo-1", outcome_type="upset_victory".
@@ -19,6 +19,8 @@ The agent must:
   (g) grounded_facts for each key_figure are literal substrings of that player's
       notable_facts (hallucination guard)
   (h) reasoning text present before the tool call (CoT directive)
+  (i) commercial_signal for each key_figure matches the seeded player_context value
+      exactly (prompt instructs "copy commercial_signal as-is"; any paraphrase = violation)
 """
 
 import math
@@ -132,6 +134,11 @@ _PERF_AGG_DOCS = [
 # Map of notable_facts by player name for hallucination guard
 _PLAYER_FACTS_BY_NAME: dict[str, list[str]] = {
     p["name"]: p["notable_facts"] for p in _PLAYERS
+}
+
+# Map of commercial_signal by player name for fidelity guard (assertion i)
+_PLAYER_SIGNAL_BY_NAME: dict[str, str] = {
+    p["name"]: p["commercial_signal"] for p in _PLAYERS
 }
 
 
@@ -303,6 +310,21 @@ def _assert_single_run(events: list, mock_client, trace_label: str) -> list[str]
                         f"substring of any notable_fact. "
                         f"Known facts: {known_facts}. Trace: {trace_path}"
                     )
+
+    # (i) commercial_signal fidelity: must match seeded player_context value exactly
+    if narrative_dict:
+        key_figures = narrative_dict.get("key_figures", [])
+        for kf in key_figures:
+            kf_name = kf.get("name", "")
+            kf_signal = kf.get("commercial_signal", "")
+            expected_signal = _PLAYER_SIGNAL_BY_NAME.get(kf_name)
+            if expected_signal is None:
+                continue  # hallucinated player already caught by (g)
+            if kf_signal != expected_signal:
+                failures.append(
+                    f"(i) commercial_signal mismatch for '{kf_name}': "
+                    f"expected {expected_signal!r}, got {kf_signal!r}. Trace: {trace_path}"
+                )
 
     # (h) reasoning text appears before the tool call
     first_tool_idx = next(
