@@ -425,34 +425,66 @@ The FastAPI backend also owns the **MCP connection lifecycle** (D-035): the Mong
 
 ### Directory layout
 
-```
-project-root/
-├── src/                  ← existing Python agent (unchanged)
-│   ├── agent.py
-│   ├── capabilities/
-│   ├── db/
-│   └── ...
-├── src/api/              ← NEW: FastAPI HTTP + SSE bridge
-│   ├── __init__.py
-│   ├── app.py            ← FastAPI app, all endpoints
-│   └── session_bridge.py ← translates ADK Runner events → SSE messages
-├── ui/                   ← NEW: Next.js operator console
-│   ├── src/app/          ← App Router pages
-│   ├── src/components/   ← UI components (AppShell, AssetCard, etc.)
-│   ├── src/lib/          ← API client, SSE hooks, mock-api.ts
-│   ├── src/mock/         ← JSON fixtures (event1.json, event2.json)
-│   ├── public/
-│   ├── package.json
-│   └── next.config.ts    ← dev proxy: /api/* → localhost:8000
-├── pyproject.toml        ← add fastapi, uvicorn
-└── package.json          ← optional root: "dev" script runs both servers
+```text
+src/                  ← Python agent
+├── agent.py          ← coordinator LlmAgent + workflow graph + coordinator tools
+├── capabilities/     ← one module per capability (ingest, context, similarity,
+│                        scoring, queue, drafts, execution, outcomes)
+├── db/               ← MongoDB wrapper modules (events, assets, campaigns,
+│                        approvals, performance, player_context, client)
+├── errors.py         ← PreconditionError and shared error types
+├── images.py         ← local image proxy (serves assets to UI via /api/image)
+├── mockup_store.py   ← in-process mockup byte store (preview mode, no Shopify creds)
+├── models.py         ← Pydantic models for all MongoDB document shapes
+├── prompt_loader.py  ← versioned prompt loader (PROMPT_VERSION env var)
+├── sse.py            ← per-session SSE queue registry
+└── timeliness.py     ← timeliness score computation
+
+src/api/              ← FastAPI HTTP + SSE bridge
+├── server.py         ← FastAPI app (app = FastAPI(...)), all endpoints
+├── session_store.py  ← in-process session / runner store
+├── index.html        ← minimal chat UI for headless testing
+└── package.json      ← vendored mongodb-mcp-server binary (D-035)
+
+prompts/v3/           ← active system prompts (v3, set by PROMPT_VERSION)
+├── coordinator_system.md
+├── clarification_system.md
+├── build_event_context.md
+├── score_asset_with_vision.md
+├── propose_review_queue.md
+└── draft_campaign_copy.md
+
+tests/
+├── conftest.py       ← shared fixtures and model builders
+├── test_step_1.py … test_step_8.py  ← unit + scaffolding tests per capability
+└── evals/            ← live LLM evals (Tier-2, require GOOGLE_API_KEY, run deliberately)
+
+scripts/              ← provisioning and demo lifecycle
+├── setup_mongodb.py  ← create collections and indexes
+├── setup_vector_index.py
+├── seed_mongodb.py   ← seed player_context and past-event corpus
+├── seed_images.py
+├── reset_atlas.py    ← demo reset between runs
+├── capture_mcp_fixtures.py
+└── smoke_shopify.py
+
+ui/                   ← Next.js operator console
+├── src/app/          ← App Router pages (layout.tsx, page.tsx)
+├── src/components/   ← ActivityTimeline, AppShell, ApprovalBatch, AssetCard,
+│                        ChatBar, ContentPane, EventDivider, EventHeader,
+│                        EvidenceSection, McpHealthBadge, NoticeCard,
+│                        ScoreBar, StreamingNotices
+├── src/hooks/        ← usePipeline.ts
+├── src/lib/          ← health-api.ts, live-api.ts, mock-api.ts, types.ts, utils.ts
+├── src/mock/         ← event1.json, event2.json (mock-mode fixtures)
+└── next.config.ts    ← dev proxy: /api/* → localhost:8000
 ```
 
 ### Two servers
 
 | Server | Command | Port | Responsibility |
 |--------|---------|------|---------------|
-| Python API | `uvicorn src.api.app:app --reload` | 8000 | ADK coordinator, SSE stream, approval resumption |
+| Python API | `uvicorn src.api.server:app --reload` | 8000 | ADK coordinator, SSE stream, approval resumption |
 | Next.js | `cd ui && npm run dev` | 3000 | Operator console UI |
 
 In development, `next.config.ts` proxies all `/api/*` requests from port 3000 → port 8000 so the UI never references the backend port directly. In production on Cloud Run, the options are two separate services (recommended) or a single service that serves the Next.js static build from FastAPI.

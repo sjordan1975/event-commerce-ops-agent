@@ -40,30 +40,23 @@ Deadline: June 11, 2026 @ 2:00 PM PDT.
 
 ```text
 project-root/
-├── CLAUDE.md                    ← this file — index only
-├── tracking.md                  ← decision log
-├── docs/specs/
-│   ├── 00-overview.md          ← vision, origin, positioning, demo narrative
-│   ├── 01-requirements.md      ← functional spec, 9 capabilities + queue assembly (D-021), MVP scope
-│   └── 02-architecture.md      ← system design, MongoDB schemas, MCP call list, ADK architecture
-├── docs/agentic-model.md        ← agent loop shape, exit conditions, HITL framing, three-layer model
-├── docs/db-wrapper-inventory.md ← MongoDB wrapper signatures, per-step ownership
-├── docs/evaluation-strategy.md  ← six failure categories, trace-eval model, remediation ladder
-├── docs/safety-measures.md      ← loop bound + spend bound
-├── docs/spike-d023-findings.md  ← D-023 spike results (superseded by D-024)
-├── docs/strategic-agent-reframe.md ← D-021 capability surface, queue assembly, propagation plan
-├── docs/testing-model.md        ← three-category test model (unit / scaffolding / eval)
-├── docs/workflow.md             ← per-step workflow and phase gates
-├── docs/plans/                  ← per-step implementation plans (step-*.md only)
-├── docs/tasks/                  ← per-step atomic task lists (one file per step)
-├── spike/                       ← validated ADK spikes (adk_hitl_test.py, adk_mcp_raw_test.py, adk_event_capture.py, adk_workflow_hitl_spike.py [D-024])
-├── scripts/                     ← provisioning and seed scripts (setup_mongodb.py, seed_mongodb.py)
-├── src/                         ← agent code (agent.py, prompt_loader.py, db/, models)
-├── tests/                       ← test suite (test_foundation.py, expanded each capability)
-└── prompts/                     ← versioned system prompts (v1 + v2 archived as pre-D-024 snapshots; v3 active per D-024)
+├── CLAUDE.md             ← this file — session orientation
+├── tracking.md           ← decision log (D-000 through current)
+├── pyproject.toml
+├── package.json          ← root dev script
+├── docs/                 ← specs, plans, tasks, and supporting reference docs
+├── prompts/              ← versioned system prompts (v1, v2 archived; v3 active)
+├── scripts/              ← provisioning, seed, and demo-reset scripts
+├── spike/                ← validated ADK spikes
+├── src/                  ← Python agent (agent.py, capabilities/, db/, models.py, …)
+├── src/api/              ← FastAPI HTTP + SSE bridge (see architecture spec)
+├── tests/                ← unit, scaffolding, and eval tests (tests/evals/ for live)
+└── ui/                   ← Next.js operator console (see architecture spec)
 ```
 
-Planning documents (historical, superseded by docs/specs/):
+Component-level detail for `src/api/` and `ui/` is in `docs/specs/02-architecture.md § UI Layer`.
+
+Key reference docs:
 - `docs/rapid_agent_hackathon_spec.md` — hackathon rules reference; do not modify
 
 ---
