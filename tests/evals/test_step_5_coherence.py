@@ -30,7 +30,6 @@ Fixture shape (deliberately unambiguous — the lever for hitting 95%):
 import math
 import os
 from datetime import datetime, timezone
-from unittest.mock import patch
 
 import pytest
 from google.genai import types
@@ -483,19 +482,17 @@ async def test_step_5_quality_gate():
 
     Requires GOOGLE_API_KEY. Run deliberately — NOT in offline CI.
     """
-    with build_runner_with_step5_mock(_SEEDED_NARRATIVE) as (runner, mock_client):
-        with patch(
-            "src.capabilities.scoring._score_asset_with_vision",
-            side_effect=_quality_gate_vision_provider,
-        ):
-            _seed_mock_quality_gate(mock_client)
+    with build_runner_with_step5_mock(
+        _SEEDED_NARRATIVE, vision_provider=_quality_gate_vision_provider
+    ) as (runner, mock_client):
+        _seed_mock_quality_gate(mock_client)
 
-            _runner_ref = runner
+        _runner_ref = runner
 
-            async def _run():
-                return await _run_agent(_runner_ref)
+        async def _run():
+            return await _run_agent(_runner_ref)
 
-            events, excluded = await run_with_transient_retry(_run)
+        events, excluded = await run_with_transient_retry(_run)
 
     if excluded:
         pytest.skip("Tier-2: transient API errors on quality gate run.")

@@ -379,12 +379,17 @@ def _step5_vision_provider(image_url: str, event_context: dict) -> Any:
 
 
 @contextmanager
-def build_runner_with_step5_mock(narrative_fixture: dict):
+def build_runner_with_step5_mock(narrative_fixture: dict, vision_provider=None):
     """Context manager for Step 5 evals: mock DB + embedding + vision with step-5-shaped data.
 
     Yields (runner, mock_client). The caller seeds mock_client with event / player /
     performance data before using it.
+
+    vision_provider: callable(image_url, event_context) -> VisionScoringOutput.
+    Defaults to _step5_vision_provider (differentiated per-asset step-5 fixture).
     """
+    if vision_provider is None:
+        vision_provider = _step5_vision_provider
     mock_client = _MockMCPClient()
     with (
         patch("src.db.events.get_client", return_value=mock_client),
@@ -397,7 +402,7 @@ def build_runner_with_step5_mock(narrative_fixture: dict):
         ),
         patch(
             "src.capabilities.scoring._score_asset_with_vision",
-            side_effect=_step5_vision_provider,
+            side_effect=vision_provider,
         ),
     ):
         agent = build_coordinator()
