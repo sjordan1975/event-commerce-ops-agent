@@ -156,6 +156,8 @@ Process the following images.
 
 Fill in team names and score to match whatever events the curated images actually depict.
 
+> **Team name precision (Batch 2):** `find_players_for_teams` matches the `team` field in player_context exactly against whatever home/away team strings the coordinator extracts and stores. Use the full formal name — "United States" not "USA", "Wales" not "Cymru" — so the player lookup resolves. The player_context entries use `team: "United States"` and `team: "Wales"` to match.
+
 ---
 
 ## `prep_demo_corpus.py` spec

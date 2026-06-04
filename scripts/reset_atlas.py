@@ -9,6 +9,8 @@ records, and 16 player_context bios.
 Safe to run between demo runs. Idempotent — running it on an already-clean
 database is a no-op (deletes 0 rows, reports correct counts).
 
+Seed corpus baseline: 4 events, 64 assets, 64 performance records, 25 player_context bios.
+
 Usage:
     python scripts/reset_atlas.py
 
@@ -64,7 +66,7 @@ def reset(db) -> None:
 
     # player_context — never touched by the pipeline; report count only
     n = db.player_context.count_documents({})
-    print(f"  player_context: untouched              →  {n} remaining (expected 16)")
+    print(f"  player_context: untouched              →  {n} remaining (expected 25)")
 
     print("\nDone.")
 
