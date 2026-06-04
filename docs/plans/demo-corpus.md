@@ -174,6 +174,14 @@ Short, descriptive filenames: `celebration_trophy_01.jpg`, `draw_midfield_action
 
 The `{url, filename}` pair in each dict **is the source-to-local map** — the script is the canonical record of where every file came from. To re-run or verify attribution, read the script; there is no separate mapping file needed.
 
+### Download robustness
+- **User-Agent**: import `WIKIMEDIA_HEADERS` from `scripts/seed_mongodb.py` — Wikimedia requires a descriptive User-Agent; reuse the existing constant rather than defining a second one
+- **Inter-request delay**: 0.5–1s sleep between downloads — courteous for ~40 sequential requests and avoids triggering throttling
+- **Retry on 429 / 5xx**: simple exponential backoff, 3 attempts, stdlib `time.sleep` — no external retry library needed
+- **Idempotency is the primary safety net**: skip-if-exists means a failed mid-run is recoverable by re-running; retry handles transient failures within a single run
+
+The 429 risk here is low (downloads only, no Gemini calls). Gemini 429s appear at pipeline run time during `find_similar_assets` embedding — that path has its own retry handling.
+
 ### No verification logic in the script
 Pool composition verification is a separate step (run the agent, inspect similarity output). The script's only job is deterministic download.
 
