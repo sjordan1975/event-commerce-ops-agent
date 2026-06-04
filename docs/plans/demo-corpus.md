@@ -104,9 +104,15 @@ Mostly social_only is correct for a draw. A small poster and tshirt minority is 
 
 ## Hard constraints
 
-1. **Photos must be from different events than the seed corpus.** The demo simulates receiving *today's* photos from a *new* event and using historical data to evaluate commercial appeal. Photos from the same four seeded events would be circular — the similarity scores would reflect event identity, not the visual-genre matching the system actually demonstrates.
+1. **No demo images from the four seeded events — any photo, not just seeded URLs.** The forbidden events are:
+   - `wc2022-final-arg-fra` (Argentina vs France, WC2022 Final)
+   - `wc2018-grp-kor-ger` (South Korea vs Germany, WC2018 Group F)
+   - `wc2014-final-ger-arg` (Germany vs Argentina, WC2014 Final)
+   - `wc2018-grp-esp-por` (Spain vs Portugal, WC2018 Group B)
 
-2. **No URL duplicates from seed corpus.** `prep_demo_corpus.py` imports `SEED_IMAGES` from `scripts/seed_images.py` and asserts zero overlap before downloading anything. Failure mode: a seeded image in the demo batch gets ingested as a "new" event asset — its embedding is already in Atlas, producing an artifically perfect similarity match.
+   This is stricter than the no-duplicate-URL rule below. Even a photo of these events that isn't in `SEED_IMAGES` is off-limits — the demo must represent a genuinely new event the agent has never seen. Using photos from seeded events would be circular: the system would appear to recognize events it already knows, not demonstrate commercial signal detection on new material.
+
+2. **No URL duplicates from seed corpus.** `prep_demo_corpus.py` imports `SEED_IMAGES` from `scripts/seed_images.py` and asserts zero overlap before downloading anything. Failure mode: a seeded image in the demo batch gets ingested as a "new" event asset — its embedding is already in Atlas, producing an artificially perfect similarity match.
 
 3. **CC-BY or CC-BY-SA license only.** Hackathon rules require open-source; judges may inspect. Wikimedia Commons is the source. Verify license on the file description page before adding a URL.
 
