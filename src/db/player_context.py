@@ -10,6 +10,7 @@ async def find_players_for_teams(home_team: str, away_team: str) -> list[Player]
         "database": "event_commerce",
         "collection": "player_context",
         "filter": {"team": {"$in": [home_team, away_team]}},
+        "limit": 500,
     })
     docs = _parse_docs_response(envelope)
     return [Player.model_validate({k: v for k, v in d.items() if k != "_id"}) for d in docs]

@@ -101,6 +101,7 @@ async def get_edit_requested_campaigns(event_id: str) -> list[ApprovedCampaign]:
         "database": "event_commerce",
         "collection": "approvals",
         "filter": {"event_id": event_id, "status": "edit_requested"},
+        "limit": 500,
     })
     approval_docs = _parse_docs_response(approval_envelope)
     if not approval_docs:
@@ -111,6 +112,7 @@ async def get_edit_requested_campaigns(event_id: str) -> list[ApprovedCampaign]:
         "database": "event_commerce",
         "collection": "campaigns",
         "filter": {"campaign_id": {"$in": campaign_ids}},
+        "limit": 500,
     })
     campaign_docs = _parse_docs_response(campaign_envelope)
     campaign_by_id = {
@@ -158,6 +160,7 @@ async def get_campaigns_by_ids(campaign_ids: list[str]) -> list[Campaign]:
         "database": "event_commerce",
         "collection": "campaigns",
         "filter": {"campaign_id": {"$in": campaign_ids}},
+        "limit": 500,
     })
     docs = _parse_docs_response(envelope)
     return [Campaign.model_validate({k: v for k, v in doc.items() if k != "_id"}) for doc in docs]

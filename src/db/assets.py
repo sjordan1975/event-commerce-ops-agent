@@ -32,6 +32,7 @@ async def get_assets_for_event(event_id: str, status: str | None = None) -> list
         "database": "event_commerce",
         "collection": "assets",
         "filter": filter_dict,
+        "limit": 500,  # MCP default is 10; override to return full event batch
     })
     docs = _parse_docs_response(envelope)
     return [Asset.model_validate({k: v for k, v in doc.items() if k != "_id"}) for doc in docs]
@@ -100,6 +101,7 @@ async def get_assets_by_ids(asset_ids: list[str]) -> list[Asset]:
         "database": "event_commerce",
         "collection": "assets",
         "filter": {"asset_id": {"$in": asset_ids}},
+        "limit": 500,
     })
     docs = _parse_docs_response(envelope)
     return [Asset.model_validate({k: v for k, v in doc.items() if k != "_id"}) for doc in docs]

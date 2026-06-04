@@ -39,6 +39,7 @@ async def find_past_events_by_outcome(
             "outcome_type": outcome_type,
             "event_id": {"$ne": exclude_event_id},
         },
+        "limit": 500,
     })
     docs = _parse_docs_response(envelope)
     return [Event.model_validate({k: v for k, v in d.items() if k != "_id"}) for d in docs]
