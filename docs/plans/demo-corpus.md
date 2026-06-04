@@ -125,6 +125,8 @@ Mostly social_only is correct for a draw. A small poster and tshirt minority is 
 ## Operator kickoff messages
 
 > **Finalize after curation.** The team names, match narrative, and outcome are filled in once we know what images we actually have. The structure below is fixed; the content slots are placeholders.
+>
+> **Each batch must be photos from a single real-world match.** The kickoff message tells the agent "here are tonight's photos" — if the batch mixes multiple matches, `build_event_context` builds an incoherent narrative. Choose one match per batch, then fill in the team names and outcome from that match.
 
 > **Note on verbosity:** `build_event_context` *should* infer outcome_type from a terse message, but that path is untested on live data. We supply it explicitly — reliability on camera over naturalness.
 
@@ -169,6 +171,8 @@ The script must be **reproducible** — running it before any demo session resto
 
 ### Filename convention
 Short, descriptive filenames: `celebration_trophy_01.jpg`, `draw_midfield_action_02.jpg`. These appear in the agent's file listing — legible names help the coordinator's prompt context.
+
+The `{url, filename}` pair in each dict **is the source-to-local map** — the script is the canonical record of where every file came from. To re-run or verify attribution, read the script; there is no separate mapping file needed.
 
 ### No verification logic in the script
 Pool composition verification is a separate step (run the agent, inspect similarity output). The script's only job is deterministic download.
