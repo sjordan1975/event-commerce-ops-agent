@@ -41,6 +41,10 @@ node_modules/
 .DS_Store
 .claude/
 
+# Demo corpus images (reproduced by scripts/prep_demo_corpus.py)
+/data/*
+!/data/.gitkeep
+
 # Code spikes
 spike/
 

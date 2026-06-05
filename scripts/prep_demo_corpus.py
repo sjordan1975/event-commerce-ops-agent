@@ -1,8 +1,8 @@
-"""Download demo event batch images to local paths for demo recording.
+"""Download demo event batch images into the project data directory.
 
 Two batches:
-  Batch 1 — win/upset outcome  →  /tmp/wc-final/
-  Batch 2 — draw outcome       →  /tmp/wc-draw/
+  Batch 1 — win/upset outcome  →  data/wc-final/
+  Batch 2 — draw outcome       →  data/wc-draw/
 
 Usage (from project root):
     python scripts/prep_demo_corpus.py
@@ -310,9 +310,10 @@ BATCH2_IMAGES: list[dict] = [
     },
 ]
 
+_HERE = Path(__file__).parent.parent  # project root
 _BATCHES = [
-    {"name": "Batch 1 (win/upset)", "dir": Path("/tmp/wc-final"),  "images": BATCH1_IMAGES},
-    {"name": "Batch 2 (draw)",      "dir": Path("/tmp/wc-draw"),   "images": BATCH2_IMAGES},
+    {"name": "Batch 1 (win/upset)", "dir": _HERE / "data" / "wc-final", "images": BATCH1_IMAGES},
+    {"name": "Batch 2 (draw)",      "dir": _HERE / "data" / "wc-draw",  "images": BATCH2_IMAGES},
 ]
 
 # ---------------------------------------------------------------------------

@@ -51,7 +51,7 @@ Embeddings encode visual + semantic content (`gemini-embedding-2` is multimodal)
 
 ---
 
-## Batch 1 image spec (win outcome — `/tmp/wc-final/`)
+## Batch 1 image spec (win outcome — `data/wc-final/`)
 
 **Goal: majority of images land ≥ 0.75 similarity against the seeded corpus.**
 
@@ -76,7 +76,7 @@ Aim for a mix that produces: ≥ 3 poster-routable (celebration, iconic moment),
 
 ---
 
-## Batch 2 image spec (draw outcome — `/tmp/wc-draw/`)
+## Batch 2 image spec (draw outcome — `data/wc-draw/`)
 
 **Goal: most images land < 0.75; a few (2–3) land ≥ 0.75.**
 
@@ -138,7 +138,7 @@ Mostly social_only is correct for a draw. A small poster and tshirt minority is 
 Match started [ISO timestamp].
 Outcome: upset_victory.
 
-I uploaded the images to /tmp/wc-final directory.
+I uploaded the images to data/wc-final directory.
 Process the following images.
 ```
 
@@ -150,7 +150,7 @@ It finished [score] — both teams take the point.
 Match started [ISO timestamp].
 Outcome: draw.
 
-I uploaded the images to /tmp/wc-draw directory.
+I uploaded the images to data/wc-draw directory.
 Process the following images.
 ```
 
