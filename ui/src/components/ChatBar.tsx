@@ -13,7 +13,7 @@ interface Props {
 export function ChatBar({ messages, phase, onSend }: Props) {
   const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const canSend = phase === 'idle' || phase === 'complete' || phase === 'error'
 
@@ -21,11 +21,20 @@ export function ChatBar({ messages, phase, onSend }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length])
 
+  function autoResize() {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }
+
   function handleSend() {
     const text = draft.trim()
     if (!text || !canSend) return
     setDraft('')
     onSend(text)
+    // Reset height after clearing
+    if (inputRef.current) inputRef.current.style.height = 'auto'
     inputRef.current?.focus()
   }
 
@@ -68,7 +77,7 @@ export function ChatBar({ messages, phase, onSend }: Props) {
                   : 'bg-surface-2 border border-border text-text-secondary'
               }`}
             >
-              <p className="text-xs leading-relaxed">{msg.text}</p>
+              <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.text}</p>
             </div>
           </div>
         ))}
@@ -78,24 +87,25 @@ export function ChatBar({ messages, phase, onSend }: Props) {
       {/* Input */}
       <div className="px-6 pb-4 shrink-0">
         <div
-          className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 transition-all ${
+          className={`flex items-end gap-3 rounded-lg border px-4 py-2.5 transition-all ${
             canSend
               ? 'border-border-bright bg-surface-2 focus-within:border-accent/40 focus-within:shadow-[0_0_0_1px_rgba(204,255,71,0.06)]'
               : 'border-border bg-surface opacity-60 cursor-not-allowed'
           }`}
         >
-          <input
+          <textarea
             ref={inputRef}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            rows={1}
+            onChange={(e) => { setDraft(e.target.value); autoResize() }}
             onKeyDown={handleKey}
             disabled={!canSend}
             placeholder={
               canSend
-                ? 'Describe an event to begin...'
+                ? 'Describe an event — Shift+Enter for new line, Enter to send'
                 : 'Pipeline running — waiting for completion...'
             }
-            className="flex-1 bg-transparent text-sm h-8 text-text-primary placeholder-text-secondary outline-none font-sans disabled:cursor-not-allowed"
+            className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-secondary outline-none font-sans disabled:cursor-not-allowed resize-none overflow-hidden min-h-[2rem] max-h-40 leading-relaxed py-0.5"
           />
           <button
             onClick={handleSend}

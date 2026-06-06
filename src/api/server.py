@@ -21,6 +21,8 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from google.genai.errors import APIError
+
 logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
@@ -35,6 +37,15 @@ load_dotenv()
 _pipeline_level = logging.INFO if os.environ.get("LOG_PIPELINE") else logging.WARNING
 for _log_name in ("src.capabilities", "src.api.server"):
     logging.getLogger(_log_name).setLevel(_pipeline_level)
+
+# The ADK MCP session_context emits two warning-level log lines on every clean
+# shutdown ("Error on session runner task" / "Failed to close MCP session") when
+# AnyIO's TaskGroup raises an ExceptionGroup as the stdio subprocess streams
+# close.  Both are caught and swallowed inside the ADK library — the app shuts
+# down cleanly — but the messages look alarming.  Suppress them to ERROR.
+logging.getLogger(
+    "google_adk.google.adk.tools.mcp_tool.session_context"
+).setLevel(logging.ERROR)
 
 # Default to the vendored MCP server binary (direct exec, no npx/registry) unless the
 # environment overrides it. Set before importing get_client so the singleton picks it up.
@@ -176,6 +187,21 @@ async def _drain_queue(session_id: str, q: "asyncio.Queue[dict | None]"):
         close_queue(session_id)
 
 
+def _format_pipeline_error(exc: Exception) -> str:
+    """Return a judge-friendly error message for transient API failures."""
+    if isinstance(exc, APIError):
+        code = getattr(exc, "code", None)
+        if code == 503:
+            return "Gemini is temporarily unavailable (high demand). Please try again in a moment."
+        if code == 429:
+            return "Gemini rate limit reached. Please try again shortly."
+        if code and code >= 500:
+            return f"Gemini API server error ({code}). Please try again."
+        if code and code >= 400:
+            return f"Gemini API error ({code}). Please check your credentials and try again."
+    return "Pipeline error — please try again."
+
+
 async def _run_coordinator_turn(
     runner: Runner,
     session_id: str,
@@ -206,6 +232,9 @@ async def _run_coordinator_turn(
                         "payload": {"role": "coordinator", "text": text.strip()},
                     })
         logger.info("coordinator_turn done   session=%s latency=%.1fs", session_id[:8], time.perf_counter() - t0)
+    except Exception as exc:
+        logger.warning("coordinator_turn error session=%s: %s", session_id[:8], exc)
+        await q.put({"type": "error", "payload": {"message": _format_pipeline_error(exc)}})
     finally:
         await q.put(None)
 
