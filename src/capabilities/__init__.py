@@ -26,6 +26,7 @@ from google.adk.workflow import FunctionNode, START
 from src.capabilities.context import build_event_context as _build_event_context
 from src.capabilities.drafts import draft_campaigns_for_queue
 from src.capabilities.ingest import ingest_event_batch as _ingest_event_batch
+from src.timeliness import compute_timeliness
 from src.capabilities.queue import (
     build_review_queue_node,
     persist_review_queue,
@@ -62,9 +63,26 @@ async def _node_ingest_event_batch(
     ctx.state["event_id"] = result["event_id"]
     ctx.state["asset_ids"] = result["asset_ids"]
     count = len(result.get("asset_ids") or [])
+    timeliness = compute_timeliness(
+        event_metadata["outcome_type"], event_metadata["start_date"]
+    )["timeliness"]
     _sse_emit(ctx, "capability_completed", {
         "capability": "ingest_event_batch",
         "resultSummary": f"{count} asset{'s' if count != 1 else ''} ingested",
+        "eventMeta": {
+            "event_id": result["event_id"],
+            "name": event_metadata["name"],
+            "home_team": event_metadata["home_team"],
+            "away_team": event_metadata["away_team"],
+            "outcome_type": event_metadata["outcome_type"],
+            "final_score": event_metadata["final_score"],
+            "timeliness": timeliness,
+            "timeliness_label": (
+                "Peak window" if timeliness >= 0.85
+                else "Good window" if timeliness >= 0.6
+                else "Fading window"
+            ),
+        },
     })
     return result
 

@@ -113,7 +113,7 @@ export async function runPipelineLive(
         break
       }
       case 'capability_completed': {
-        const p = event.payload as { capability: string; resultSummary: string; strategyExcerpt?: string }
+        const p = event.payload as { capability: string; resultSummary: string; strategyExcerpt?: string; eventMeta?: EventMeta }
         callbacks.onCapabilityComplete(
           p.capability as Parameters<typeof callbacks.onCapabilityComplete>[0],
           p.resultSummary,
@@ -124,6 +124,9 @@ export async function runPipelineLive(
             p.capability as Parameters<typeof callbacks.onNotice>[0],
             p.resultSummary,
           )
+        }
+        if (p.eventMeta && callbacks.onEventMeta) {
+          callbacks.onEventMeta(p.eventMeta)
         }
         break
       }
