@@ -44,6 +44,9 @@ node_modules/
 # Demo corpus images (reproduced by scripts/prep_demo_corpus.py)
 /data/*
 !/data/.gitkeep
+!/data/uploads/
+/data/uploads/*
+!/data/uploads/.gitkeep
 
 # Code spikes
 spike/

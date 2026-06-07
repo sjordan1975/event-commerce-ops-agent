@@ -19,10 +19,14 @@ Requires:
 """
 
 import os
+import shutil
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 from pymongo import MongoClient
+
+_UPLOADS_DIR = Path(__file__).parent.parent / "data" / "uploads"
 
 load_dotenv()
 
@@ -67,6 +71,15 @@ def reset(db) -> None:
     # player_context — never touched by the pipeline; report count only
     n = db.player_context.count_documents({})
     print(f"  player_context: untouched              →  {n} remaining (expected 25)")
+
+    # uploaded batches — delete all subdirs under data/uploads/
+    n_batches = 0
+    if _UPLOADS_DIR.exists():
+        for entry in _UPLOADS_DIR.iterdir():
+            if entry.is_dir():
+                shutil.rmtree(entry)
+                n_batches += 1
+    print(f"  uploads:       deleted {n_batches:>4}  batch dir{'s' if n_batches != 1 else ''}  →  data/uploads/ empty")
 
     print("\nDone.")
 
