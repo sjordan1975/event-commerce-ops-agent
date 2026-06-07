@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { McpHealth, Notice } from '@/lib/types'
+import { BatchUpload } from './BatchUpload'
 import { McpHealthBadge } from './McpHealthBadge'
 import { NoticeCard } from './NoticeCard'
 
@@ -10,7 +11,7 @@ interface Props {
   mcpHealth: McpHealth
 }
 
-export function StreamingNotices({ notices, mcpHealth }: Props) {
+export function StreamingNotices({ notices, mcpHealth, apiUrl }: Props & { apiUrl?: string }) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const prevLen = useRef(0)
 
@@ -55,6 +56,13 @@ export function StreamingNotices({ notices, mcpHealth }: Props) {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* Batch upload — only shown in live mode */}
+      {apiUrl && (
+        <div className="shrink-0 border-t border-border">
+          <BatchUpload apiUrl={apiUrl} />
+        </div>
+      )}
 
       {/* MCP health badge — pinned to bottom */}
       <div className="shrink-0 border-t border-border">

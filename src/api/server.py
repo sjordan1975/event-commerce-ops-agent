@@ -26,7 +26,7 @@ from google.genai.errors import APIError
 logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
@@ -160,6 +160,51 @@ async def serve_local_image(path: str) -> Response:
         ".gif": "image/gif",
     }.get(suffix, "image/jpeg")
     return Response(content=p.read_bytes(), media_type=mime)
+
+
+# ---------------------------------------------------------------------------
+# Batch upload endpoint
+# ---------------------------------------------------------------------------
+
+_DATA_DIR = Path(__file__).parent.parent.parent / "data"
+_ACCEPTED_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+@app.post("/api/upload")
+async def upload_batch(files: list[UploadFile]):
+    """Accept a batch of image files and save to data/uploads/batch-<timestamp>.
+
+    Returns the server-side path operators can reference in the chat prompt,
+    e.g. 'ingest from data/uploads/batch-1749304800'.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="no files provided")
+
+    batch_name = f"batch-{int(time.time())}"
+    batch_dir = _DATA_DIR / "uploads" / batch_name
+    batch_dir.mkdir(parents=True, exist_ok=True)
+
+    saved: list[str] = []
+    skipped: list[str] = []
+
+    for f in files:
+        suffix = Path(f.filename or "").suffix.lower()
+        if suffix not in _ACCEPTED_SUFFIXES:
+            skipped.append(f.filename or "")
+            continue
+        dest = batch_dir / (f.filename or f"image{len(saved)}{suffix}")
+        dest.write_bytes(await f.read())
+        saved.append(dest.name)
+
+    if not saved:
+        raise HTTPException(status_code=400, detail="no valid image files in upload")
+
+    return {
+        "path": f"data/uploads/{batch_name}",
+        "count": len(saved),
+        "files": saved,
+        "skipped": skipped,
+    }
 
 
 # ---------------------------------------------------------------------------

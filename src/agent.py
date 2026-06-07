@@ -375,10 +375,11 @@ async def redraft_campaigns(event_id: str, tool_context: ToolContext) -> dict:
 def list_images(path: str) -> dict:
     """List image files available for batch ingestion.
 
-    Accepts a local directory path (e.g. /tmp/wc-final/) or a GCS URI
-    (e.g. gs://fieldhouse-demo/wc-final/). Returns {"files": [...], "count": N}
-    on success, or {"error": "...", "files": [], "count": 0} if the path is
-    inaccessible. Call this before run_event_pipeline to enumerate the batch.
+    Accepts a local directory path (e.g. data/uploads/batch-1749304800 or
+    /abs/path/to/images/) or a GCS URI (e.g. gs://bucket/wc-final/).
+    Returns {"files": [...], "count": N} on success, or
+    {"error": "...", "files": [], "count": 0} if the path is inaccessible.
+    Call this before run_event_pipeline to enumerate the batch.
     """
     return _list_images_impl(path)
 

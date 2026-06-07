@@ -255,3 +255,26 @@ export async function submitDecisionsLive(
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Batch upload
+// ---------------------------------------------------------------------------
+
+export interface UploadResult {
+  path: string
+  count: number
+  files: string[]
+  skipped: string[]
+}
+
+export async function uploadBatch(apiUrl: string, files: File[]): Promise<UploadResult> {
+  const form = new FormData()
+  for (const f of files) form.append('files', f)
+
+  const response = await fetch(`${apiUrl}/api/upload`, { method: 'POST', body: form })
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}))
+    throw new Error(detail?.detail || `Upload failed: ${response.status}`)
+  }
+  return response.json()
+}

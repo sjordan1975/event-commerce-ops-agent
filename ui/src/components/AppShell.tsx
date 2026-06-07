@@ -38,7 +38,11 @@ export function AppShell() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left: streaming notices */}
-        <StreamingNotices notices={notices} mcpHealth={mcpHealth} />
+        <StreamingNotices
+          notices={notices}
+          mcpHealth={mcpHealth}
+          apiUrl={process.env.NEXT_PUBLIC_API_URL}
+        />
 
         {/* Right: timeline + content + chat */}
         <div className="flex-1 flex flex-col overflow-hidden">

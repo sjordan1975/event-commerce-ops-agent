@@ -82,8 +82,15 @@ def list_images(path: str) -> dict:
     return _list_local(path)
 
 
+_PROJECT_ROOT = Path(__file__).parent.parent
+
+
 def _list_local(path: str) -> dict:
     p = Path(path)
+    # If the absolute path doesn't exist, try resolving relative to the project
+    # root — handles both "data/uploads/batch-xxx" and "/data/uploads/batch-xxx".
+    if not p.exists():
+        p = _PROJECT_ROOT / path.lstrip("/")
     if not p.exists():
         return {"error": f"path not found: {path!r}", "files": [], "count": 0}
     if not p.is_dir():
