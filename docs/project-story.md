@@ -57,7 +57,7 @@ The coordinator runs in a chat-mode loop on `gemini-2.5-flash`. The pipeline run
 
 The queue assembly step — capability 5 — is the heart of the system. It operates on two structurally different tracks. **Exploitation**: assets that resemble past high-performers are identified by vector search, and routing is determined by a similarity-weighted plurality vote over historical `product_route` assignments. The LLM cannot override this; the historical signal governs. **Exploration**: assets that didn't match past winners are evaluated by the agent on their own merits — raw vision scores, event narrative, and image content — with a one-sentence rationale attached to each pick. *"This didn't match past winners, but captures the goalkeeper's disbelief in a way the celebration photos don't — worth your time."* This is where the agent earns its keep: judgment without a similarity crutch.
 
-We wrote **248 tests** — 206 unit tests plus scaffolding and live evals — using a three-tier model: unit tests for pure logic; scaffolding tests for prompt structure and output parsing (no LLM calls); trace-based evals for agentic behavior. The eval bar is 95% pass rate across 20 runs per capability.
+We wrote **254 tests** — 211 unit tests plus scaffolding and live evals — using a three-tier model: unit tests for pure logic; scaffolding tests for prompt structure and output parsing (no LLM calls); trace-based evals for agentic behavior. The eval bar is 95% pass rate across 20 runs per capability.
 
 ---
 
@@ -75,7 +75,7 @@ We wrote **248 tests** — 206 unit tests plus scaffolding and live evals — us
 
 ## Accomplishments that we're proud of
 
-The full nine-capability pipeline runs end-to-end — from a natural language batch submission through HITL approval to Shopify product creation — in under 60 seconds, with all 248 tests green.
+The full nine-capability pipeline runs end-to-end — from a natural language batch submission through HITL approval to Shopify product creation — in under 60 seconds, with all 254 tests green.
 
 MongoDB is load-bearing. Every capability touches Atlas — ingestion, vector search, scoring state, campaign queue, approval queue, social post queue, provenance records. Removing the MCP would not degrade the system; it would break it. That is the standard we held ourselves to, and we held it.
 

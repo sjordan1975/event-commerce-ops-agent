@@ -208,6 +208,16 @@ export async function submitDecisionsLive(
       case 'coordinator_message':
         // coordinator commentary during execution — not surfaced in execution callbacks
         break
+      case 'approval_ready': {
+        // Coordinator redrafted edit_requested items and re-suspended for a second review round
+        const p = event.payload as { approvalId: string; items: ApprovalItem[]; eventMeta?: EventMeta }
+        const items = p.items.map((item) => ({
+          ...item,
+          photoUrl: rewritePhotoUrl(item.photoUrl, apiUrl),
+        }))
+        callbacks.onApprovalReady?.(p.approvalId, items)
+        break
+      }
       case 'execution_evidence': {
         const p = event.payload as ExecutionEvidence
         const evidence: ExecutionEvidence = {

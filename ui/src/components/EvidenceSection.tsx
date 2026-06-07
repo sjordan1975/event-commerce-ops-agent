@@ -83,6 +83,7 @@ function SocialPostMock({ post, onClose }: { post: SocialPost; onClose: () => vo
           {/* Caption */}
           <p className="text-black text-sm leading-relaxed">
             <span className="font-semibold">fieldhouse</span>{' '}
+            {post.headline && <span className="font-semibold">{post.headline} </span>}
             {post.caption}
           </p>
 
@@ -253,7 +254,7 @@ function ShopifyCard({
           </span>
           {mode === 'preview' && <PreviewBadge />}
           <p className="text-sm font-semibold text-text-primary leading-snug mb-2">
-            {product.title}
+            {product.headline || product.title}
           </p>
           {mode === 'live' ? (
             <>
@@ -318,6 +319,11 @@ function SocialPostCard({ post }: { post: SocialPost }) {
 
         {/* Content */}
         <div className="flex-1 min-w-0">
+          {post.headline && (
+            <p className="text-sm font-semibold text-text-primary leading-snug mb-1">
+              {post.headline}
+            </p>
+          )}
           <p className="text-sm text-text-secondary leading-relaxed mb-1">
             {post.caption}
           </p>

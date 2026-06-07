@@ -90,6 +90,8 @@ export interface ExecutionCallbacks {
   onMockupResolved: (assetId: string, mockupUrl: string) => void
   onAtlasState: (state: AtlasState) => void
   onPipelineComplete: () => void
+  // Fired when coordinator redrafts edit_requested items and re-suspends for approval (live path only)
+  onApprovalReady?: (approvalId: string, items: ApprovalItem[]) => void
 }
 
 // Simulate capabilities 1–6 then surface the approval gate
@@ -179,6 +181,7 @@ export async function simulateExecution(
     socialPosts: fixture.execution_evidence.social_posts.map((p) => ({
       assetId: p.asset_id,
       photoUrl: p.photo_url,
+      headline: (p as { headline?: string }).headline,
       caption: p.caption,
       hashtags: p.hashtags,
       status: 'queued' as const,

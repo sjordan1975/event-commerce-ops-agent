@@ -65,6 +65,7 @@ export interface ShopifyProduct {
   assetId: string
   productId: string
   title: string
+  headline?: string
   url: string
   productType: 'poster' | 'tshirt'
   photoUrl: string
@@ -74,6 +75,7 @@ export interface ShopifyProduct {
 export interface SocialPost {
   assetId: string
   photoUrl: string
+  headline?: string
   caption: string
   hashtags: string[]
   status: 'queued'

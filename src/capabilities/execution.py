@@ -392,6 +392,7 @@ async def execute_approved_campaigns(event_id: str, tool_context: ToolContext) -
                     "product_url": shopify_result.get("product_url", ""),
                     "mockup_url": shopify_result.get("mockup_url", ""),
                     "content_url": content_url,
+                    "headline": copy.get("headline", ""),
                     "channels": {"shopify": shopify_result},
                 })
                 # mockup_url is available immediately — emit now, not deferred
@@ -440,6 +441,7 @@ async def execute_approved_campaigns(event_id: str, tool_context: ToolContext) -
             "assetId": e["asset_id"],
             "productId": e.get("product_id", ""),
             "title": _title_for_route(e.get("product_route")),
+            "headline": e.get("headline", ""),
             "url": e.get("product_url", ""),
             "productType": e.get("product_route"),
             "photoUrl": e.get("content_url", ""),
@@ -452,6 +454,7 @@ async def execute_approved_campaigns(event_id: str, tool_context: ToolContext) -
         {
             "assetId": e["asset_id"],
             "photoUrl": e.get("content_url", ""),
+            "headline": e["channels"]["social"].get("headline", ""),
             "caption": e["channels"]["social"].get("caption", ""),
             "hashtags": e["channels"]["social"].get("hashtags", []),
             "status": "queued",

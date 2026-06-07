@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Phase
 
-**Branch `ui/phase-b` (cut from `ui/phase-a`, not yet merged). All 9 capabilities complete; in demo prep. 206 unit tests green (248 total incl. evals).**
+**Branch `ui/phase-b` (cut from `ui/phase-a`, not yet merged). All 9 capabilities complete; in demo prep. 211 unit tests green (254 total incl. evals).**
 
 **Immediate next:** Cloud Run deploy, demo video. Demo reset between runs = `reset_atlas.py` (sufficient). Pre-demo close tasks in `docs/project-close-hygiene.md`. Deadline: June 11, 2026 @ 2:00 PM PDT.
 
@@ -131,6 +131,7 @@ Key decisions: MongoDB over Elastic (D-001), Google ADK v2.1 over LangGraph (D-0
 
 ### Testing (unit + scaffolding — distinct from evals)
 - **TDD for all core logic:** Pydantic models, scoring functions, prompt construction, output parsing
+- **Test error paths at every external boundary:** every place the code touches an external system (Gemini API, MongoDB MCP, Shopify, any service or storage) needs a unit test for the error path — not just the happy path. Verify the error surfaces correctly to the output layer (UI `phase: 'error'` + message, or equivalent). See `tests/test_errors.py` (`_format_pipeline_error`) for the pattern.
 - **Stub pattern:** stubs raise `NotImplementedError`; tests fail on assertions, not imports — never use `pytest.importorskip` for core modules
 - **Conftest helpers:** `build_valid_asset()`, `build_valid_campaign()`, etc. — return valid model instances for reuse across test files
 - **LLM scaffolding tests:** validate prompt structure and output parsing without live API calls; mock at the `Runner` boundary, not inside agent logic

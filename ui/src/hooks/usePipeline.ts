@@ -234,7 +234,13 @@ export function usePipeline() {
         label: 'Awaiting your review',
         resultSummary: `${approvedCount} approved · decisions submitted`,
       })
-      setPhase('executing')
+      // Live: if any edit_requested, coordinator will redraft before executing — stay in
+      // redrafting phase until onApprovalReady fires with the updated items.
+      if (hasEdits && liveSessionId) {
+        setPhase('redrafting')
+      } else {
+        setPhase('executing')
+      }
 
       const executionCallbacks = {
         onCapabilityStart: (cap: Parameters<typeof updateStep>[0]) =>
@@ -246,6 +252,12 @@ export function usePipeline() {
         onMockupResolved: (assetId: string, url: string) =>
           setMockupUrls((prev) => ({ ...prev, [assetId]: url })),
         onAtlasState: (s: import('@/lib/types').AtlasState) => setAtlasState(s),
+        onApprovalReady: (apId: string, items: import('@/lib/types').ApprovalItem[]) => {
+          setApprovalId(apId)
+          setApprovalItems(items)
+          setIsRedraftRound(true)
+          setPhase('awaiting_approval')
+        },
         onPipelineComplete: () => {
           setPhase('complete')
           sessionIdRef.current = null
