@@ -35,7 +35,7 @@ from src.models import ExecutionError, ExecutionResult
 from src.sse import get_queue
 
 # Blank shirt asset used for Gemini t-shirt mockup generation.
-_SHIRT_BASE = Path(__file__).parent.parent.parent / "spike" / "output" / "shirt_base.jpg"
+_SHIRT_BASE = Path(__file__).parent.parent / "assets" / "shirt_base.jpg"
 
 _MOCKUP_PROMPT = """\
 You are given two images:
