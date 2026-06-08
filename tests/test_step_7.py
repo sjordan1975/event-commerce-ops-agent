@@ -786,7 +786,7 @@ async def test_redraft_campaigns_increments_state():
 
 @pytest.mark.anyio
 async def test_execute_approved_campaigns_poster_route():
-    """poster route → shopify + printful channels; record_execution_result called."""
+    """poster route → shopify channel; record_execution_result called."""
     from src.capabilities.execution import execute_approved_campaigns
     from unittest.mock import MagicMock, AsyncMock, patch
 
@@ -821,7 +821,7 @@ async def test_execute_approved_campaigns_poster_route():
 
 @pytest.mark.anyio
 async def test_execute_approved_campaigns_social_route():
-    """social_only route → social channel only; no shopify/printful."""
+    """social_only route → social channel only; no shopify."""
     from src.capabilities.execution import execute_approved_campaigns
     from unittest.mock import MagicMock, AsyncMock, patch
 
@@ -945,14 +945,13 @@ async def test_mark_asset_executing():
 
 
 @pytest.mark.anyio
-async def test_record_execution_result_shopify_printful():
+async def test_record_execution_result_shopify():
     """record_execution_result writes published + published_urls and campaign executed + execution."""
     from src.db.campaigns import record_execution_result
     from src.models import ExecutionResult
 
     result = ExecutionResult(
         shopify={"product_id": "gid://1", "product_url": "https://demo.myshopify.com/products/x"},
-        printful={"task_id": "t-1", "mockup_url": "https://printful.com/mockups/x.jpg"},
         social=None,
         executed_at="2026-07-14T22:00:00Z",
     )
@@ -970,7 +969,6 @@ async def test_record_execution_result_shopify_printful():
     set_doc = calls[0].args[1]["update"]["$set"]
     assert set_doc["status"] == "published"
     assert "shopify" in set_doc["published_urls"]
-    assert "printful" in set_doc["published_urls"]
 
     # Call 1: campaigns update — status=executed + execution
     assert calls[1].args[1]["collection"] == "campaigns"

@@ -108,20 +108,20 @@ async def test_t1b_provenance_doc_linkage_and_shape():
 
     payloads_by_asset = {c[1]["update"]["$set"]["asset_id"]: c[1]["update"]["$set"] for c in perf_writes}
 
-    # ast-0: poster → shopify + printful
+    # ast-0: poster → shopify
     p0 = payloads_by_asset["ast-0"]
     assert p0["campaign_id"] == "cmp-0"
     assert p0["event_id"] == EVENT_ID
-    assert p0["channels"] == ["shopify", "printful"]
+    assert p0["channels"] == ["shopify"]
     assert p0["metrics"] is None
     assert p0["metrics_status"] == "pending_sync"
     assert p0["window_days"] == 7
     # window_start should be the executed_at from the campaign fixture
     assert p0["window_start"] == STEP8_PUBLISHED_AT
 
-    # ast-1: tshirt → shopify + printful
+    # ast-1: tshirt → shopify
     p1 = payloads_by_asset["ast-1"]
-    assert p1["channels"] == ["shopify", "printful"]
+    assert p1["channels"] == ["shopify"]
     assert p1["metrics"] is None
     assert p1["metrics_status"] == "pending_sync"
 

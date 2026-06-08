@@ -196,11 +196,10 @@ def build_valid_approved_campaign(**overrides) -> ApprovedCampaign:
 
 
 def build_valid_execution_result(**overrides) -> ExecutionResult:
-    """Return a valid ExecutionResult with realistic shopify+printful payload."""
+    """Return a valid ExecutionResult with realistic shopify payload."""
     from datetime import datetime, timezone
     base = {
         "shopify": {"product_id": "gid://shopify/Product/1", "product_url": "https://demo.myshopify.com/products/x"},
-        "printful": {"task_id": "t-1", "mockup_url": "https://printful.com/mockups/x.jpg"},
         "social": None,
         "executed_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -244,7 +243,7 @@ def build_valid_performance(**overrides) -> Performance:
         "campaign_id": "cmp-0",
         "event_id": "evt-demo-1",
         "product_route": "poster",
-        "channels": ["shopify", "printful"],
+        "channels": ["shopify"],
         "metrics": None,
         "metrics_status": "pending_sync",
         "window_days": 7,

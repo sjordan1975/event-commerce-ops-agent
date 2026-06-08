@@ -163,7 +163,7 @@ export async function simulateExecution(
   await sleep(1600, signal)
   cb.onCapabilityComplete(
     'execute_approved_campaigns',
-    `${approved} campaigns dispatched · Shopify + Printful + social`
+    `${approved} campaigns dispatched · Shopify + social`
   )
 
   // Emit evidence WITHOUT mockup URLs (they resolve async)

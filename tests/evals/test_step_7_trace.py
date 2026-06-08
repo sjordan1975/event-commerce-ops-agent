@@ -284,8 +284,8 @@ async def test_t1e_cap_counter_increments_and_refuses():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.anyio
-async def test_t1d_poster_route_produces_shopify_printful_keys():
-    """poster route → execution result carries shopify + printful keys."""
+async def test_t1d_poster_route_produces_shopify_key():
+    """poster route → execution result carries shopify key."""
     from src.capabilities.execution import execute_approved_campaigns
 
     poster_ac = build_valid_approved_campaign(
@@ -309,7 +309,6 @@ async def test_t1d_poster_route_produces_shopify_printful_keys():
     assert len(result["executed"]) == 1
     item = result["executed"][0]
     assert "shopify" in item["channels"]
-    assert "printful" in item["channels"]
     assert "social" not in item["channels"]
 
 

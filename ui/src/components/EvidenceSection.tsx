@@ -109,7 +109,7 @@ function PreviewBadge() {
   return (
     <div className="inline-flex items-center gap-1.5 font-mono text-[9px] tracking-wide uppercase px-2 py-0.5 rounded bg-status-amber-dim border border-status-amber/20 text-status-amber self-start mb-2">
       <span>⚠</span>
-      <span>Preview · live Shopify/Printful not configured</span>
+      <span>Preview · live Shopify not configured</span>
     </div>
   )
 }

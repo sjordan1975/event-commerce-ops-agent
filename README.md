@@ -115,6 +115,8 @@ All three scripts are idempotent — safe to re-run against an existing cluster.
 
 ## Run
 
+### Local development
+
 **Backend** (FastAPI + SSE, port 8000):
 
 ```bash
@@ -133,7 +135,15 @@ npm run dev
 
 Open `http://localhost:3000`. The MCP health badge in the sidebar shows the MongoDB connection lifecycle. Send a message to start a pipeline run.
 
-> **Deployed:** set `NEXT_PUBLIC_API_URL` to the backend's public URL (e.g. your DigitalOcean Droplet address). Without it the UI falls back to built-in mock data.
+### Deployed
+
+Deploy the backend (FastAPI/uvicorn) to any environment that can serve HTTP. Point the frontend at it by setting:
+
+```sh
+NEXT_PUBLIC_API_URL=https://your-backend-url
+```
+
+Without this variable the UI falls back to built-in mock data.
 
 **Demo reset** between runs:
 

@@ -880,12 +880,10 @@ def test_execution_result():
     # All channels present
     er = ExecutionResult(
         shopify={"product_id": "gid://shopify/Product/1", "product_url": "https://demo.myshopify.com/products/x"},
-        printful={"task_id": "t-1", "mockup_url": "https://printful.com/mockups/x.jpg"},
         social=None,
         executed_at="2026-07-14T22:00:00Z",
     )
     assert er.shopify is not None
-    assert er.printful is not None
     assert er.social is None
     assert er.executed_at == "2026-07-14T22:00:00Z"
 
@@ -895,7 +893,6 @@ def test_execution_result():
         executed_at="2026-07-14T22:00:00Z",
     )
     assert er_social.shopify is None
-    assert er_social.printful is None
     assert er_social.social is not None
 
     # Round-trip
@@ -970,7 +967,7 @@ def test_performance_model():
         campaign_id="cmp-0",
         event_id="evt-demo-1",
         product_route="poster",
-        channels=["shopify", "printful"],
+        channels=["shopify"],
         metrics=None,
         metrics_status="pending_sync",
         window_days=7,
@@ -1030,15 +1027,12 @@ def test_performance_metrics_model():
     # All-None round-trip
     pm_none = PerformanceMetrics()
     assert pm_none.shopify is None
-    assert pm_none.printful is None
     assert pm_none.social is None
 
     # Populated channel dicts round-trip
     pm_full = PerformanceMetrics(
         shopify={"views": 1000, "orders": 12, "revenue_usd": 420.0},
-        printful={"units_fulfilled": 10},
         social={"impressions": 5000, "saves": 200},
     )
     assert pm_full.shopify["orders"] == 12
-    assert pm_full.printful["units_fulfilled"] == 10
     assert pm_full.social["impressions"] == 5000

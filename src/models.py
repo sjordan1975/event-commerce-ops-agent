@@ -149,7 +149,7 @@ class Campaign(BaseModel):
     event_id: str
     product_type: Literal["poster", "tshirt"] | None
     generated_copy: GeneratedCopy
-    platform_target: Literal["shopify", "printful", "social"]
+    platform_target: Literal["shopify", "social"]
     timing_recommendation: str
     status: str = "draft"
     created_at: str
@@ -191,7 +191,6 @@ class ApprovedCampaign(BaseModel):
 
 class ExecutionResult(BaseModel):
     shopify: dict | None = None
-    printful: dict | None = None
     social: dict | None = None
     executed_at: str
 
@@ -209,7 +208,6 @@ class ExecutionError(BaseModel):
 # open for forward-compat with the external sync's payload shape.
 class PerformanceMetrics(BaseModel):
     shopify: dict | None = None
-    printful: dict | None = None
     social: dict | None = None
 
 

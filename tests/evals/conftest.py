@@ -940,7 +940,6 @@ def _make_step8_executed_campaign_doc(
         "execution": {
             "executed_at": STEP8_PUBLISHED_AT,
             "shopify": {"product_id": "gid://shopify/Product/1"} if product_route in ("poster", "tshirt") else None,
-            "printful": {"mockup_url": "https://printful.com/mockups/x.jpg"} if product_route in ("poster", "tshirt") else None,
             "social": {"post_url": "https://social.example/p/1"} if product_route == "social_only" else None,
         },
     }

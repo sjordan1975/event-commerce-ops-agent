@@ -171,8 +171,6 @@ async def record_execution_result(asset_id: str, campaign_id: str, result: Execu
     published_urls: dict = {}
     if result.shopify:
         published_urls["shopify"] = result.shopify.get("product_url")
-    if result.printful:
-        published_urls["printful"] = result.printful.get("mockup_url")
     if result.social:
         published_urls["social"] = result.social.get("post_url")
 

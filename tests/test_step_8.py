@@ -83,12 +83,12 @@ def _now() -> str:
 
 def test_channels_poster():
     from src.db.performance import channels_for_route
-    assert channels_for_route("poster") == ["shopify", "printful"]
+    assert channels_for_route("poster") == ["shopify"]
 
 
 def test_channels_tshirt():
     from src.db.performance import channels_for_route
-    assert channels_for_route("tshirt") == ["shopify", "printful"]
+    assert channels_for_route("tshirt") == ["shopify"]
 
 
 def test_channels_social_only():
@@ -135,7 +135,7 @@ async def test_record_performance_writes_expected_payload():
     assert payload["asset_id"] == "ast-0"
     assert payload["campaign_id"] == "cmp-0"
     assert payload["event_id"] == "evt-demo-1"
-    assert payload["channels"] == ["shopify", "printful"]
+    assert payload["channels"] == ["shopify"]
     assert payload["metrics"] is None
     assert payload["metrics_status"] == "pending_sync"
     assert payload["window_days"] == 7
@@ -166,8 +166,8 @@ async def test_record_performance_channel_breakdown_by_route():
     from src.db.performance import record_performance
 
     for route, expected_channels in [
-        ("poster", ["shopify", "printful"]),
-        ("tshirt", ["shopify", "printful"]),
+        ("poster", ["shopify"]),
+        ("tshirt", ["shopify"]),
         ("social_only", ["social"]),
         (None, ["social"]),
     ]:
@@ -489,7 +489,7 @@ async def test_record_outcomes_channels_by_route():
     from unittest.mock import MagicMock
 
     cases = [
-        ("ast-0", "cmp-0", "poster", ["shopify", "printful"]),
+        ("ast-0", "cmp-0", "poster", ["shopify"]),
         ("ast-1", "cmp-1", "social_only", ["social"]),
     ]
 

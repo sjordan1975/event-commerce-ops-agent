@@ -512,7 +512,7 @@ def generate_performance(
 ) -> dict:
     """Generate channel-split performance metrics correlated to asset scores and route.
 
-    poster/tshirt → shopify + printful metrics
+    poster/tshirt → shopify metrics
     social_only   → social metrics only
     null          → all zeros
     Window: rolling 7 days from publish time (per MVP assumptions).
@@ -522,7 +522,6 @@ def generate_performance(
     social_factor = (scores["social_score"] + scores["emotional_score"]) / 2
 
     shopify: dict = {"views": 0, "orders": 0, "revenue_usd": 0.00}
-    printful: dict = {"units_fulfilled": 0}
     social: dict = {"impressions": 0, "saves": 0}
 
     if product_route in ("poster", "tshirt"):
@@ -532,7 +531,6 @@ def generate_performance(
             "orders": orders,
             "revenue_usd": round(orders * rng.uniform(18.0, 42.0), 2),
         }
-        printful = {"units_fulfilled": max(0, orders - int(rng.uniform(0, 2)))}
     elif product_route == "social_only":
         impressions = int(social_factor * 8000 * noise)
         social = {
@@ -547,7 +545,6 @@ def generate_performance(
         "event_id": event_id,
         "metrics": {
             "shopify": shopify,
-            "printful": printful,
             "social": social,
         },
         "window_days": 7,

@@ -79,7 +79,7 @@ async def aggregate_performance_for_events(event_ids: list[str]) -> dict:
 def channels_for_route(product_route: str | None) -> list[str]:
     """Map product_route to channel list (mirrors Step 7 execution dispatch, D-030)."""
     if product_route in ("poster", "tshirt"):
-        return ["shopify", "printful"]
+        return ["shopify"]
     return ["social"]
 
 

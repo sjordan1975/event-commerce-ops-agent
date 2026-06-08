@@ -37,7 +37,7 @@ export const CAPABILITY_NOTICE_TEXTS: Record<Capability, string> = {
   propose_review_queue:      'LLM assembling strategic review queue',
   draft_campaigns_for_queue: 'Generating copy for queued assets',
   request_human_approval:    'Opening approval gate',
-  execute_approved_campaigns:'Dispatching to Shopify, Printful, social',
+  execute_approved_campaigns:'Dispatching to Shopify, social',
   record_outcomes:           'Writing provenance records to Atlas',
 }
 
