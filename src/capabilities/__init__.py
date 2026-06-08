@@ -202,8 +202,12 @@ async def _node_persist_review_queue(ctx: Any) -> dict:
             )
             ctx.state["review_queue"] = q_obj.model_dump(mode="json")
 
+            candidates = ctx.state.get("queue_candidates", {})
+            evaluated = len(candidates.get("exploitation", [])) + len(candidates.get("discovery", []))
             total = len(q_obj.exploitation) + len(q_obj.discovery)
-            queue_summary = f"{total} items staged · {len(q_obj.exploitation)} proven · {len(q_obj.discovery)} discovery"
+            filtered = evaluated - total
+            filtered_str = f" · {filtered} filtered by quality gate" if filtered > 0 else ""
+            queue_summary = f"{evaluated} evaluated · {total} staged{filtered_str} · {len(q_obj.exploitation)} proven · {len(q_obj.discovery)} discovery"
             strategy_excerpt = q_obj.strategy_summary
         except Exception:
             pass

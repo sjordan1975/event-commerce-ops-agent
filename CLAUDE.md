@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Branch `ui/phase-b` (cut from `ui/phase-a`, not yet merged). All 9 capabilities complete; in demo prep. 211 unit tests green (254 total incl. evals).**
 
-**Immediate next:** Cloud Run deploy, demo video. Demo reset between runs = `reset_atlas.py` (sufficient). Pre-demo close tasks in `docs/project-close-hygiene.md`. Deadline: June 11, 2026 @ 2:00 PM PDT.
+**Immediate next:** Deploy — backend on DigitalOcean (new clean Droplet, provisioned via DO MCP), frontend on Vercel. Then demo video. Demo reset between runs = `reset_atlas.py` (sufficient). Pre-demo close tasks in `docs/project-close-hygiene.md`. Deadline: June 11, 2026 @ 2:00 PM PDT.
 
 **Demo corpus: COMPLETE.** 39 images in `data/wc-final/` (Batch 1, France/Croatia 2018 WC Final, 19 images) and `data/wc-draw/` (Batch 2, USA/Wales 2022, 20 images). `data/` is gitignored; restore with `python scripts/prep_demo_corpus.py`. Similarity verified: `QUEUE_EXPLOITATION_SIMILARITY_CUTOFF=0.90` yields 7 exploitation (Batch 1) vs 3 (Batch 2). `QUEUE_MAX_PER_POOL=5` caps each pool post-LLM. See `docs/plans/demo-corpus.md`.
 
