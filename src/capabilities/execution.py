@@ -255,12 +255,12 @@ def _shopify_create_product(
     img_bytes = _generate_mockup_bytes(content_url, product_type)
 
     if not _has_shopify_creds():
-        # Preview mode — store locally and return stub product URL
-        api_base = os.environ.get("NEXT_PUBLIC_API_URL", "http://localhost:8000")
+        # Preview mode — store locally; return a relative path so the frontend
+        # can prepend its configured API base URL (NEXT_PUBLIC_API_URL).
         mockup_url = ""
         if img_bytes:
             store_mockup(asset_id, img_bytes)
-            mockup_url = f"{api_base}/api/mockup/{asset_id}"
+            mockup_url = f"/api/mockup/{asset_id}"
         return {
             "product_id": f"gid://shopify/Product/{campaign_id}",
             "product_url": f"https://demo.myshopify.com/products/{campaign_id}",

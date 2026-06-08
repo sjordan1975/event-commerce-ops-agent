@@ -22,6 +22,15 @@ function rewritePhotoUrl(url: string, apiUrl: string): string {
   return `${apiUrl}/api/image?path=${encodeURIComponent(url)}`
 }
 
+// Rewrite a relative mockup path to an absolute URL using the API base.
+// Absolute URLs (Shopify-hosted images) pass through unchanged.
+function rewriteMockupUrl(url: string, apiUrl: string): string {
+  if (!url || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url
+  }
+  return `${apiUrl}${url}`
+}
+
 // ---------------------------------------------------------------------------
 // SSE stream reader
 // ---------------------------------------------------------------------------
@@ -225,6 +234,7 @@ export async function submitDecisionsLive(
           shopifyProducts: p.shopifyProducts.map((sp) => ({
             ...sp,
             photoUrl: rewritePhotoUrl(sp.photoUrl, apiUrl),
+            mockupUrl: rewriteMockupUrl(sp.mockupUrl ?? '', apiUrl) || undefined,
           })),
           socialPosts: p.socialPosts.map((post) => ({
             ...post,
@@ -236,7 +246,7 @@ export async function submitDecisionsLive(
       }
       case 'mockup_resolved': {
         const p = event.payload as { assetId: string; mockupUrl: string }
-        callbacks.onMockupResolved(p.assetId, p.mockupUrl)
+        callbacks.onMockupResolved(p.assetId, rewriteMockupUrl(p.mockupUrl, apiUrl))
         break
       }
       case 'atlas_state': {
