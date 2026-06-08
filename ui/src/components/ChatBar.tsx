@@ -103,7 +103,9 @@ export function ChatBar({ messages, phase, onSend }: Props) {
             placeholder={
               canSend
                 ? 'Describe an event — Shift+Enter for new line, Enter to send'
-                : 'Pipeline running — waiting for completion...'
+                : phase === 'thinking'
+                  ? 'Thinking...'
+                  : 'Pipeline running — waiting for completion...'
             }
             className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-secondary outline-none font-sans disabled:cursor-not-allowed resize-none overflow-hidden min-h-[2rem] max-h-40 leading-relaxed py-0.5"
           />

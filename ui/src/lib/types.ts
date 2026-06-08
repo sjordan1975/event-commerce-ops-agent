@@ -114,6 +114,7 @@ export interface McpHealth {
 
 export type PipelinePhase =
   | 'idle'
+  | 'thinking'   // coordinator responding, no pipeline capability started yet
   | 'running'
   | 'awaiting_approval'
   | 'redrafting'

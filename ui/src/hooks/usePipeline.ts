@@ -142,15 +142,22 @@ export function usePipeline() {
       setErrorMessage(null)
       sessionIdRef.current = null
       setActiveEventMeta(apiUrl ? null : fixture.event)
-      setPhase('running')
+      setPhase('thinking')
 
       addMessage('operator', text)
+
+      let pipelineStarted = false
 
       const pipelineCallbacks = {
         onMessage: (role: 'coordinator' | 'operator', msg: string) => addMessage(role, msg),
         onNotice: (cap: Parameters<typeof addNotice>[0], t: string) => addNotice(cap, t),
-        onCapabilityStart: (cap: Parameters<typeof updateStep>[0]) =>
-          updateStep(cap, { status: 'running', label: '' }),
+        onCapabilityStart: (cap: Parameters<typeof updateStep>[0]) => {
+          if (!pipelineStarted) {
+            pipelineStarted = true
+            setPhase('running')
+          }
+          updateStep(cap, { status: 'running', label: '' })
+        },
         onCapabilityComplete: (
           cap: Parameters<typeof updateStep>[0],
           resultSummary: string,
@@ -170,6 +177,11 @@ export function usePipeline() {
         if (apiUrl) {
           const { sessionId } = await runPipelineLive(apiUrl, text, pipelineCallbacks, ctrl.signal)
           sessionIdRef.current = sessionId
+          // If no capability started, coordinator replied without launching the pipeline
+          // (e.g. off-topic message, clarification declined). Reset so the operator can type again.
+          if (!pipelineStarted) {
+            setPhase('idle')
+          }
         } else {
           await simulatePipeline(fixture, pipelineCallbacks, ctrl.signal)
         }
