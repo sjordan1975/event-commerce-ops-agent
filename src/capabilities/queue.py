@@ -171,7 +171,7 @@ def build_review_queue_node() -> LlmAgent:
         output_key="review_queue",
         before_model_callback=_queue_model_callback,
         generate_content_config=genai_types.GenerateContentConfig(
-            max_output_tokens=4096,
+            max_output_tokens=8192,
         ),
         description="Assemble the operator review queue (exploitation + discovery).",
     )
