@@ -53,7 +53,7 @@ Step 5 is where the agent earns its keep. It operates on two tracks:
 ## Prerequisites
 
 - Python 3.13+
-- Node.js 18+ (operator console)
+- Node.js 18+ (operator console + vendored MongoDB MCP server binary)
 - MongoDB Atlas cluster with vector search enabled
 - Google AI API key (`GOOGLE_API_KEY`)
 - Shopify Partners dev store (optional — runs in preview mode without it)
@@ -68,6 +68,12 @@ Step 5 is where the agent earns its keep. It operates on two tracks:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+```
+
+Install the vendored MongoDB MCP server binary (required by the backend — spawned as a subprocess at runtime):
+
+```bash
+cd src/api && npm install && cd ../..
 ```
 
 ### 2. Configure environment
