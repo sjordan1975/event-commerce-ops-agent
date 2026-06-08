@@ -18,7 +18,7 @@ Built for the [Google Cloud Rapid Agent Hackathon](https://rapid-agent.devpost.c
 
 An operator drops a batch of event photos and a natural-language description into the console. The agent runs nine capabilities in sequence:
 
-1. **Ingest** — record the event, bulk-insert all images into Atlas
+1. **Ingest** — record the event, create an asset document in Atlas for each image (images are referenced by URL or local path — not stored in Atlas)
 2. **Build context** — synthesize an event narrative grounded in historical performance data and player biographies
 3. **Find similar assets** — embed each image via `gemini-embedding-2` and vector-search against a corpus of past high-performing assets
 4. **Score assets** — Gemini Vision scores each frame across five commercial dimensions: quality, emotional intensity, social scroll-stop probability, merch suitability, and fan identity signal
