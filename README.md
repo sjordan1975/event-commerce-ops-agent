@@ -1,5 +1,11 @@
 # Event Commerce Ops Agent
 
+![Tests](https://github.com/sjordan1975/event-commerce-ops-agent/actions/workflows/test.yml/badge.svg)
+![Version](https://img.shields.io/github/v/tag/sjordan1975/event-commerce-ops-agent?label=version)
+![Python](https://img.shields.io/badge/python-3.13-blue)
+![TypeScript](https://img.shields.io/badge/typescript-5-blue)
+![Next.js](https://img.shields.io/badge/Next.js-15-black)
+
 > *Sports moments decay commercially, fast. The bottleneck isn't the photography — it's everything after the shutter closes.*
 
 An AI agent that triages live event media and orchestrates the full monetization pipeline — from a batch of post-match photos to published Shopify listings and a queued social post — with a human operator in the loop.
