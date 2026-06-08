@@ -42,7 +42,7 @@ Step 5 is where the agent earns its keep. It operates on two tracks:
 
 ## Try it
 
-The live demo is running at <a href="https://event-commerce-ops-agent.vercel.app/" target="_blank" rel="noopener noreferrer"><strong>https://event-commerce-ops-agent.vercel.app/ ↗</strong></a> — no installation required.
+The live demo is running at **[https://event-commerce-ops-agent.vercel.app/](https://event-commerce-ops-agent.vercel.app/)** — no installation required.
 
 Paste the following into the chat to run the full pipeline:
 
