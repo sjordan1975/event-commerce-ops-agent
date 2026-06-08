@@ -14,10 +14,9 @@
 | MCP integration | `McpToolset` (built into ADK) | Native ADK adapter; used by domain wrappers as a programmatic client (D-019) — not registered in `agent.tools` |
 | Database / state | MongoDB Atlas | Partner MCP track; all state, queues, vector search, memory |
 | Ecommerce | Shopify GraphQL Admin API | Partners dev store (free); products + draft orders |
-| Print-on-demand | Printful REST API | Async mockup generation; free account |
 | Social | Simulated | Post package written to MongoDB; no live platform API |
-| Hosting | Cloud Run | Python agent backend; listed in hackathon spec for custom backends |
-| Credentials | GCP Secret Manager | API keys for Shopify, Printful; Vertex AI uses ADC |
+| Hosting | DigitalOcean Droplet | FastAPI/uvicorn; systemd service; HTTPS via sslip.io |
+| Credentials | `.env` file on droplet | API keys for Shopify, Gemini; no Secret Manager |
 | Demo assets | Wikimedia Commons | 20–50 CC-licensed soccer/sports photos; static seed batch |
 
 ---
