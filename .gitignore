@@ -62,6 +62,7 @@ docs/*
 # AI assistant scaffolding
 CLAUDE.md
 AGENTS.md
+tracking.md
 
 # Ignore any file or folder starting with exactly one underscore anywhere in the tree
 _[!_]*
