@@ -10,14 +10,14 @@
 |-------|-----------|-------|
 | LLM | Gemini (Vertex AI) | Required by hackathon — reasoning and vision |
 | Embeddings | `gemini-embedding-2` (Vertex AI) | 3072 dimensions, multimodal (image + text) |
-| Orchestration | Google ADK v2.1 | Single `LlmAgent` composing 9 capability tools; `LongRunningFunctionTool` at the HITL gate. No `Workflow` graph — the agent loops calling tools until terminal text (see `docs/agentic-model.md`) |
+| Orchestration | Google ADK v2.1 | Coordinator `LlmAgent` (chat) over a `Workflow` graph of `FunctionNode`s; one `LlmAgent(mode='single_turn')` node for the strategic decision; `LongRunningFunctionTool` at the HITL gate (see D-024, `docs/agentic-model.md`) |
 | MCP integration | `McpToolset` (built into ADK) | Native ADK adapter; used by domain wrappers as a programmatic client (D-019) — not registered in `agent.tools` |
 | Database / state | MongoDB Atlas | Partner MCP track; all state, queues, vector search, memory |
 | Ecommerce | Shopify GraphQL Admin API | Partners dev store (free); products + draft orders |
 | Social | Simulated | Post package written to MongoDB; no live platform API |
 | Hosting | DigitalOcean Droplet | FastAPI/uvicorn; systemd service; HTTPS via sslip.io |
 | Credentials | `.env` file on droplet | API keys for Shopify, Gemini; no Secret Manager |
-| Demo assets | Wikimedia Commons | 20–50 CC-licensed soccer/sports photos; static seed batch |
+| Demo assets | Local corpus | 39 images in `data/wc-final/` + `data/wc-draw/`; restored by `scripts/prep_demo_corpus.py` |
 
 ---
 
@@ -76,11 +76,8 @@ One document per image. Central state document — touched by nearly every capab
   "published_urls": {
     "shopify": {
       "product_id": "gid://shopify/Product/8842301234",
-      "product_url": "https://demo-store.myshopify.com/products/wc2026-poster-abc"
-    },
-    "printful": {
-      "task_id": "8847291",
-      "mockup_url": "https://printful.com/mockups/rendered/poster_abc123.jpg"
+      "product_url": "https://demo-store.myshopify.com/products/wc2026-poster-abc",
+      "mockup_url": "https://demo-store.myshopify.com/cdn/mockup_abc123.jpg"
     },
     "social": {
       "status": "queued",
@@ -91,7 +88,7 @@ One document per image. Central state document — touched by nearly every capab
 }
 ```
 
-`published_urls` is populated by `execute_approved_campaigns`. Only the keys relevant to `product_route` are written — poster/tshirt assets get `shopify` + `printful`; social_only assets get `social`. The Printful `mockup_url` is the rendered product image — the primary visual artifact of the Printful integration in the demo.
+`published_urls` is populated by `execute_approved_campaigns`. Only the keys relevant to `product_route` are written — poster/tshirt assets get `shopify` (with Gemini-generated mockup URL); social_only assets get `social`.
 
 ### `campaigns`
 One document per asset-campaign pairing. Written by `draft_campaigns_for_queue`; execution fields updated by `execute_approved_campaigns`.
@@ -113,14 +110,13 @@ One document per asset-campaign pairing. Written by `draft_campaigns_for_queue`;
   "created_at": "...",
   "execution": {
     "shopify_product_id": "gid://shopify/Product/8842301234",
-    "printful_task_id": "8847291",
-    "printful_mockup_url": "https://printful.com/mockups/rendered/poster_abc123.jpg",
+    "mockup_url": "https://demo-store.myshopify.com/cdn/mockup_abc123.jpg",
     "executed_at": "2026-07-14T22:05:00Z"
   }
 }
 ```
 
-`execution` is written by `execute_approved_campaigns` when the campaign is dispatched. It is `null` until execution completes. For social_only campaigns `shopify_product_id`, `printful_task_id`, and `printful_mockup_url` are omitted. The `printful_mockup_url` is the key demo artifact — a rendered image of the product shown in the approval and execution UI.
+`execution` is written by `execute_approved_campaigns` when the campaign is dispatched. It is `null` until execution completes. For social_only campaigns `shopify_product_id` and `mockup_url` are omitted. `mockup_url` is the Gemini-generated product image — the key visual artifact shown in the approval and execution UI.
 
 ### `approvals`
 Approval queue. Written by `draft_campaigns_for_queue`; updated by the human via `request_human_approval`.
@@ -303,11 +299,11 @@ apply_approval_decisions (FunctionTool — persists the per-item decisions list)
 ```
 approvals.find            → { event_id, status: "approved", execution: null } — fetch approved, not-yet-executed
 assets.updateOne          → set status: "executing"
-[external: Shopify GraphQL, Printful REST (mockup polling = INTERNAL async loop, not a LongRunningFunctionTool)]
+[external: Gemini image gen (mockup), Shopify GraphQL (stagedUploadsCreate → productCreate → productCreateMedia)]
 assets.updateOne          → set status: "published", write platform URLs + timestamps
 campaigns.updateOne       → record execution outcome (campaign status: "executed")
 ```
-Channel selection is by `product_route` (poster/tshirt → shopify+printful; social_only → social). Failure is **retriable** (leaves `execution: null`, approval stays `approved`), not terminal. **MVP build:** the four external helpers are **stubbed at the seam** (canned payloads); live Shopify/Printful wiring is a demo-prep task (D-031). The redraft loop on `edit_requested` re-reads persisted `edit_requested` approvals and overwrites the campaign drafts (Step 7 implements it; reconciles D-030's deferral).
+Channel selection is by `product_route` (poster/tshirt → shopify+printful; social_only → social). Failure is **retriable** (leaves `execution: null`, approval stays `approved`), not terminal. **MVP build:** live Shopify wiring and Gemini mockup generation are implemented (D-036); the redraft loop on `edit_requested` re-reads persisted `edit_requested` approvals and overwrites the campaign drafts (Step 7 implements it; reconciles D-030's deferral).
 
 ### `record_outcomes` (coordinator-side; D-032)
 ```
@@ -404,8 +400,8 @@ HITL approval + execution + outcomes (capabilities 7–9) live coordinator-side,
 - **`FunctionNode(func=fn, parameter_binding='state')`** — wraps each deterministic capability. Reads parameters from `ctx.state`; writes results back to `ctx.state` for downstream nodes. The function bodies in `src/capabilities/{ingest,context,...}.py` are unchanged from pre-D-024 form.
 - **`run_event_pipeline` `FunctionTool` shim** — the coordinator dispatches the workflow by calling this tool. The shim creates a fresh `InMemorySessionService`, seeds session state with `{"images": ..., "event_metadata": ...}`, and runs a sub-`Runner(node=workflow)`. Returns the final state. `Workflow` extends `BaseNode`, not `BaseAgent`, so `AgentTool` cannot wrap it.
 - **`LongRunningFunctionTool` at `request_human_approval`** — coordinator-side, not workflow-side. Returns `None` to suspend; runner emits `long_running_tool_ids`; resumes when caller sends `FunctionResponse` with matching `id`.
-- **`McpToolset(StdioConnectionParams(...))`** — connects MongoDB MCP server (`npx mongodb-mcp-server`). Per D-019, owned by `src/db/client.py` as a programmatic client — not registered in `agent.tools`. Discovered tools are invoked by domain wrappers inside each capability via `MongoMCPClient.call(tool_name, args)`.
-- **`InMemorySessionService`** for local dev; swap to persistent session service for Cloud Run.
+- **`McpToolset(StdioConnectionParams(...))`** — connects MongoDB MCP server via the vendored binary at `src/api/node_modules/.bin/mongodb-mcp-server` (set via `MONGODB_MCP_COMMAND`; never `npx` — registry lookups block the event loop, see D-035). Per D-019, owned by `src/db/client.py` as a programmatic client — not registered in `agent.tools`. Discovered tools are invoked by domain wrappers inside each capability via `MongoMCPClient.call(tool_name, args)`.
+- **`InMemorySessionService`** for local dev and the live DigitalOcean deployment (single-instance; session stays in process memory).
 - **State persistence** via MongoDB `assets` collection — most capabilities write `status` updates so the trajectory is resumable across ADK sessions.
 - **Retry logic** internal to `execute_approved_campaigns` for Printful async mockup polling.
 - **`PreconditionError`** — wrapper-level exception with self-correcting message format. Under D-024 the graph enforces order structurally; `PreconditionError` remains as defense-in-depth for direct capability calls (e.g., from unit tests). See `docs/strategic-agent-reframe.md` § Enforced vs. emergent.
@@ -486,7 +482,7 @@ ui/                   ← Next.js operator console
 | Python API | `uvicorn src.api.server:app --reload` | 8000 | ADK coordinator, SSE stream, approval resumption |
 | Next.js | `cd ui && npm run dev` | 3000 | Operator console UI |
 
-In development, `next.config.ts` proxies all `/api/*` requests from port 3000 → port 8000 so the UI never references the backend port directly. In production on Cloud Run, the options are two separate services (recommended) or a single service that serves the Next.js static build from FastAPI.
+In development, `next.config.ts` proxies all `/api/*` requests from port 3000 → port 8000 so the UI never references the backend port directly. In production, the frontend is on Vercel and the backend on DigitalOcean; the UI is pointed at the backend via `NEXT_PUBLIC_API_URL`.
 
 ### API surface
 
@@ -529,9 +525,9 @@ pipeline_complete        { event_id }
 
 The `LongRunningFunctionTool` at `request_human_approval` suspends the coordinator runner. The runner holds an open async task; the session state is live in the session service. When the operator POSTs decisions to `/api/approvals/{approval_id}`, `session_bridge.py` calls `apply_approval_decisions` via the existing ADK pattern, which writes the per-item decisions to MongoDB and delivers a `FunctionResponse` back to the suspended runner. The runner resumes the coordinator, which reads the persisted decisions and calls `execute_approved_campaigns`.
 
-With `InMemorySessionService` this is straightforward — session is in process memory. **The demo video runs on localhost; `InMemorySessionService` is sufficient.** Batch images are pre-staged at `/tmp/wc-final/` (localhost) and referenced by that path in the operator's kickoff message. On Cloud Run, images must be pre-uploaded to GCS; the operator uses a `gs://` path instead, `ingest_event_batch` enumerates the bucket, and `content_url` stores `gs://` URIs — which Vertex AI (embeddings + Vision) reads natively without any additional auth step.
+With `InMemorySessionService` this is straightforward — session is in process memory. **The live deployment is a single-instance DigitalOcean droplet; `InMemorySessionService` is sufficient.** Batch images are pre-staged in `data/wc-final/` or `data/wc-draw/` (restored by `scripts/prep_demo_corpus.py`) and referenced by local path in the operator's kickoff message.
 
-For Cloud Run: the `LongRunningFunctionTool` suspension is a live async coroutine held inside `runner.run_async()` — it is process-local, not a checkpoint in the session service. `DatabaseSessionService` persists conversation history across restarts but does **not** solve cross-instance HITL resumption (the suspended coroutine cannot be handed to a different process). The pragmatic solution for the hackathon submission is single-instance Cloud Run (`--min-instances=1 --max-instances=1`): one process, always warm, session stays in memory. `DatabaseSessionService` (MongoDB-backed) is still worth wiring for conversation history persistence and honest architecture framing, but it does not change HITL resumption behavior. Tracked in `docs/plans/delivery-roadmap.md` § Track 4.
+The `LongRunningFunctionTool` suspension is a live async coroutine held inside `runner.run_async()` — it is process-local. Single-instance deployment means the suspended coroutine is always in the same process; HITL resumption works without cross-instance coordination.
 
 ### Phase A / Phase B
 
