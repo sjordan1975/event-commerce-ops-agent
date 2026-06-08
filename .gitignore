@@ -54,5 +54,14 @@ spike/
 # Deprecated planning docs
 deprecated/
 
+# Internal docs (keep specs/ and hackathon reference)
+docs/*
+!docs/rapid_agent_hackathon_spec.md
+!docs/specs
+
+# AI assistant scaffolding
+CLAUDE.md
+AGENTS.md
+
 # Ignore any file or folder starting with exactly one underscore anywhere in the tree
 _[!_]*
