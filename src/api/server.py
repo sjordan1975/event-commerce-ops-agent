@@ -33,9 +33,18 @@ from pydantic import BaseModel
 
 load_dotenv()
 
+# Ensure app-level logs reach stdout — uvicorn only configures its own loggers,
+# so src.* messages have no handler unless we add one to the root logger.
+_root = logging.getLogger()
+if not _root.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(levelname)-8s %(name)s: %(message)s"))
+    _root.addHandler(_h)
+    _root.setLevel(logging.WARNING)  # pipeline loggers below may override
+
 # Pipeline logging: off by default, opt-in via LOG_PIPELINE=1 in .env
 _pipeline_level = logging.INFO if os.environ.get("LOG_PIPELINE") else logging.WARNING
-for _log_name in ("src.capabilities", "src.api.server"):
+for _log_name in ("src.capabilities", "src.api.server", "src.agent"):
     logging.getLogger(_log_name).setLevel(_pipeline_level)
 
 # The ADK MCP session_context emits two warning-level log lines on every clean
