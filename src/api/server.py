@@ -26,10 +26,13 @@ from google.genai.errors import APIError
 logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 load_dotenv()
 
@@ -90,7 +93,11 @@ async def lifespan(app: FastAPI):
     await get_client().close()
 
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="Event Commerce Ops — SSE pipeline", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Allow the Next.js dev server (and any origin during demo) to call the API.
 app.add_middleware(
@@ -104,6 +111,11 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Existing endpoints
 # ---------------------------------------------------------------------------
+
+@app.get("/robots.txt", response_class=Response)
+async def robots_txt():
+    return Response(content="User-agent: *\nDisallow: /\n", media_type="text/plain")
+
 
 @app.get("/health")
 async def health() -> dict:
@@ -302,7 +314,8 @@ class PipelineRunRequest(BaseModel):
 
 
 @app.post("/api/pipeline/run")
-async def pipeline_run(body: PipelineRunRequest):
+@limiter.limit("10/hour")
+async def pipeline_run(request: Request, body: PipelineRunRequest):
     """Start coordinator Turn 1. Returns an SSE stream of pipeline events."""
     session_id = str(uuid.uuid4())
     q = create_queue(session_id)
@@ -345,7 +358,8 @@ class PipelineDecisionsRequest(BaseModel):
 
 
 @app.post("/api/pipeline/decisions")
-async def pipeline_decisions(body: PipelineDecisionsRequest):
+@limiter.limit("10/hour")
+async def pipeline_decisions(request: Request, body: PipelineDecisionsRequest):
     """Resume coordinator with operator decisions. Returns an SSE stream."""
     entry = get_session(body.session_id)
     if entry is None:
