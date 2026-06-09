@@ -406,6 +406,32 @@ async def test_capability_tolerates_missing_narrative():
     assert len(result["scored"]) == 1
 
 
+@pytest.mark.anyio
+async def test_capability_error_propagates():
+    """A vision scoring failure raises out of score_assets_with_vision."""
+    from src.capabilities.scoring import score_assets_with_vision
+
+    assets = [build_valid_asset(asset_id=f"ast-{i}", event_id="evt-001") for i in range(3)]
+    event_context = {
+        "outcome_type": "draw",
+        "final_score": "1-1",
+        "narrative_angle": "(unavailable)",
+        "key_figure_names": "(none)",
+    }
+
+    def always_fail(url, ctx):
+        raise RuntimeError("mock vision API failure")
+
+    with (
+        patch("src.capabilities.scoring.get_assets_for_event", new=AsyncMock(return_value=assets)),
+        patch("src.capabilities.scoring._build_event_context_payload", new=AsyncMock(return_value=event_context)),
+        patch("src.capabilities.scoring._score_asset_with_vision", side_effect=always_fail),
+        patch("src.capabilities.scoring.save_asset_scores", new=AsyncMock()),
+    ):
+        with pytest.raises(RuntimeError, match="mock vision API failure"):
+            await score_assets_with_vision("evt-001")
+
+
 # ---------------------------------------------------------------------------
 # T-4.10: Workflow node adapter
 # ---------------------------------------------------------------------------

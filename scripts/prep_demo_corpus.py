@@ -108,9 +108,9 @@ BATCH1_IMAGES: list[dict] = [
 
     # --- Awards / ceremony (1) ---
     {
-        "url": "https://upload.wikimedia.org/wikipedia/commons/e/e2/Luka_Modri%C4%87_receives_the_golden_ball_prize_at_the_hands_of_Russian_President_Vladimir_Putin.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/3/37/Djibril_Sidib%C3%A9_World_Cup_Trophy.jpg",
         "filename": "modric_golden_ball_award.jpg",
-        "tags": ["award_ceremony", "portrait"],
+        "tags": ["celebration", "portrait"],
         "notes": "CC-BY-SA 3.0",
     },
 

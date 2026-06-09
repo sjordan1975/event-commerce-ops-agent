@@ -53,7 +53,7 @@ France won 4–2 — a dominant victory. Match started 2018-07-15T15:00:00Z. Out
 https://upload.wikimedia.org/wikipedia/commons/2/29/Antoine_Griezmann_World_Cup_Trophy.jpg
 https://upload.wikimedia.org/wikipedia/commons/6/61/Kylian_Mbapp%C3%A9_World_Cup_Trophy.jpg
 https://upload.wikimedia.org/wikipedia/commons/1/14/France_celebrate_on_the_field_of_Luzhniki_after_the_2018_FIFA_World_Cup_Final.jpg
-https://upload.wikimedia.org/wikipedia/commons/e/e2/Luka_Modri%C4%87_receives_the_golden_ball_prize_at_the_hands_of_Russian_President_Vladimir_Putin.jpg
+https://upload.wikimedia.org/wikipedia/commons/3/37/Djibril_Sidib%C3%A9_World_Cup_Trophy.jpg
 ```
 
 The agent will ingest the images, build event context, score each asset, propose a review queue, and draft campaigns — then pause for your approval before publishing mocks.

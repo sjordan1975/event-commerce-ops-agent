@@ -532,6 +532,27 @@ async def test_find_similar_assets_call_order():
     )
 
 
+@pytest.mark.anyio
+async def test_find_similar_assets_result_order_matches_input():
+    """asyncio.gather preserves input order — result[i].asset_id must equal assets[i].asset_id."""
+    from src.capabilities.similarity import find_similar_assets
+
+    asset_ids = [f"ast-{i}" for i in range(5)]
+    assets = [_make_asset(aid) for aid in asset_ids]
+    emb = build_embedding_fixture()
+
+    with (
+        patch("src.capabilities.similarity.get_assets_for_event", new=AsyncMock(return_value=assets)),
+        patch("src.capabilities.similarity._compute_image_embedding", return_value=emb),
+        patch("src.capabilities.similarity.save_asset_embedding", new=AsyncMock()),
+        patch("src.capabilities.similarity.vector_search_assets", new=AsyncMock(return_value=[])),
+        patch("src.capabilities.similarity.save_similar_assets", new=AsyncMock()),
+    ):
+        result = await find_similar_assets("evt-current")
+
+    assert [r["asset_id"] for r in result["similar"]] == asset_ids
+
+
 # ---------------------------------------------------------------------------
 # T-3.9: _infer_route_from_neighbors
 # ---------------------------------------------------------------------------

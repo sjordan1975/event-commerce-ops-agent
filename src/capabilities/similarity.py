@@ -86,26 +86,33 @@ async def find_similar_assets(event_id: str) -> dict:
             missing={"assets": "no assets for event; call ingest_event_batch first"},
         )
 
-    # Embed-and-persist loop (idempotent — skip assets that already have an embedding)
-    for asset in assets:
-        if asset.embedding is None:
-            embedding = await asyncio.to_thread(_compute_image_embedding, asset.content_url)
-            await save_asset_embedding(asset.asset_id, embedding)
-            asset.embedding = embedding
+    sem = asyncio.Semaphore(int(os.environ.get("GEMINI_CONCURRENCY_LIMIT", "5")))
 
-    # Search + infer-route + persist loop (runs for every asset regardless of embedding source)
-    similarity_results = []
-    for asset in assets:
+    # Embed-and-persist (idempotent — skip assets that already have an embedding).
+    # All embedding calls run concurrently, bounded by the semaphore.
+    async def _embed_one(asset) -> None:
+        if asset.embedding is not None:
+            return
+        async with sem:
+            embedding = await asyncio.to_thread(_compute_image_embedding, asset.content_url)
+        await save_asset_embedding(asset.asset_id, embedding)
+        asset.embedding = embedding
+
+    await asyncio.gather(*[_embed_one(a) for a in assets])
+
+    # Search + infer-route + persist. Vector search is MongoDB (no Gemini semaphore needed).
+    async def _search_one(asset) -> dict:
         neighbors = await vector_search_assets(
             embedding=asset.embedding,
             top_k=DEFAULT_TOP_K,
             exclude_event_id=event_id,
         )
-        similarity_results.append({
+        await save_similar_assets(asset.asset_id, [n.asset_id for n in neighbors])
+        return {
             "asset_id": asset.asset_id,
             "neighbors": [n.model_dump(mode="json") for n in neighbors],
             "inferred_route": _infer_route_from_neighbors(neighbors),
-        })
-        await save_similar_assets(asset.asset_id, [n.asset_id for n in neighbors])
+        }
 
-    return {"event_id": event_id, "similar": similarity_results}
+    similarity_results = await asyncio.gather(*[_search_one(a) for a in assets])
+    return {"event_id": event_id, "similar": list(similarity_results)}

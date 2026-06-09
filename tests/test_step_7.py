@@ -923,6 +923,49 @@ async def test_execute_approved_campaigns_mark_executing_before_calls():
     assert call_order.index("mark_executing") < call_order.index("shopify")
 
 
+@pytest.mark.anyio
+async def test_execute_approved_campaigns_one_failure_does_not_block_others():
+    """A failure on one item still allows the others to execute (per-task isolation)."""
+    from src.capabilities.execution import execute_approved_campaigns
+    from unittest.mock import MagicMock, AsyncMock, patch
+
+    ac_fail = build_valid_approved_campaign(
+        approval_id="apr-fail",
+        campaign=build_valid_campaign(campaign_id="cmp-fail", asset_id="a-fail"),
+        asset_id="a-fail",
+        product_route="poster",
+    )
+    ac_ok = build_valid_approved_campaign(
+        approval_id="apr-ok",
+        campaign=build_valid_campaign(campaign_id="cmp-ok", asset_id="a-ok"),
+        asset_id="a-ok",
+        product_route="poster",
+    )
+
+    def shopify_side_effect(campaign_id, asset_id, *args, **kwargs):
+        if asset_id == "a-fail":
+            raise Exception("mockup generation failed")
+        return {"product_id": "gid://1", "product_url": "https://demo.myshopify.com/p/1", "mockup_url": ""}
+
+    tool_context = MagicMock()
+    tool_context.state = {}
+    tool_context.actions = MagicMock()
+
+    with (
+        patch("src.capabilities.execution.get_approved_campaigns", new_callable=AsyncMock, return_value=[ac_fail, ac_ok]),
+        patch("src.capabilities.execution.get_assets_by_ids", new_callable=AsyncMock, return_value=[]),
+        patch("src.capabilities.execution.mark_asset_executing", new_callable=AsyncMock),
+        patch("src.capabilities.execution._shopify_create_product", side_effect=shopify_side_effect),
+        patch("src.capabilities.execution.record_execution_result", new_callable=AsyncMock),
+        patch("src.capabilities.execution.record_execution_failure", new_callable=AsyncMock),
+    ):
+        result = await execute_approved_campaigns("evt-demo-1", tool_context)
+
+    assert len(result["executed"]) == 1
+    assert len(result["failed"]) == 1
+    assert result["executed"][0]["campaign_id"] == "cmp-ok"
+    assert result["failed"][0]["campaign_id"] == "cmp-fail"
+
 
 @pytest.mark.anyio
 async def test_mark_asset_executing():
