@@ -280,7 +280,8 @@ async def _run_coordinator_turn(
     logger.info("coordinator_turn start  session=%s msg=%r", session_id[:8], preview)
     t0 = time.perf_counter()
     trigger = genai_types.Content(role="user", parts=[genai_types.Part(text=message)])
-    try:
+
+    async def _attempt() -> None:
         async for event in runner.run_async(
             user_id=_OPERATOR_USER_ID,
             session_id=adk_session_id,
@@ -297,6 +298,16 @@ async def _run_coordinator_turn(
                         "type": "coordinator_message",
                         "payload": {"role": "coordinator", "text": text.strip()},
                     })
+
+    try:
+        try:
+            await _attempt()
+        except APIError as exc:
+            if getattr(exc, "code", None) == 503:
+                logger.warning("coordinator_turn retry  session=%s (503 — retrying once)", session_id[:8])
+                await _attempt()
+            else:
+                raise
         logger.info("coordinator_turn done   session=%s latency=%.1fs", session_id[:8], time.perf_counter() - t0)
     except Exception as exc:
         logger.warning("coordinator_turn error session=%s: %s", session_id[:8], exc)

@@ -365,7 +365,11 @@ async def execute_approved_campaigns(event_id: str, tool_context: ToolContext) -
     executed: list[dict] = []
     failed: list[dict] = []
 
-    for ac in approved:
+    # Semaphore guards the Gemini image-gen + Shopify I/O block per item.
+    # Image gen is slower than text calls — keep concurrency low.
+    sem = asyncio.Semaphore(int(os.environ.get("GEMINI_IMAGE_CONCURRENCY", "2")))
+
+    async def _execute_one(ac) -> None:
         await mark_asset_executing(ac.asset_id)
         campaign_id = ac.campaign.campaign_id
         copy = ac.campaign.generated_copy.model_dump(mode="json")
@@ -374,10 +378,11 @@ async def execute_approved_campaigns(event_id: str, tool_context: ToolContext) -
 
         try:
             if ac.product_route in ("poster", "tshirt"):
-                shopify_result = await asyncio.to_thread(
-                    _shopify_create_product,
-                    campaign_id, ac.asset_id, copy, content_url, ac.product_route or "poster",
-                )
+                async with sem:
+                    shopify_result = await asyncio.to_thread(
+                        _shopify_create_product,
+                        campaign_id, ac.asset_id, copy, content_url, ac.product_route or "poster",
+                    )
                 result = ExecutionResult(
                     shopify=shopify_result,
                     printful=None,
@@ -429,6 +434,8 @@ async def execute_approved_campaigns(event_id: str, tool_context: ToolContext) -
             )
             await record_execution_failure(ac.asset_id, campaign_id, error)
             failed.append({"campaign_id": campaign_id, "asset_id": ac.asset_id, "error": str(exc)})
+
+    await asyncio.gather(*[_execute_one(ac) for ac in approved])
 
     n_exec = len(executed)
     _emit("capability_completed", {

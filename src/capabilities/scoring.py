@@ -102,13 +102,18 @@ async def score_assets_with_vision(event_id: str) -> dict:
 
     event_context = await _build_event_context_payload(event_id)
 
-    for asset in assets:
+    sem = asyncio.Semaphore(int(os.environ.get("GEMINI_CONCURRENCY_LIMIT", "5")))
+
+    async def _score_one(asset) -> None:
         if asset.scores is not None:
-            continue
-        output = await asyncio.to_thread(_score_asset_with_vision, asset.content_url, event_context)
+            return
+        async with sem:
+            output = await asyncio.to_thread(_score_asset_with_vision, asset.content_url, event_context)
         await save_asset_scores(asset.asset_id, output.scores, output.detected_subjects)
         asset.scores = output.scores
         asset.detected_subjects = output.detected_subjects
+
+    await asyncio.gather(*[_score_one(a) for a in assets])
 
     return {
         "event_id": event_id,
