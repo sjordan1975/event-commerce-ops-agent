@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "realtime-event-commerce-ops-agent"
-version = "1.3.0"
+version = "1.3.1"
 requires-python = ">=3.13"
 dependencies = [
     "google-adk==2.1.0",
