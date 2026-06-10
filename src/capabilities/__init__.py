@@ -173,7 +173,7 @@ async def _node_prepare_queue_candidates(ctx: Any) -> dict:
     n_disc = len(candidates.get("discovery", []))
     _sse_emit(ctx, "capability_completed", {
         "capability": "prepare_queue_candidates",
-        "resultSummary": f"{n_exploit} exploitation · {n_disc} discovery candidates",
+        "resultSummary": f"{n_exploit} proven · {n_disc} discovery candidates",
     })
     # Anticipatory: the LlmAgent propose_review_queue node runs next — no hook point there.
     logger.info("propose_review_queue start  exploit=%d discovery=%d", n_exploit, n_disc)
