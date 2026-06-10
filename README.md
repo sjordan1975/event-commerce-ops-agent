@@ -200,7 +200,7 @@ python scripts/reset_atlas.py
 .venv/bin/python -m pytest tests/ --ignore=tests/evals -q
 ```
 
-211 unit tests + scaffolding tests. Live evals (against real Atlas and Gemini) live under `tests/evals/` and are excluded by default.
+Live evals (against real Atlas and Gemini) live under `tests/evals/` and are excluded by default.
 
 ---
 
