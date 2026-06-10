@@ -378,10 +378,14 @@ async def execute_approved_campaigns(event_id: str, tool_context: ToolContext) -
 
         try:
             if ac.product_route in ("poster", "tshirt"):
+                _timeout = float(os.environ.get("MOCKUP_TIMEOUT", "120"))
                 async with sem:
-                    shopify_result = await asyncio.to_thread(
-                        _shopify_create_product,
-                        campaign_id, ac.asset_id, copy, content_url, ac.product_route or "poster",
+                    shopify_result = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            _shopify_create_product,
+                            campaign_id, ac.asset_id, copy, content_url, ac.product_route or "poster",
+                        ),
+                        timeout=_timeout,
                     )
                 result = ExecutionResult(
                     shopify=shopify_result,
