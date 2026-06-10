@@ -48,7 +48,8 @@ Paste the following into the chat to run the full pipeline:
 
 ```text
 France vs Croatia, 2018 FIFA World Cup Final.
-France won 4–2 — a dominant victory. Match started 2018-07-15T15:00:00Z. 
+France won 4–2 — a dominant victory. 
+Match started 2018-07-15T15:00:00Z. 
 Outcome: expected win.
 
 https://upload.wikimedia.org/wikipedia/commons/2/29/Antoine_Griezmann_World_Cup_Trophy.jpg
