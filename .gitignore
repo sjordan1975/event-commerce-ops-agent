@@ -66,3 +66,4 @@ tracking.md
 
 # Ignore any file or folder starting with exactly one underscore anywhere in the tree
 _[!_]*
+.grepai/

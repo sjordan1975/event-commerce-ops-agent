@@ -40,28 +40,6 @@ Step 5 is where the agent earns its keep. It operates on two tracks:
 
 ---
 
-## Try it
-
-The live demo is running at **[https://event-commerce-ops-agent.vercel.app/](https://event-commerce-ops-agent.vercel.app/)** — no installation required.
-
-Paste the following into the chat to run the full pipeline:
-
-```text
-France vs Croatia, 2018 FIFA World Cup Final.
-France won 4–2 — a dominant victory. 
-Match started 2018-07-15T15:00:00Z. 
-Outcome: expected win.
-
-https://upload.wikimedia.org/wikipedia/commons/2/29/Antoine_Griezmann_World_Cup_Trophy.jpg
-https://upload.wikimedia.org/wikipedia/commons/6/61/Kylian_Mbapp%C3%A9_World_Cup_Trophy.jpg
-https://upload.wikimedia.org/wikipedia/commons/1/14/France_celebrate_on_the_field_of_Luzhniki_after_the_2018_FIFA_World_Cup_Final.jpg
-https://upload.wikimedia.org/wikipedia/commons/3/37/Djibril_Sidib%C3%A9_World_Cup_Trophy.jpg
-```
-
-The agent will ingest the images, build event context, score each asset, propose a review queue, and draft campaigns — then pause for your approval before publishing mocks.
-
----
-
 ## Tech stack
 
 | Layer | Technology |
